@@ -1,0 +1,299 @@
+# Objects (나머지)
+🗡️|단검,칼,무기|dagger,knife,weapon
+⚔️|대결,전투,충돌,경쟁,싸움|crossed swords,battle,fight,conflict,versus
+💣|폭탄,위험,터짐,시한폭탄,장애|bomb,danger,explode,time bomb,breaking
+🪃|부메랑,되돌아옴,반복|boomerang,come back,return
+🏹|활,화살,목표,궁수자리|bow and arrow,archery,target,sagittarius
+🛡️|방패,보안,방어,보호,안전|shield,security,defense,protection,safe
+🪚|톱,목공,자르기|carpentry saw,saw,cut,woodwork
+🔧|렌치,설정,수리,고치기,유지보수,스패너|wrench,settings,fix,repair,maintenance,configure
+🪛|드라이버,수리,조립|screwdriver,repair,assemble
+🔩|볼트,너트,부품,세부사항|nut and bolt,parts,hardware,details
+⚙️|설정,톱니바퀴,환경설정,옵션,시스템,기어,구성|settings,gear,config,configuration,options,system,preferences
+🗜️|압축,압축기,클램프,압박|clamp,compress,compression,squeeze
+⚖️|저울,균형,법,비교,공정,판단|balance scale,justice,law,compare,fair,tradeoff
+🦯|지팡이,시각장애,접근성|white cane,blind,accessibility
+🔗|링크,연결,URL,하이퍼링크,연동|link,url,hyperlink,connection,chain
+⛓️|쇠사슬,체인,연결,구속,의존성|chains,chain,linked,dependency,locked
+🪝|갈고리,훅,후킹,웹훅|hook,webhook,hooking
+🧰|공구함,도구,툴킷,유틸리티|toolbox,tools,toolkit,utilities
+🧲|자석,끌어당김,매력,유입|magnet,attraction,attract,lead
+🪜|사다리,단계,승진,성장|ladder,steps,climb,promotion
+⚗️|증류기,화학,실험,연금술|alembic,chemistry,experiment,alchemy
+🧪|실험,시험관,테스트,화학,연구,베타|test tube,experiment,test,chemistry,lab,beta,testing
+🧫|배양,페트리접시,생물학,실험|petri dish,culture,biology,lab
+🧬|DNA,유전자,생물학,유전,진화|dna,gene,genetics,biology,evolution
+🔬|현미경,연구,분석,조사,과학,디테일|microscope,research,analysis,science,detail,investigate
+🔭|망원경,천문,관측,비전,장기계획|telescope,astronomy,vision,long-term,observe
+📡|안테나,위성,통신,신호,전송,API|satellite antenna,antenna,signal,broadcast,communication,api
+💉|주사,백신,접종,병원|syringe,vaccine,shot,injection
+🩸|피,헌혈,혈액|drop of blood,blood,donation
+💊|약,알약,복용,처방,해결책|pill,medicine,drug,prescription,remedy
+🩹|반창고,상처,임시수정,패치,응급처치|adhesive bandage,bandage,patch,quick fix,band-aid
+🩼|목발,부상|crutch,injury
+🩺|청진기,진단,건강검진,의사,헬스체크|stethoscope,diagnosis,checkup,doctor,health check
+🩻|엑스레이,뼈,검사,투시|x-ray,scan,bones
+🚪|문,출입,입구,출구,퇴장,나가기|door,entrance,exit,leave
+🛗|엘리베이터,승강기|elevator,lift
+🪞|거울,회고,반성,미러링|mirror,reflection,retrospective,mirroring
+🪟|창문,윈도우,윈도우즈|window,windows
+🛏️|침대,잠,호텔,휴식|bed,sleep,hotel,rest
+🛋️|소파,거실,휴식,인테리어|couch and lamp,sofa,living room,relax
+🪑|의자,자리,좌석|chair,seat
+🚽|화장실,변기|toilet,restroom,wc
+🪠|뚫어뻥,막힘해결|plunger,unclog
+🚿|샤워,씻기|shower,wash
+🛁|욕조,목욕,반신욕|bathtub,bath
+🪤|쥐덫,함정,트랩|mouse trap,trap
+🪒|면도,면도기|razor,shave
+🧴|로션,선크림,화장품|lotion bottle,lotion,sunscreen
+🧷|옷핀,고정,안전핀|safety pin,pin
+🧹|빗자루,청소,정리,리팩토링,클린업|broom,cleaning,clean up,cleanup,refactor,sweep
+🧺|바구니,빨래,장바구니|basket,laundry,picnic
+🧻|휴지,화장지,두루마리|roll of paper,toilet paper,tissue
+🪣|양동이,버킷,물통|bucket,pail,s3 bucket
+🧼|비누,세척,손씻기,깨끗|soap,clean,wash hands
+🫧|거품,비누방울,버블|bubbles,soap,bubble
+🪥|칫솔,양치|toothbrush,brush teeth
+🧽|스펀지,설거지,청소|sponge,cleaning,dishes
+🧯|소화기,화재,긴급대응,진화,핫픽스|fire extinguisher,fire,firefighting,incident response,hotfix
+🛒|쇼핑카트,장보기,장바구니,구매,쇼핑|shopping cart,cart,shopping,purchase,groceries
+🚬|담배,흡연|cigarette,smoking
+⚰️|관,죽음,장례,종료,폐기|coffin,death,funeral,deprecated
+🪦|묘비,무덤,종료,지원종료,RIP,폐기|headstone,grave,rip,end of life,deprecated,dead
+⚱️|유골함,장례|funeral urn,urn
+🧿|나자르,부적,악마의눈,행운|nazar amulet,evil eye,charm,luck
+🪬|함사,부적,보호|hamsa,amulet,protection
+🗿|모아이,석상,무표정,굳음|moai,statue,stone face,deadpan
+🪧|팻말,공지,피켓,시위,안내판|placard,sign,notice,protest
+🪪|신분증,ID카드,사원증,인증,신원|identification card,id card,badge,identity,id
+# Symbols
+🏧|ATM,현금인출기,은행|atm,cash machine,bank
+🚮|쓰레기통,분리수거,버리기|litter in bin sign,trash,dispose
+🚰|식수,음수대,물|potable water,drinking water,water
+♿|휠체어,장애인,접근성,배리어프리|wheelchair symbol,accessibility,a11y,accessible
+🚹|남자화장실,남성|mens room,men
+🚺|여자화장실,여성|womens room,women
+🚻|화장실,공용화장실|restroom,toilet
+🚼|수유실,아기,기저귀|baby symbol,baby,nursery
+🚾|화장실,WC|water closet,wc,toilet
+🛂|출입국심사,여권,입국심사|passport control,passport,immigration
+🛃|세관,통관|customs
+🛄|수하물,짐찾기|baggage claim,luggage
+🛅|물품보관소,짐보관|left luggage,locker
+⚠️|경고,주의,위험,조심,문제,이슈,알림|warning,caution,danger,alert,attention,issue,careful
+🚸|어린이보호,스쿨존,주의|children crossing,school zone,caution
+⛔|진입금지,금지,차단,불가,제한|no entry,forbidden,blocked,denied,restricted
+🚫|금지,불가,안됨,차단,거부,취소|prohibited,forbidden,not allowed,banned,blocked,cancel
+🚳|자전거금지|no bicycles
+🚭|금연,흡연금지|no smoking
+🚯|쓰레기투기금지|no littering
+🚱|식수아님,마시지마세요|non-potable water
+🚷|보행자금지,통행금지|no pedestrians
+📵|휴대폰금지,폰금지,디지털디톡스|no mobile phones,no phones,digital detox
+🔞|19금,성인,미성년자불가|no one under eighteen,adult,18+,nsfw
+☢️|방사능,위험,핵,유해|radioactive,danger,nuclear,toxic
+☣️|생물학적위험,위험,유해|biohazard,danger,toxic
+⬆️|위,위쪽,업,상승,올리기,업로드|up arrow,up,increase,upload,raise
+↗️|오른쪽위,상승,증가,외부링크|up-right arrow,increase,external link
+➡️|오른쪽,다음,진행,이동,결과|right arrow,next,forward,go,result
+↘️|오른쪽아래,하락,감소|down-right arrow,decrease
+⬇️|아래,아래쪽,다운,하락,다운로드|down arrow,down,decrease,download
+↙️|왼쪽아래|down-left arrow
+⬅️|왼쪽,이전,뒤로,돌아가기|left arrow,back,previous,return
+↖️|왼쪽위|up-left arrow
+↕️|위아래,세로,정렬|up-down arrow,vertical,sort
+↔️|좌우,가로,양방향,교환,비교|left-right arrow,horizontal,bidirectional,swap,compare
+↩️|되돌리기,답장,뒤로,실행취소,롤백|right arrow curving left,undo,reply,return,rollback
+↪️|다시실행,전달,포워드|left arrow curving right,redo,forward
+⤴️|위로,올라감|right arrow curving up,up
+⤵️|아래로,내려감|right arrow curving down,down
+🔃|새로고침,동기화,순환|clockwise arrows,refresh,reload,sync
+🔄|새로고침,동기화,갱신,업데이트,반복,재시도|counterclockwise arrows,refresh,sync,update,retry,repeat,reload
+🔙|뒤로,돌아가기,이전|back arrow,back,return
+🔚|끝,종료,완료,마지막|end arrow,end,finish
+🔛|켜짐,온,활성화|on arrow,on,enabled
+🔜|곧,예정,다가옴,근일|soon arrow,soon,coming soon,upcoming
+🔝|최상위,위로,탑,맨위|top arrow,top,best
+🛐|예배,기도|place of worship,worship,pray
+⚛️|원자,과학,물리,리액트|atom symbol,atom,science,physics,react
+🕉️|옴,힌두|om,hinduism
+✡️|다윗의별,유대교|star of david,judaism
+☸️|법륜,불교|wheel of dharma,buddhism
+☯️|음양,균형,조화,도교|yin yang,balance,harmony,tao
+✝️|십자가,기독교,천주교|latin cross,cross,christian
+☦️|정교회,십자가|orthodox cross,cross
+☪️|이슬람,초승달과별|star and crescent,islam
+☮️|평화,피스|peace symbol,peace
+🕎|메노라,하누카|menorah,hanukkah
+🔯|육각별,별|dotted six-pointed star,star
+🪯|칸다,시크교|khanda,sikhism
+♈|양자리,별자리|aries,zodiac
+♉|황소자리,별자리|taurus,zodiac
+♊|쌍둥이자리,별자리|gemini,zodiac
+♋|게자리,별자리|cancer,zodiac
+♌|사자자리,별자리|leo,zodiac
+♍|처녀자리,별자리|virgo,zodiac
+♎|천칭자리,별자리|libra,zodiac
+♏|전갈자리,별자리|scorpio,zodiac
+♐|사수자리,궁수자리,별자리|sagittarius,zodiac
+♑|염소자리,별자리|capricorn,zodiac
+♒|물병자리,별자리|aquarius,zodiac
+♓|물고기자리,별자리|pisces,zodiac
+⛎|뱀주인자리,별자리|ophiuchus,zodiac
+🔀|셔플,랜덤,섞기,무작위,브랜치,병합|shuffle,random,mix,branch,merge
+🔁|반복,루프,재시도,순환|repeat,loop,retry,cycle
+🔂|한곡반복,반복,1회반복|repeat single,repeat one
+▶️|재생,시작,실행,플레이,진행|play,start,run,go,execute
+⏩|빨리감기,빠르게,가속,건너뛰기|fast-forward,fast,skip,speed up
+⏭️|다음,건너뛰기,스킵,다음단계|next track,next,skip
+⏯️|재생일시정지,토글|play or pause,toggle
+◀️|되돌리기,뒤로,역방향|reverse,back
+⏪|되감기,빠른되감기|fast reverse,rewind
+⏮️|이전,처음으로|last track,previous
+🔼|위로,올리기,증가|upwards button,up,increase
+⏫|빠르게올리기,최상위,우선순위높음|fast up,top,high priority
+🔽|아래로,내리기,감소,펼치기|downwards button,down,decrease,dropdown
+⏬|빠르게내리기,최하위,우선순위낮음|fast down,bottom,low priority
+⏸️|보류,일시정지,대기,중단,홀드,멈춤|pause,on hold,hold,paused,waiting,suspend
+⏹️|정지,중지,종료,스톱|stop,halt,end
+⏺️|녹화,녹음,기록|record,recording
+⏏️|꺼내기,추출|eject
+🎦|영화관,극장,상영|cinema,movie theater
+🔅|밝기낮춤,어둡게|dim button,dim,brightness down
+🔆|밝기높임,밝게|bright button,bright,brightness up
+📶|신호,와이파이,수신,안테나,네트워크|antenna bars,signal,wifi,reception,network
+🛜|와이파이,무선,인터넷,네트워크|wireless,wifi,internet,network
+📳|진동,진동모드,무음|vibration mode,vibrate
+📴|폰끄기,전원끄기,오프라인|mobile phone off,off,offline
+♀️|여성,여자,여성기호|female sign,female,woman
+♂️|남성,남자,남성기호|male sign,male,man
+⚧️|트랜스젠더|transgender symbol,transgender
+✖️|곱하기,곱셈,닫기,삭제|multiply,times,close,remove
+➕|추가,더하기,플러스,신규,새로만들기|plus,add,new,create,addition
+➖|빼기,마이너스,제거,감소|minus,subtract,remove,decrease
+➗|나누기,나눗셈|divide,division
+🟰|같음,등호,동일|heavy equals sign,equals,equal
+♾️|무한,영원,무제한,끝없음,루프|infinity,forever,unlimited,endless,loop
+‼️|강조,중요,느낌표,주목|double exclamation,important,emphasis,attention
+⁉️|뭐라고,놀람,의문,황당|exclamation question mark,what,surprise,wtf
+❓|질문,물음표,궁금,문의,모름,의문,FAQ|question,question mark,ask,unknown,faq,help,inquiry
+❔|질문,물음표|white question mark,question
+❕|느낌표,주의|white exclamation mark,exclamation
+❗|중요,주의,느낌표,강조,필독,긴급|exclamation,important,attention,urgent,must read,alert
+〰️|물결,대시,흐지부지|wavy dash,wave
+💱|환전,환율,외환|currency exchange,exchange rate,forex
+💲|달러,돈,가격,비용,유료|heavy dollar sign,dollar,money,price,cost,paid
+⚕️|의학,의료,건강,병원|medical symbol,medicine,health,healthcare
+♻️|재활용,재사용,순환,리사이클,친환경|recycling,recycle,reuse,eco,sustainable
+⚜️|백합문장,장식|fleur-de-lis,decoration
+🔱|삼지창,포세이돈|trident,poseidon
+📛|이름표,명찰,사원증|name badge,name tag,badge
+🔰|초보,초보자,입문,신입,새싹|japanese symbol for beginner,beginner,newbie,novice,starter
+⭕|정답,동그라미,맞음,가능,OK|hollow red circle,correct,ok,circle,yes
+✅|완료,체크,확인,성공,끝,승인,통과,해결|check mark button,done,complete,check,success,approved,pass,resolved
+☑️|체크박스,체크,할일,선택|check box with check,checkbox,check,todo
+✔️|체크,완료,확인,맞음|check mark,check,done,correct,ok
+❌|실패,엑스,취소,틀림,오류,거절,삭제|cross mark,fail,cancel,wrong,error,no,reject,delete
+❎|엑스,취소,불가,제외|cross mark button,cancel,no,exclude
+➰|고리,루프,꼬임|curly loop,loop
+➿|이중고리,루프|double curly loop,loop
+〽️|부분교체|part alternation mark
+✳️|별표,강조,주석,애스터리스크|eight-spoked asterisk,asterisk,note
+✴️|별,팔각별|eight-pointed star,star
+❇️|반짝임,새로움,빛남|sparkle,new,shine
+©️|저작권,카피라이트,라이선스|copyright,license
+®️|등록상표,상표|registered,trademark
+™️|상표,트레이드마크,브랜드|trade mark,trademark,brand
+🔠|대문자,영문,알파벳|input latin uppercase,uppercase,capital letters
+🔡|소문자,영문,알파벳|input latin lowercase,lowercase
+🔢|숫자,번호,수치|input numbers,numbers,1234
+🔣|기호,특수문자|input symbols,symbols,special characters
+🔤|알파벳,ABC,영어,문자|input latin letters,abc,alphabet,letters,english
+🅰️|A형,에이,혈액형|a button,blood type a,a
+🆎|AB형,에이비,혈액형|ab button,blood type ab
+🅱️|B형,비,혈액형|b button,blood type b,b
+🆑|CL,지우기,클리어|cl button,clear
+🆒|쿨,멋짐,COOL|cool button,cool
+🆓|무료,공짜,프리,FREE|free button,free,no charge
+ℹ️|정보,안내,인포,참고,도움말|information,info,about,help,note
+🆔|아이디,ID,신원,계정|id button,id,identity,account
+Ⓜ️|M,엠,메트로|circled m,metro
+🆕|새로운,신규,뉴,NEW,새기능,추가|new button,new,fresh,feature,added
+🆖|NG,안좋음,실패|ng button,no good,fail
+🅾️|O형,오,혈액형|o button,blood type o
+🆗|OK,오케이,확인,좋아|ok button,ok,okay,fine
+🅿️|주차,주차장,P|p button,parking
+🆘|SOS,도움,구조,긴급,살려줘|sos button,help,emergency,rescue
+🆙|업,업데이트,레벨업,상승|up button,up,update,level up
+🆚|대,VS,비교,대결|vs button,versus,compare,vs
+🈁|여기,코코|japanese here button,here
+🈂️|서비스요금|japanese service charge button
+🈷️|월,월정액,매월|japanese monthly amount button,monthly
+🈶|유료,있음|japanese not free of charge button,paid
+🈯|예약,지정,예약석|japanese reserved button,reserved
+🉐|득,이득,할인,특가|japanese bargain button,bargain,deal
+🈹|할인,세일,나눔|japanese discount button,discount,sale
+🈚|무료,없음|japanese free of charge button,free
+🈲|금지,금함|japanese prohibited button,prohibited
+🉑|가능,허용,합격|japanese acceptable button,acceptable,ok
+🈸|신청,접수,지원|japanese application button,application,apply
+🈴|합격,통과,합의|japanese passing grade button,pass,passing grade
+🈳|빈자리,공석,빈방|japanese vacancy button,vacancy,empty
+㊗️|축하,경축|japanese congratulations button,congratulations
+㊙️|비밀,기밀,대외비,보안|japanese secret button,secret,confidential
+🈺|영업중,오픈|japanese open for business button,open
+🈵|만석,만원,매진,꽉참|japanese no vacancy button,full,sold out
+🔴|빨강,빨간원,라이브,녹화,중요,긴급,녹음중|red circle,red,live,recording,critical,urgent
+🟠|주황,주황원,경고,중간|orange circle,orange,warning,medium
+🟡|노랑,노란원,주의,대기,보류,진행중|yellow circle,yellow,caution,pending,in progress
+🟢|초록,녹색원,정상,완료,온라인,가능,진행|green circle,green,ok,online,go,healthy,done
+🔵|파랑,파란원,정보|blue circle,blue,info
+🟣|보라,보라원|purple circle,purple
+🟤|갈색,갈색원|brown circle,brown
+⚫|검정,검은원|black circle,black
+⚪|흰색,흰원,빈칸|white circle,white,empty
+🟥|빨간사각형,빨강|red square,red
+🟧|주황사각형,주황|orange square,orange
+🟨|노란사각형,노랑|yellow square,yellow
+🟩|초록사각형,녹색,초록|green square,green
+🟦|파란사각형,파랑|blue square,blue
+🟪|보라사각형,보라|purple square,purple
+🟫|갈색사각형,갈색|brown square,brown
+⬛|검은사각형,검정,블록|black large square,black,block
+⬜|흰사각형,흰색,빈칸,체크박스|white large square,white,empty,checkbox
+◼️|검은사각형,중간|black medium square,square
+◻️|흰사각형,중간|white medium square,square
+◾|검은사각형,작은|black medium-small square,square
+◽|흰사각형,작은|white medium-small square,square
+▪️|검은사각형,글머리,불릿|black small square,bullet
+▫️|흰사각형,글머리,불릿|white small square,bullet
+🔶|주황마름모,다이아몬드|large orange diamond,diamond,orange
+🔷|파란마름모,다이아몬드|large blue diamond,diamond,blue
+🔸|작은주황마름모,글머리|small orange diamond,bullet
+🔹|작은파란마름모,글머리,불릿|small blue diamond,bullet
+🔺|빨간삼각형,위,증가,상승|red triangle pointed up,up,increase
+🔻|빨간삼각형,아래,감소,하락|red triangle pointed down,down,decrease
+💠|다이아몬드,꽃무늬,장식|diamond with a dot,diamond,decoration
+🔘|라디오버튼,선택,버튼|radio button,option,select
+🔳|사각버튼,버튼|white square button,button
+🔲|사각버튼,버튼|black square button,button
+# Flags
+🏁|결승,완주,마감,끝,레이스,완료|chequered flag,finish,finish line,race,done,complete
+🚩|깃발,위험신호,문제,레드플래그,표시|triangular flag,red flag,warning sign,flag,milestone
+🎌|일본,국기,축제|crossed flags,japan,celebration
+🏴|검은깃발,해적|black flag
+🏳️|흰깃발,항복,포기|white flag,surrender,give up
+🏳️‍🌈|무지개깃발,프라이드,성소수자,LGBT|rainbow flag,pride,lgbt
+🏳️‍⚧️|트랜스젠더깃발|transgender flag
+🏴‍☠️|해적깃발,해적,해킹|pirate flag,pirate,jolly roger
+🇰🇷|한국,대한민국,코리아,우리나라|korea,south korea
+🇺🇸|미국,USA,아메리카|usa,united states,america
+🇯🇵|일본|japan
+🇨🇳|중국|china
+🇬🇧|영국,잉글랜드|uk,britain,england
+🇩🇪|독일|germany
+🇫🇷|프랑스|france
+🇪🇺|유럽연합,유럽,EU|eu,europe
+🇺🇳|유엔,국제연합|un,united nations
+🇰🇵|북한|north korea

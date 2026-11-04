@@ -1,0 +1,129 @@
+# Food & Drink
+🍇|포도,과일,와인|grapes,fruit,wine
+🍈|멜론,과일|melon,fruit
+🍉|수박,여름,과일|watermelon,summer,fruit
+🍊|귤,오렌지,감귤,과일|tangerine,orange,citrus,fruit
+🍋|레몬,새콤,상큼|lemon,sour,citrus
+🍌|바나나,과일|banana,fruit
+🍍|파인애플,과일,열대|pineapple,tropical,fruit
+🥭|망고,과일,열대|mango,tropical,fruit
+🍎|사과,빨간사과,과일,애플,선생님|apple,red apple,fruit,teacher
+🍏|청사과,초록사과,과일|green apple,fruit
+🍐|배,과일|pear,fruit
+🍑|복숭아,과일,엉덩이|peach,fruit,butt
+🍒|체리,과일|cherries,cherry,fruit
+🍓|딸기,과일,디저트|strawberry,berry,fruit
+🫐|블루베리,베리,과일|blueberries,berry,fruit
+🥝|키위,과일|kiwi,fruit
+🍅|토마토,채소|tomato,vegetable
+🫒|올리브,올리브유|olive,olive oil
+🥥|코코넛,열대|coconut,tropical
+🥑|아보카도,건강식|avocado,healthy
+🍆|가지,채소|eggplant,aubergine,vegetable
+🥔|감자,채소|potato,vegetable
+🥕|당근,채소,보상|carrot,vegetable,reward
+🌽|옥수수,채소|corn,maize
+🌶️|고추,매움,핫,매운맛|hot pepper,spicy,chili,hot
+🫑|피망,파프리카,채소|bell pepper,paprika,vegetable
+🥒|오이,채소|cucumber,pickle,vegetable
+🥬|채소,상추,배추,야채|leafy green,lettuce,cabbage,vegetable
+🥦|브로콜리,채소,건강|broccoli,vegetable,healthy
+🧄|마늘,양념|garlic,spice
+🧅|양파,양념|onion
+🥜|땅콩,견과,알레르기|peanuts,nuts,allergy
+🫘|콩,두부|beans,legume
+🌰|밤,견과,가을|chestnut,nut,autumn
+🫚|생강,뿌리|ginger,root
+🫛|완두콩,콩|pea pod,peas
+🍞|빵,식빵,베이커리,아침|bread,toast,bakery,breakfast
+🥐|크루아상,빵,아침,프랑스|croissant,bread,breakfast,france
+🥖|바게트,빵,프랑스|baguette,bread,france
+🫓|난,플랫브레드,빵|flatbread,naan,pita
+🥨|프레첼,빵,독일|pretzel,germany
+🥯|베이글,빵,아침|bagel,breakfast
+🥞|팬케이크,브런치,아침|pancakes,brunch,breakfast
+🧇|와플,브런치,디저트|waffle,brunch,dessert
+🧀|치즈,유제품|cheese,dairy
+🍖|고기,뼈다귀,바베큐|meat on bone,meat,bbq
+🍗|닭다리,치킨,통닭|poultry leg,chicken,drumstick
+🥩|고기,스테이크,소고기,삼겹살|steak,meat,beef
+🥓|베이컨,아침|bacon,breakfast
+🍔|햄버거,버거,패스트푸드,점심|hamburger,burger,fast food,lunch
+🍟|감자튀김,패스트푸드|french fries,fries,fast food
+🍕|피자,파티,야식|pizza,party,late night snack
+🌭|핫도그,소시지|hot dog,sausage
+🥪|샌드위치,점심,도시락|sandwich,lunch
+🌮|타코,멕시코|taco,mexican
+🌯|부리또,멕시코,랩|burrito,wrap,mexican
+🫔|타말레,멕시코|tamale,mexican
+🥙|케밥,피타,랩|kebab,pita,wrap,gyro
+🧆|팔라펠,중동|falafel,middle east
+🥚|달걀,계란,부활절,이스터에그|egg,easter egg
+🍳|계란후라이,요리,아침,프라이팬|cooking,fried egg,breakfast,frying pan
+🥘|빠에야,요리,냄비|paella,pan,cooking
+🍲|찌개,국,전골,탕,냄비|stew,soup,hot pot
+🫕|퐁듀,치즈|fondue,cheese
+🥣|시리얼,죽,그릇,아침|cereal,bowl,porridge,breakfast
+🥗|샐러드,다이어트,건강식|salad,diet,healthy
+🍿|팝콘,영화,구경,관람|popcorn,movie,watching,cinema
+🧈|버터|butter
+🧂|소금,짠맛,간|salt,salty
+🥫|통조림,캔,비상식량|canned food,can
+🍱|도시락,벤또,점심|bento,lunch box,lunch
+🍘|센베,쌀과자|rice cracker,senbei
+🍙|주먹밥,삼각김밥,오니기리|rice ball,onigiri
+🍚|밥,쌀,식사,한식|rice,cooked rice,meal
+🍛|카레,카레라이스|curry,curry rice
+🍜|라면,국수,라멘,우동|ramen,noodles,noodle soup
+🍝|스파게티,파스타,이탈리아|spaghetti,pasta,italian
+🍠|고구마,군고구마|sweet potato,roasted
+🍢|오뎅,어묵꼬치|oden,skewer
+🍣|초밥,스시,일식|sushi,japanese
+🍤|새우튀김,튀김|fried shrimp,tempura
+🍥|어묵,나루토|fish cake,naruto
+🥮|월병,추석|moon cake,mid-autumn
+🍡|떡꼬치,경단,당고|dango,rice cake
+🥟|만두,교자|dumpling,gyoza,mandu
+🥠|포춘쿠키,운세|fortune cookie,fortune
+🥡|테이크아웃,포장,배달,중식|takeout,take away,delivery,chinese food
+🍦|아이스크림,소프트콘,여름|ice cream,soft serve,summer
+🍧|빙수,팥빙수,여름|shaved ice,bingsu,summer
+🍨|아이스크림,디저트|ice cream,dessert
+🍩|도넛,간식,디저트|doughnut,donut,snack
+🍪|쿠키,과자,간식|cookie,biscuit,snack
+🎂|생일,케이크,생일축하,기념일|birthday,cake,birthday cake,anniversary
+🍰|케이크,디저트,카페|cake,shortcake,dessert,cafe
+🧁|컵케이크,디저트,베이킹|cupcake,dessert,baking
+🥧|파이,디저트,베이킹|pie,dessert,baking
+🍫|초콜릿,발렌타인,간식|chocolate,valentine,snack
+🍬|사탕,캔디,간식|candy,sweet
+🍭|막대사탕,롤리팝,사탕|lollipop,candy
+🍮|푸딩,커스터드,디저트|custard,pudding,flan
+🍯|꿀,달콤,허니|honey,honey pot,sweet
+🍼|젖병,아기,육아,분유|baby bottle,baby,milk,formula
+🥛|우유,유제품|milk,glass of milk
+☕|커피,카페,휴식,티타임,모닝커피,음료|coffee,cafe,break,hot beverage,tea,morning
+🫖|찻주전자,차,티타임|teapot,tea
+🍵|차,녹차,말차,티타임|tea,green tea,matcha
+🍶|사케,술,청주|sake,rice wine
+🍾|샴페인,축하,파티,런칭,성공|champagne,celebrate,party,launch,success
+🍷|와인,술,저녁|wine,drink,dinner
+🍸|칵테일,술,바|cocktail,martini,bar
+🍹|칵테일,음료,휴가,트로피컬|tropical drink,cocktail,vacation
+🍺|맥주,술,회식,호프|beer,drink,pub
+🍻|건배,맥주,회식,짠,뒷풀이|cheers,beers,toast,team dinner,party
+🥂|건배,축하,샴페인,짠|cheers,toast,celebrate,champagne
+🥃|위스키,양주,술|whisky,tumbler,liquor
+🫗|쏟음,붓기,흘림|pouring,spill,pour
+🥤|음료,탄산,빨대,테이크아웃|cup with straw,soda,soft drink,takeout
+🧋|버블티,밀크티,타피오카|bubble tea,boba,milk tea
+🧃|주스,음료팩|juice box,beverage box
+🧉|마테차,차|mate,yerba mate
+🧊|얼음,차가움,냉동,아이스|ice,cold,ice cube,frozen
+🥢|젓가락,식사|chopsticks,eat
+🍽️|식사,저녁,점심,식당,레스토랑,맛집|dinner,lunch,meal,restaurant,dining
+🍴|식사,포크,나이프,식당,밥|fork and knife,meal,restaurant,eat
+🥄|숟가락,스푼|spoon
+🔪|칼,식칼,요리,위험|knife,kitchen knife,cooking
+🫙|병,유리병,보관,저장|jar,container,storage
+🏺|항아리,고대,유물|amphora,jar,ancient

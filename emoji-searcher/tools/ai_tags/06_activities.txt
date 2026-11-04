@@ -1,0 +1,86 @@
+# Activities
+🎃|할로윈,호박,10월|jack-o-lantern,halloween,pumpkin,october
+🎄|크리스마스,트리,성탄절,연말,12월|christmas tree,christmas,xmas,december,holiday
+🎆|불꽃놀이,축제,새해,축하|fireworks,festival,new year,celebration
+🎇|불꽃,폭죽,축하|sparkler,fireworks,celebration
+🧨|폭죽,폭탄,위험,터짐|firecracker,dynamite,explosive,danger
+✨|반짝,새로움,신규,개선,깔끔,마법,특별|sparkles,new,shiny,improvement,magic,clean,special
+🎈|풍선,파티,생일,축하|balloon,party,birthday,celebration
+🎉|축하,파티,완료,성공,경축,달성,짝짝|party,celebrate,congrats,tada,success,done,hooray
+🎊|축하,박터트리기,파티,경축|confetti,celebrate,party,congrats
+🎋|칠석,소원,대나무|tanabata,wish,bamboo
+🎍|새해,설날,장식|pine decoration,new year
+🎎|인형,일본,히나마츠리|japanese dolls,doll
+🎏|잉어깃발,어린이날|carp streamer,children's day
+🎐|풍경,여름,바람|wind chime,summer
+🎑|달맞이,추석,보름달|moon viewing,mid-autumn,chuseok
+🧧|세뱃돈,설날,새해,복주머니,용돈|red envelope,lunar new year,money gift
+🎀|리본,선물,장식,귀여움|ribbon,bow,gift,decoration
+🎁|선물,기프트,생일,이벤트,보너스|gift,present,birthday,bonus,surprise
+🎗️|추모,리본,기억,캠페인|reminder ribbon,awareness,memorial
+🎟️|티켓,입장권,이벤트,예매|admission ticket,ticket,event,booking
+🎫|티켓,표,이슈,예매|ticket,pass,issue,booking
+🎖️|훈장,메달,명예,공로|military medal,medal,honor
+🏆|트로피,우승,성과,업적,1등,수상,목표달성|trophy,win,award,achievement,champion,goal
+🏅|메달,수상,성과,업적|medal,award,achievement
+🥇|금메달,1등,우승,최고,1위|gold medal,first place,winner,best,1st
+🥈|은메달,2등,2위|silver medal,second place,2nd
+🥉|동메달,3등,3위|bronze medal,third place,3rd
+⚽|축구,공,스포츠,월드컵|soccer,football,ball,sports
+⚾|야구,공,스포츠|baseball,ball,sports
+🥎|소프트볼,공|softball,ball
+🏀|농구,공,스포츠|basketball,ball,sports
+🏐|배구,공,스포츠|volleyball,ball,sports
+🏈|미식축구,풋볼|american football,football
+🏉|럭비,공|rugby,ball
+🎾|테니스,공,스포츠|tennis,ball,sports
+🥏|원반,프리스비|flying disc,frisbee
+🎳|볼링,스트라이크|bowling,strike
+🏏|크리켓|cricket
+🏑|필드하키,하키|field hockey,hockey
+🏒|아이스하키,하키|ice hockey,hockey
+🥍|라크로스|lacrosse
+🏓|탁구,핑퐁,핑|ping pong,table tennis,ping
+🏸|배드민턴|badminton
+🥊|권투,복싱,싸움,대결|boxing,boxing glove,fight
+🥋|태권도,무술,도복,유도|martial arts,taekwondo,judo,karate
+🥅|골대,목표,골|goal net,goal,target
+⛳|골프,목표,깃발|golf,flag in hole,target
+⛸️|스케이트,피겨,빙상|ice skate,skating
+🎣|낚시,피싱,낚임|fishing,fishing pole,phishing,bait
+🤿|다이빙,스노클링,딥다이브,심층분석|diving mask,diving,snorkel,deep dive
+🎽|러닝셔츠,마라톤,운동복|running shirt,marathon,sportswear
+🎿|스키,겨울,스키장|skis,ski,winter
+🛷|썰매,눈,겨울|sled,sledge,winter
+🥌|컬링,스톤|curling stone,curling
+🎯|목표,과녁,명중,정확,타겟,OKR,포커스|target,goal,bullseye,direct hit,focus,okr,objective
+🪀|요요,장난감|yo-yo,toy
+🪁|연,연날리기|kite
+🔫|물총,장난감총,총|water pistol,gun,toy gun
+🎱|당구,8번공,포켓볼|pool,billiards,8 ball
+🔮|수정구슬,예측,점,미래,운세,전망|crystal ball,predict,fortune,future,forecast
+🪄|마술봉,마법,자동화,마술|magic wand,magic,automation,wizard
+🎮|게임,비디오게임,오락,콘솔,플스|video game,game,gaming,controller,console
+🕹️|조이스틱,게임,레트로,조작|joystick,game,arcade,retro,control
+🎰|슬롯머신,도박,카지노,운|slot machine,gambling,casino,luck
+🎲|주사위,랜덤,운,보드게임,확률|dice,random,chance,board game,probability
+🧩|퍼즐,조각,해결,플러그인,통합,모듈|puzzle,piece,solve,plugin,integration,module,jigsaw
+🧸|곰인형,테디베어,장난감,어린이|teddy bear,toy,kids
+🪅|피냐타,파티|pinata,party
+🪩|미러볼,디스코,파티,클럽|mirror ball,disco,party,club
+🪆|마트료시카,중첩,러시아인형|nesting dolls,matryoshka,nested,russian doll
+♠️|스페이드,카드|spade suit,cards
+♥️|하트,카드|heart suit,cards
+♦️|다이아몬드,카드|diamond suit,cards
+♣️|클로버,카드|club suit,cards
+♟️|체스,전략,졸,폰,수읽기|chess pawn,chess,strategy,pawn
+🃏|조커,카드,와일드카드|joker,wildcard,cards
+🀄|마작|mahjong
+🎴|화투,카드놀이|flower playing cards,hwatu,cards
+🎭|연극,공연,가면,예술,드라마|performing arts,theater,drama,masks,acting
+🖼️|그림,액자,이미지,사진,갤러리,미술|framed picture,image,picture,gallery,art
+🎨|디자인,미술,그림,예술,팔레트,색상,UI|art,design,palette,painting,color,ui
+🧵|실,바느질,스레드,쓰레드,연결|thread,sewing,thread pool
+🪡|바늘,바느질,수선|sewing needle,needle,sewing,stitch
+🧶|실뭉치,뜨개질,털실,엉킴|yarn,knitting,tangled
+🪢|매듭,묶음,연결,꼬임|knot,tie,tangled

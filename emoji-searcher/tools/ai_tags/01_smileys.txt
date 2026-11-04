@@ -1,0 +1,167 @@
+# Smileys & Emotion
+😀|웃음,기쁨,행복,좋음,신남,스마일,반가움|smile,happy,joy,grin,good,glad
+😃|웃음,기쁨,행복,신남,반가움,밝음|smile,happy,joy,excited,cheerful
+😄|웃음,기쁨,행복,즐거움,신남,하하|laugh,happy,joy,fun,cheerful
+😁|웃음,씨익,뿌듯,만족,기쁨,히히|grin,proud,satisfied,happy,beaming
+😆|폭소,웃김,재밌음,깔깔,ㅋㅋ,빵터짐|laugh,lol,funny,hilarious,xd
+😅|민망,식은땀,다행,아슬아슬,머쓱,휴|awkward,phew,nervous,relief,sweat,oops
+🤣|빵터짐,폭소,웃김,ㅋㅋㅋ,개웃김,배꼽|rofl,lol,hilarious,lmao,funny
+😂|웃겨서눈물,폭소,ㅋㅋㅋ,웃김,눈물,빵터짐|lol,tears of joy,hilarious,funny,lmao
+🙂|미소,괜찮음,무난,평온,좋아요,ㅎㅎ|smile,ok,fine,calm,polite
+🙃|반어,장난,뒤집힘,어이없음,비꼼,아이러니|irony,sarcasm,silly,upside down,joking
+🫠|녹음,멘붕,번아웃,더움,지침,부끄러움|melting,burnout,overwhelmed,embarrassed,hot
+😉|윙크,장난,농담,비밀,찡긋,힌트|wink,joke,flirt,hint,secret
+😊|미소,수줍음,행복,감사,따뜻함,흐뭇|blush,smile,grateful,warm,shy,pleased
+😇|천사,순수,착함,무죄,선행,결백|angel,innocent,halo,good,pure
+🥰|사랑,애정,행복,설렘,좋아함,러블리|love,adore,affection,crush,lovely
+😍|반함,사랑,좋아함,최애,하트눈,감동|love,crush,heart eyes,adore,favorite
+🤩|감탄,대박,신남,스타,최고,와우|wow,amazing,starstruck,excited,awesome
+😘|뽀뽀,키스,사랑,애정,굿나잇|kiss,love,blow kiss,affection
+😗|뽀뽀,키스,휘파람,쪽|kiss,whistle,smooch
+☺️|미소,편안,흐뭇,행복,수줍음|smile,content,relaxed,happy
+😚|뽀뽀,키스,쪽,애정|kiss,smooch,affection
+😙|뽀뽀,휘파람,키스,흥얼|kiss,whistle,humming
+🥲|웃프다,눈물,감동,씁쓸,괜찮은척,슬픈미소|bittersweet,touched,smile through tears,grateful
+😋|맛있음,맛집,음식,냠냠,먹방,메롱|yummy,delicious,tasty,food,savor
+😛|메롱,장난,혀,놀림|tongue,playful,silly,tease
+😜|장난,메롱,농담,익살,윙크|playful,joke,crazy,wink,silly
+🤪|미침,정신없음,엉뚱,광기,장난|crazy,zany,goofy,wild,silly
+😝|메롱,장난,으엑,놀림|tongue,playful,yuck,tease
+🤑|돈,부자,수익,월급,돈벌기,재테크|money,rich,profit,greedy,cash
+🤗|포옹,허그,환영,감사,응원,위로|hug,welcome,thanks,support,comfort
+🤭|킥킥,비밀,웃음참기,깜짝,헉,수줍음|giggle,oops,secret,shy,surprise
+🫢|헉,놀람,깜짝,충격,비밀|gasp,surprise,shock,oops
+🫣|훔쳐보기,무서움,부끄러움,스포일러,궁금|peek,scared,shy,spoiler,curious
+🤫|쉿,비밀,조용,보안,함구|shh,secret,quiet,confidential,hush
+🤔|생각,고민,궁금,질문,검토,의문,흠|think,thinking,hmm,question,consider,wonder
+🫡|경례,알겠습니다,존경,복명복창,충성,확인|salute,yes sir,respect,ack,roger
+🤐|비밀,함구,입다물기,보안,기밀|secret,zip,silence,confidential,nda
+🤨|의심,뭐지,갸웃,수상,의문|skeptical,suspicious,doubt,really,raised eyebrow
+😐|무표정,덤덤,그저그럼,중립,할말없음|neutral,meh,blank,indifferent
+😑|무표정,짜증,노코멘트,지루|expressionless,annoyed,unamused,bored
+😶|침묵,할말없음,무언,말잇못|silent,speechless,no comment,mute
+🫥|투명,존재감없음,숨기,사라짐,잠수|invisible,hidden,disappear,ghosting
+😶‍🌫️|멍,몽롱,안개,혼란,멍때림|foggy,dazed,confused,head in clouds
+😏|히죽,썩소,자신감,음흉,느끼|smirk,smug,confident,sly
+😒|지루,시큰둥,짜증,불만,별로|unamused,bored,meh,annoyed,dissatisfied
+🙄|어이없음,한심,눈굴림,짜증,에휴|eye roll,annoyed,whatever,ugh
+😬|어색,곤란,난처,이런,큰일|awkward,grimace,yikes,nervous,oops
+😮‍💨|한숨,휴,안도,지침,피곤|sigh,exhale,relief,tired,phew
+🤥|거짓말,피노키오,뻥,가짜|lie,liar,pinocchio,fake,fib
+🫨|흔들림,충격,떨림,지진,멘붕|shaking,shock,vibrating,earthquake
+😌|안심,안도,평온,홀가분,편안|relieved,calm,peaceful,content
+😔|우울,슬픔,실망,반성,침울|pensive,sad,disappointed,regret,down
+😪|졸림,피곤,잠,콧물|sleepy,tired,drowsy
+🤤|침흘림,먹고싶음,탐남,맛있겠다|drool,want,craving,delicious
+😴|잠,수면,졸림,휴식,쿨쿨,자는중|sleep,sleeping,zzz,rest,nap,tired
+😷|감기,마스크,아픔,병,코로나,방역|sick,mask,cold,flu,covid,ill
+🤒|열,아픔,병가,감기,몸살|fever,sick,ill,sick leave,flu
+🤕|부상,다침,두통,사고,아픔|hurt,injury,headache,accident,bandage
+🤢|구역질,메스꺼움,역겨움,멀미|nausea,sick,disgust,gross
+🤮|토,구토,역겨움,최악,우웩|vomit,puke,disgusting,gross,sick
+🤧|재채기,감기,콧물,알레르기,비염|sneeze,cold,allergy,flu,tissue
+🥵|더움,폭염,땀,열,뜨거움,매움|hot,heat,sweating,heatwave,spicy
+🥶|추움,한파,얼음,꽁꽁,냉방|cold,freezing,frozen,chill
+🥴|어지러움,취함,멍,헤롱|woozy,dizzy,drunk,tipsy
+😵|어지러움,기절,충격,멘붕,뻗음|dizzy,knocked out,shock,dead
+😵‍💫|현기증,혼란,멘붕,빙글빙글|dizzy,confused,spiral,hypnotized
+🤯|충격,멘붕,대박,머리터짐,깨달음|mind blown,shocked,wow,explode
+🤠|카우보이,서부,모험,신남|cowboy,western,yeehaw,adventure
+🥳|파티,축하,생일,기념,성공,축제|party,celebrate,birthday,congrats,hooray
+🥸|변장,위장,잠입,익명,가짜|disguise,incognito,anonymous,undercover
+😎|멋짐,쿨,자신감,여름,선글라스|cool,confident,summer,sunglasses,awesome
+🤓|공부,모범생,덕후,너드,똑똑|nerd,geek,study,smart,glasses
+🧐|분석,검토,조사,관찰,의심,리뷰|inspect,analyze,review,investigate,curious
+😕|혼란,헷갈림,애매,갸웃|confused,unsure,puzzled
+🫤|애매,갸웃,미심쩍음,글쎄|meh,unsure,skeptical,doubtful
+😟|걱정,불안,염려,근심|worried,anxious,concerned
+🙁|실망,시무룩,아쉬움|frown,sad,disappointed
+☹️|슬픔,실망,우울,찡그림|sad,frown,unhappy
+😮|놀람,와,헉,오|surprised,wow,oh,open mouth
+😯|놀람,숨죽임,헉,조용|hushed,surprised,stunned
+😲|깜짝,충격,경악,놀람|astonished,shocked,amazed
+😳|당황,부끄러움,민망,헉,얼굴빨개짐|flushed,embarrassed,shocked,blush
+🥺|부탁,애원,제발,간절,불쌍|please,pleading,begging,puppy eyes
+🥹|감동,울컥,눈물참기,뭉클,고마움|touched,moved,holding back tears,grateful
+😦|당황,놀람,실망|frowning,shocked,dismayed
+😧|괴로움,고통,충격|anguished,distressed,shocked
+😨|두려움,공포,무서움,겁|fearful,scared,afraid,fear
+😰|불안,초조,긴장,식은땀,걱정|anxious,nervous,worried,stressed
+😥|아쉬움,실망,안도,휴|disappointed,relieved,sad
+😢|슬픔,눈물,울음,아쉬움|cry,sad,tear,upset
+😭|오열,엉엉,슬픔,눈물,감동|sob,crying,sad,tears,touched
+😱|공포,경악,비명,멘붕,충격|scream,horror,shocked,omg,panic
+😖|당혹,괴로움,혼란,난감|confounded,frustrated,distressed
+😣|참기,인내,힘듦,버팀|persevere,struggle,endure
+😞|실망,낙담,우울|disappointed,dejected,sad
+😓|식은땀,힘듦,곤란,낭패|downcast,sweat,hard work,stressed
+😩|지침,피곤,힘듦,짜증,하기싫음|weary,tired,exhausted,frustrated
+😫|피곤,지침,야근,녹초|tired,exhausted,overworked,burnout
+🥱|하품,지루,졸림,심심|yawn,bored,sleepy,tired
+😤|씩씩,분노,의지,결심,승리감|huff,frustrated,determined,triumph
+😡|분노,화남,빡침,격분|angry,rage,mad,furious
+😠|화남,짜증,불만,분노|angry,mad,annoyed
+🤬|욕,분노,격분,빡침,검열|cursing,swearing,rage,furious
+😈|악마,장난,음흉,나쁜생각,악당|devil,evil,mischief,naughty
+👿|악마,분노,악당,사악|devil,angry,evil,imp
+💀|해골,죽음,망함,끝,웃겨죽음|skull,dead,death,dying,dead inside
+☠️|위험,독,해적,죽음,경고|danger,poison,pirate,death,toxic
+💩|똥,망함,쓰레기,최악,응가|poop,crap,bad,trash,shit
+🤡|광대,바보,웃음거리,서커스|clown,fool,joke,circus
+👹|도깨비,괴물,악귀,무서움|ogre,monster,demon,scary
+👺|도깨비,텐구,괴물,분노|goblin,tengu,monster,angry
+👻|유령,귀신,할로윈,장난,잠수|ghost,halloween,spooky,boo,ghosting
+👽|외계인,UFO,우주,이상함|alien,ufo,extraterrestrial,space
+👾|게임,오락,외계인,레트로|game,arcade,retro,space invader,alien
+🤖|로봇,AI,자동화,봇,인공지능,기계|robot,ai,bot,automation,machine,llm
+😺|웃음,행복,냥,고양이|smile,happy,kitty,cat
+😸|웃음,기쁨,냥,고양이|grin,happy,kitty,cat
+😹|폭소,웃김,냥,고양이|lol,laugh,kitty,cat
+😻|사랑,반함,냥,고양이|love,heart eyes,kitty,cat
+😼|썩소,음흉,냥,고양이|smirk,sly,kitty,cat
+😽|뽀뽀,애정,냥,고양이|kiss,kitty,cat
+🙀|놀람,충격,냥,고양이|shocked,scream,kitty,cat
+😿|슬픔,눈물,냥,고양이|sad,crying,kitty,cat
+😾|화남,삐짐,냥,고양이|angry,pouting,kitty,cat
+🙈|못본척,부끄러움,외면,민망,원숭이|see no evil,shy,embarrassed,monkey
+🙉|못들은척,안들려,원숭이,외면|hear no evil,ignore,monkey
+🙊|비밀,말실수,함구,원숭이,앗|speak no evil,oops,secret,monkey
+💌|편지,연애편지,초대장,고백,메일|love letter,letter,invitation,mail
+💘|사랑,반함,큐피드,고백,짝사랑|love,cupid,crush,romance
+💝|선물,사랑,기념일,발렌타인|gift,love,valentine,present
+💖|사랑,반짝,설렘,애정|sparkling heart,love,affection
+💗|사랑,설렘,두근,커지는|growing heart,love,excited
+💓|두근두근,설렘,심장,사랑|beating heart,love,heartbeat
+💞|사랑,커플,연애,하트|love,couple,romance,hearts
+💕|사랑,커플,애정,러브|love,couple,hearts,affection
+💟|하트,장식,사랑|heart decoration,love
+❣️|하트,강조,사랑,느낌표|heart exclamation,love,emphasis
+💔|이별,실연,상처,슬픔,실패|broken heart,breakup,heartbreak,sad
+❤️‍🔥|열정,불타는사랑,의욕,뜨거움|passion,burning love,motivation,fire
+❤️‍🩹|회복,치유,위로,힐링|healing,recovery,mending,comfort
+❤️|사랑,하트,좋아요,애정,감사,빨강|love,heart,like,thanks,red
+🩷|사랑,핑크,분홍,귀여움|pink heart,love,cute,pink
+🧡|사랑,주황,오렌지,따뜻함|orange heart,love,warm,orange
+💛|사랑,노랑,우정,밝음|yellow heart,friendship,yellow
+💚|사랑,초록,환경,자연,건강|green heart,nature,eco,health,green
+💙|사랑,파랑,신뢰,평온|blue heart,trust,calm,blue
+🩵|하늘색,밝은파랑,평온,시원|light blue heart,sky,calm
+💜|사랑,보라,퍼플|purple heart,love,purple
+🤎|갈색,브라운,따뜻함|brown heart,brown
+🖤|검정,블랙,어둠,시크|black heart,dark,black,goth
+🩶|회색,그레이,차분|grey heart,gray,neutral
+🤍|흰색,화이트,순수,깨끗|white heart,pure,white,clean
+💋|키스,입술,립스틱,뽀뽀|kiss,lips,lipstick
+💯|100점,만점,완벽,최고,인정,완료|100,perfect,score,agree,complete
+💢|화남,짜증,분노,빡침|anger,annoyed,mad,rage
+💥|충돌,폭발,펑,버그,에러,크래시|collision,boom,crash,explosion,bang
+💫|어지러움,반짝,별,마법|dizzy,stars,sparkle,magic
+💦|땀,물,노력,튀김|sweat,water,drops,splash
+💨|빠름,질주,속도,도망,슝|fast,dash,speed,run,whoosh
+🕳️|구멍,함정,빈틈,토끼굴|hole,pit,trap,rabbit hole
+💬|대화,채팅,메시지,댓글,말풍선,토론,의견|chat,message,comment,talk,discussion,speech
+👁️‍🗨️|목격,증인,관찰,말하기|eye in speech bubble,witness,observe
+🗨️|대화,말풍선,채팅,댓글|speech bubble,chat,dialog,comment
+🗯️|화남,외침,분노,말풍선|anger bubble,shout,rant
+💭|생각,상상,아이디어,구상,고민|thought,thinking,idea,dream,imagine
+💤|잠,졸림,휴식,수면,쿨쿨|sleep,zzz,rest,sleepy,idle

@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# emoji-searcher: 개발용 원천 데이터 캐시, 레지스트리 백업
+emoji-searcher/tools/.cache/
+emoji-searcher/registry/backup/
+
+# 편집기 / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

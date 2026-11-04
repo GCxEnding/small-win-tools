@@ -1,0 +1,219 @@
+# Travel & Places
+🌍|지구,세계,유럽,아프리카,글로벌|globe,earth,world,europe,africa,global
+🌎|지구,세계,미국,아메리카,글로벌|globe,earth,world,americas,global
+🌏|지구,세계,아시아,호주,글로벌|globe,earth,world,asia,australia,global
+🌐|웹,인터넷,글로벌,다국어,언어,네트워크,브라우저|web,internet,global,language,i18n,network,browser
+🗺️|지도,세계지도,여행,로드맵,계획|map,world map,travel,roadmap,plan
+🗾|일본,지도|japan,map
+🧭|나침반,방향,가이드,탐색,안내,목표|compass,direction,guide,navigation,orientation
+🏔️|설산,산,등산,겨울|snow mountain,mountain,hiking
+⛰️|산,등산,하이킹,목표,도전|mountain,hiking,climb,goal,challenge
+🌋|화산,폭발,분노,재난|volcano,eruption,disaster
+🗻|후지산,산,일본|mount fuji,mountain,japan
+🏕️|캠핑,야영,텐트,아웃도어|camping,camp,tent,outdoor
+🏖️|해변,해수욕장,휴가,여름,바캉스|beach,vacation,summer,holiday
+🏜️|사막,건조|desert,dry
+🏝️|무인도,섬,휴양,휴가|desert island,island,vacation,tropical
+🏞️|국립공원,자연,풍경,공원|national park,nature,landscape,park
+🏟️|경기장,스타디움,콘서트|stadium,arena,concert
+🏛️|박물관,고전건축,정부,기관,은행|museum,classical building,government,institution
+🏗️|건설,공사중,개발중,구축,인프라,빌드|construction,under construction,building,wip,infrastructure,build
+🧱|벽돌,벽,기초,블록,방화벽|brick,wall,foundation,block,firewall
+🪨|바위,돌,단단함|rock,stone,solid
+🪵|목재,나무,장작|wood,log,timber
+🛖|오두막,움막|hut,shack
+🏘️|주택가,동네,마을,부동산|houses,neighborhood,real estate
+🏚️|폐가,낡은집,레거시,방치|derelict house,abandoned,legacy,old
+🏠|집,홈,주택,가정,메인,홈페이지,재택|home,house,main,homepage,remote work
+🏡|집,정원,주택,전원주택|house with garden,home,garden
+🏢|빌딩,회사,사무실,오피스,기업,출근|office building,company,office,work,corporate
+🏣|우체국,일본우체국|japanese post office,post
+🏤|우체국,우편|post office,mail
+🏥|병원,의료,진료,건강검진|hospital,medical,clinic,health
+🏦|은행,금융,돈,대출,계좌|bank,finance,money,loan,account
+🏨|호텔,숙박,출장,여행|hotel,accommodation,business trip
+🏩|모텔,러브호텔|love hotel,motel
+🏪|편의점,가게,상점|convenience store,store,shop
+🏫|학교,교육,학습,수업|school,education,class
+🏬|백화점,쇼핑,마트|department store,shopping,mall
+🏭|공장,제조,생산,산업,팩토리|factory,manufacturing,production,industry
+🏯|일본성,성,일본|japanese castle,castle
+🏰|성,유럽성,요새,판타지|castle,european castle,fortress
+💒|결혼식,웨딩,예식장,결혼|wedding,chapel,marriage
+🗼|도쿄타워,타워,일본|tokyo tower,tower
+🗽|자유의여신상,뉴욕,미국,자유|statue of liberty,new york,usa,freedom
+⛪|교회,성당,기독교|church,christian
+🕌|모스크,이슬람|mosque,islam
+🛕|힌두사원,사원|hindu temple,temple
+🕍|시나고그,유대교|synagogue,jewish
+⛩️|신사,도리이,일본|shinto shrine,torii,japan
+🕋|카바,메카,이슬람|kaaba,mecca,islam
+⛲|분수,공원|fountain,park
+⛺|텐트,캠핑,야영|tent,camping
+🌁|안개,흐림,샌프란시스코|foggy,fog,san francisco
+🌃|밤,야경,밤하늘,야근|night,night sky,city night,late night
+🏙️|도시,빌딩,도심,스카이라인|cityscape,city,downtown,skyline
+🌄|일출,산,아침,새벽|sunrise over mountains,sunrise,morning
+🌅|일출,해돋이,아침,새해,시작|sunrise,dawn,morning,new year,beginning
+🌆|노을,도시,저녁,퇴근|cityscape at dusk,dusk,evening,city
+🌇|일몰,석양,저녁,퇴근|sunset,evening,dusk
+🌉|다리,야경,브릿지,연결|bridge at night,bridge,connection
+♨️|온천,뜨거움,목욕,스파|hot springs,onsen,spa,hot
+🎠|회전목마,놀이공원|carousel,merry-go-round,amusement park
+🛝|미끄럼틀,놀이터|slide,playground
+🎡|관람차,놀이공원|ferris wheel,amusement park
+🎢|롤러코스터,기복,변동,스릴,놀이공원|roller coaster,ups and downs,thrill,volatile
+💈|이발소,미용실|barber pole,barber,haircut
+🎪|서커스,텐트,축제|circus tent,circus,festival
+🚂|기차,증기기관차,기관차,파이프라인|locomotive,steam train,train,pipeline
+🚃|전철,열차|railway car,train
+🚄|고속열차,KTX,신칸센,빠름|high-speed train,bullet train,ktx,fast
+🚅|고속열차,KTX,신칸센|bullet train,high-speed train,shinkansen
+🚆|기차,열차,출퇴근|train,rail,commute
+🚇|지하철,메트로,출퇴근,통근|metro,subway,commute
+🚈|경전철,전철|light rail,train
+🚉|기차역,역,정거장|station,train station
+🚊|트램,노면전차|tram,streetcar
+🚝|모노레일|monorail
+🚞|산악열차,기차,여행|mountain railway,train
+🚋|트램,전차|tram car
+🚌|버스,대중교통,출퇴근,통근|bus,public transport,commute
+🚍|버스,대중교통|oncoming bus,bus
+🚎|트롤리버스,버스|trolleybus
+🚐|미니버스,승합차,밴|minibus,van
+🚑|구급차,응급,병원,긴급|ambulance,emergency,hospital
+🚒|소방차,화재,긴급,장애대응|fire engine,fire,emergency,firefighting,incident
+🚓|경찰차,경찰,순찰|police car,police,patrol
+🚔|경찰차,경찰,출동|oncoming police car,police
+🚕|택시,카카오택시,이동|taxi,cab,ride
+🚖|택시|oncoming taxi,taxi
+🚗|자동차,차,운전,드라이브,출퇴근|car,automobile,drive,commute
+🚘|자동차,차|oncoming automobile,car
+🚙|SUV,자동차,지프,차|suv,car,jeep
+🛻|픽업트럭,트럭|pickup truck,truck
+🚚|트럭,배송,택배,배달,이사,운송|delivery truck,delivery,shipping,moving,truck
+🚛|트레일러,화물,물류,운송|articulated lorry,truck,logistics,freight
+🚜|트랙터,농사,농업|tractor,farm
+🏎️|레이싱,경주,속도,빠름,F1|racing car,racing,fast,speed,f1
+🏍️|오토바이,바이크|motorcycle,motorbike
+🛵|스쿠터,배달,오토바이|scooter,delivery,moped
+🦽|수동휠체어,휠체어,접근성|manual wheelchair,accessibility
+🦼|전동휠체어,휠체어,접근성|motorized wheelchair,accessibility
+🛺|툭툭,삼륜차|auto rickshaw,tuk tuk
+🚲|자전거,따릉이,라이딩|bicycle,bike,cycling
+🛴|킥보드,전동킥보드,킥스쿠터|kick scooter,scooter
+🛹|스케이트보드,보드|skateboard
+🛼|롤러스케이트,롤러|roller skate
+🚏|버스정류장,정류장,대기|bus stop,stop,wait
+🛣️|고속도로,도로,로드맵,여정|motorway,highway,road,roadmap,journey
+🛤️|철도,선로,트랙,경로|railway track,track,path
+🛢️|기름통,석유,드럼통,오일|oil drum,oil,barrel
+⛽|주유소,기름,연료,충전|fuel pump,gas station,fuel,refuel
+🛞|바퀴,휠,타이어|wheel,tire
+🚨|긴급,경보,사이렌,장애,비상,알람,중요|emergency,alert,siren,urgent,incident,alarm,critical
+🚥|신호등,교통|traffic light,horizontal traffic light
+🚦|신호등,상태,진행상황,교통|traffic light,status,signal
+🛑|정지,멈춤,중단,스톱,금지,차단|stop sign,stop,halt,blocked,block
+🚧|공사중,작업중,진행중,개발중,미완성,주의|construction,under construction,work in progress,wip,roadblock,barrier
+⚓|닻,고정,정박,항구|anchor,ship,port,pinned
+🛟|구명튜브,구조,도움,지원,헬프|ring buoy,lifebuoy,rescue,help,support
+⛵|돛단배,요트,항해|sailboat,sailing,yacht
+🛶|카누,카약|canoe,kayak
+🚤|쾌속정,보트,빠름|speedboat,boat,fast
+🛳️|크루즈,여객선,여행|passenger ship,cruise,ship
+⛴️|페리,배,여객선|ferry,boat
+🛥️|모터보트,보트|motor boat,boat
+🚢|배,선박,출항,배포,컨테이너|ship,boat,shipping,cruise,ship it
+✈️|비행기,여행,출장,해외,항공,휴가|airplane,flight,travel,trip,business trip,vacation
+🛩️|경비행기,비행기|small airplane,plane
+🛫|이륙,출발,출국,여행시작,런칭|departure,takeoff,departing,launch
+🛬|착륙,도착,입국,귀국|arrival,landing,arriving
+🪂|낙하산,스카이다이빙|parachute,skydive
+💺|좌석,자리,예약|seat,reserved
+🚁|헬리콥터,헬기|helicopter
+🚟|케이블카,모노레일|suspension railway
+🚠|케이블카,산|mountain cableway,cable car
+🚡|케이블카,곤돌라|aerial tramway,cable car
+🛰️|인공위성,위성,통신,우주|satellite,space,communication
+🚀|로켓,배포,출시,릴리즈,시작,발사,런칭,성장|rocket,deploy,launch,release,ship,start,growth
+🛸|UFO,비행접시,외계인|flying saucer,ufo,alien
+🛎️|호출벨,벨,알림,호텔|bellhop bell,bell,service,hotel
+🧳|여행가방,캐리어,여행,출장,짐|luggage,suitcase,travel,trip,packing
+⌛|모래시계,시간끝,마감,기한,종료|hourglass done,time up,deadline,expired
+⏳|모래시계,대기,진행중,로딩,기다림,마감|hourglass,waiting,loading,in progress,pending,deadline
+⌚|손목시계,시계,시간|watch,time,smartwatch
+⏰|알람,시계,기상,마감,알림,리마인더|alarm clock,alarm,wake up,deadline,reminder
+⏱️|스톱워치,측정,시간기록,성능|stopwatch,timer,benchmark,performance
+⏲️|타이머,시간|timer clock,timer
+🕰️|탁상시계,시계,옛날|mantelpiece clock,clock
+🕛|12시,열두시,정오,자정|twelve o'clock,12,noon,midnight
+🕧|12시반|twelve-thirty
+🕐|1시,한시|one o'clock,1
+🕜|1시반|one-thirty
+🕑|2시,두시|two o'clock,2
+🕝|2시반|two-thirty
+🕒|3시,세시|three o'clock,3
+🕞|3시반|three-thirty
+🕓|4시,네시|four o'clock,4
+🕟|4시반|four-thirty
+🕔|5시,다섯시|five o'clock,5
+🕠|5시반|five-thirty
+🕕|6시,여섯시,퇴근|six o'clock,6
+🕡|6시반|six-thirty
+🕖|7시,일곱시|seven o'clock,7
+🕢|7시반|seven-thirty
+🕗|8시,여덟시|eight o'clock,8
+🕣|8시반|eight-thirty
+🕘|9시,아홉시,출근|nine o'clock,9
+🕤|9시반|nine-thirty
+🕙|10시,열시|ten o'clock,10
+🕥|10시반|ten-thirty
+🕚|11시,열한시|eleven o'clock,11
+🕦|11시반|eleven-thirty
+🌑|삭,그믐,달,밤|new moon,moon,dark
+🌒|초승달,달|waxing crescent moon,moon
+🌓|반달,상현달,달|first quarter moon,half moon
+🌔|달,상현|waxing gibbous moon,moon
+🌕|보름달,추석,달|full moon,moon
+🌖|달,하현|waning gibbous moon,moon
+🌗|반달,하현달|last quarter moon,half moon
+🌘|그믐달,달|waning crescent moon,moon
+🌙|초승달,밤,야간,다크모드,잠|crescent moon,night,dark mode,sleep
+🌚|달,음흉,새까만달|new moon face,moon,creepy
+🌛|달,밤|first quarter moon face,moon
+🌜|달,밤|last quarter moon face,moon
+🌡️|온도,온도계,체온,날씨,기온|thermometer,temperature,fever,weather
+☀️|해,맑음,태양,날씨,여름,라이트모드|sun,sunny,weather,summer,light mode
+🌝|보름달,달,웃음|full moon face,moon
+🌞|해,태양,맑음,좋은아침|sun with face,sunny,good morning
+🪐|토성,행성,우주|ringed planet,saturn,planet,space
+⭐|별,즐겨찾기,중요,스타,추천,평점|star,favorite,important,rating,featured
+🌟|반짝별,빛나는별,우수,하이라이트,추천|glowing star,highlight,shine,excellent
+🌠|별똥별,소원,유성|shooting star,wish,meteor
+🌌|은하수,우주,밤하늘|milky way,galaxy,space
+☁️|구름,흐림,클라우드,날씨|cloud,cloudy,weather,cloud computing
+⛅|구름,흐림,날씨|sun behind cloud,partly cloudy,weather
+⛈️|뇌우,폭풍,천둥,번개|thunderstorm,storm,thunder,lightning
+🌤️|구름조금,맑음,날씨|sun behind small cloud,mostly sunny
+🌥️|흐림,구름많음,날씨|sun behind large cloud,mostly cloudy
+🌦️|소나기,비,날씨|sun behind rain cloud,showers,rain
+🌧️|비,우천,장마,날씨,우울|rain,rainy,weather,cloud with rain
+🌨️|눈,눈구름,겨울,날씨|snow,cloud with snow,winter
+🌩️|번개,천둥,날씨|lightning,thunder,cloud with lightning
+🌪️|토네이도,회오리,혼돈,재난|tornado,whirlwind,chaos,disaster
+🌫️|안개,흐림,미세먼지|fog,foggy,mist
+🌬️|바람,강풍,날씨|wind face,wind,blow
+🌀|태풍,회오리,혼란,소용돌이,로딩|cyclone,typhoon,hurricane,spiral,loading
+🌈|무지개,희망,다양성,프라이드|rainbow,hope,diversity,pride
+🌂|우산,접힌우산|closed umbrella,umbrella
+☂️|우산,비|umbrella,rain
+☔|비,우산,장마,우천|umbrella with rain,rain,rainy
+⛱️|파라솔,해변,휴가|umbrella on ground,parasol,beach
+⚡|번개,전기,빠름,속도,에너지,성능,고압|lightning,electric,fast,speed,energy,performance,high voltage
+❄️|눈,눈송이,겨울,추위,동결,프리즈|snowflake,snow,winter,cold,freeze,code freeze
+☃️|눈사람,겨울,크리스마스|snowman,winter,christmas
+⛄|눈사람,겨울|snowman,winter
+☄️|혜성,우주,충돌|comet,space,meteor
+🔥|불,화재,긴급,핫,인기,열정,핫픽스,대박|fire,hot,urgent,trending,lit,hotfix,flame
+💧|물방울,물,눈물,수분|droplet,water,drop,tear
+🌊|파도,바다,물결,서핑,웨이브|wave,ocean,sea,surf,water

@@ -1,0 +1,173 @@
+# People & Body (나머지)
+🤸|체조,옆돌기,스트레칭,신남|cartwheel,gymnastics,stretch
+🤼|레슬링,씨름,경쟁,몸싸움|wrestling,wrestle,competition
+🤽|수구,수영,물놀이|water polo,swim
+🤾|핸드볼,공던지기|handball,throw
+🤹|저글링,멀티태스킹,곡예,동시진행|juggling,multitask,balance,circus
+🧘|명상,요가,마음챙김,휴식,집중,평정|meditation,yoga,mindfulness,calm,zen,focus
+🛀|목욕,욕조,휴식,샤워|bath,bathtub,relax
+🛌|잠,침대,휴식,취침,병가|sleep,bed,rest,sick day
+🗣️|말하기,발표,공지,스피치,음성|speaking,talk,announce,speech,voice
+👤|사람,프로필,계정,사용자,익명|person,profile,user,account,silhouette
+👥|회의,팀,사람들,그룹,모임,미팅,조직|meeting,team,people,group,users,members
+🫂|포옹,위로,허그,응원,공감|hug,comfort,support,embrace
+👪|가족,가정,부모,아이|family,parents,home
+👣|발자국,흔적,기록,추적,히스토리|footprints,trace,track,history,steps
+# Animals & Nature
+🐵|원숭이,장난|monkey,playful
+🐒|원숭이,장난,동물|monkey,animal
+🦍|고릴라,힘,동물|gorilla,ape,strong
+🦧|오랑우탄,유인원|orangutan,ape
+🐶|강아지,개,멍멍이,반려견,댕댕이|dog,puppy,pet,doggo
+🐕|개,강아지,반려견,산책|dog,pet,walk
+🦮|안내견,시각장애,개|guide dog,accessibility
+🐕‍🦺|보조견,도우미견,개|service dog,assistance
+🐩|푸들,개,강아지|poodle,dog
+🐺|늑대,야생,외로움|wolf,wild,lone wolf
+🦊|여우,교활,영리,파이어폭스|fox,clever,sly,firefox
+🦝|너구리,장난,쓰레기|raccoon,trash panda,mischief
+🐱|고양이,냥이,야옹,반려묘|cat,kitty,meow,pet
+🐈|고양이,냥이,반려묘|cat,pet,kitty
+🐈‍⬛|검은고양이,불운,할로윈|black cat,halloween,bad luck
+🦁|사자,용기,왕,리더|lion,brave,king,leader
+🐯|호랑이,범,용맹,한국|tiger,brave,korea
+🐅|호랑이,범,야생|tiger,wild
+🐆|표범,치타,빠름|leopard,cheetah,fast
+🐴|말,경마|horse,pony
+🫎|무스,사슴,캐나다|moose,elk
+🫏|당나귀,고집,짐|donkey,stubborn,mule
+🐎|말,질주,빠름,경마|horse,gallop,racing,fast
+🦄|유니콘,환상,판타지,스타트업,희귀|unicorn,fantasy,magic,startup,rare
+🦓|얼룩말,줄무늬|zebra,stripes
+🦌|사슴,루돌프,숲|deer,reindeer,forest
+🦬|들소,버팔로|bison,buffalo
+🐮|소,젖소,음메|cow,moo
+🐂|황소,소,강세장,주식|ox,bull,bull market
+🐃|물소,소|water buffalo
+🐄|젖소,소,우유,농장|cow,milk,farm
+🐷|돼지,꿀꿀,살찜|pig,oink,piggy
+🐖|돼지,저축|pig,savings
+🐗|멧돼지,야생|boar,wild pig
+🐽|돼지코,꿀꿀|pig nose,snout
+🐏|숫양,양|ram,sheep
+🐑|양,수면,울|sheep,ewe,wool,sleep
+🐐|염소,GOAT,최고|goat,greatest of all time
+🐪|낙타,사막,여행|camel,desert
+🐫|낙타,사막,쌍봉|camel,desert,two hump
+🦙|라마,알파카,LLM,AI|llama,alpaca,llm
+🦒|기린,키큼|giraffe,tall
+🐘|코끼리,기억,PHP,큰|elephant,memory,php,big
+🦣|매머드,멸종,거대,레거시|mammoth,extinct,huge,legacy
+🦏|코뿔소,강함|rhino,rhinoceros,tough
+🦛|하마,큰|hippo,hippopotamus
+🐭|쥐,생쥐,찍찍|mouse,rat
+🐁|생쥐,쥐|mouse
+🐀|쥐,해충|rat,pest
+🐹|햄스터,귀여움,반려동물|hamster,cute,pet
+🐰|토끼,귀여움,부활절|rabbit,bunny,cute,easter
+🐇|토끼,빠름,토끼굴|rabbit,bunny,fast,rabbit hole
+🐿️|다람쥐,도토리,저장|chipmunk,squirrel,hoard
+🦫|비버,댐,건축,근면|beaver,dam,builder,busy
+🦔|고슴도치,가시|hedgehog,spiky
+🦇|박쥐,밤,할로윈,배트맨|bat,night,halloween,vampire
+🐻|곰,곰돌이,곰탱이|bear,teddy
+🐻‍❄️|북극곰,추위,겨울|polar bear,arctic,cold
+🐨|코알라,호주,졸림|koala,australia,sleepy
+🐼|판다,귀여움,중국|panda,cute,china
+🦥|나무늘보,느림,게으름,여유|sloth,slow,lazy,chill
+🦦|수달,귀여움|otter,cute
+🦨|스컹크,냄새,악취|skunk,smell,stinky
+🦘|캥거루,호주,점프|kangaroo,australia,jump
+🦡|오소리,끈질김|badger,persistent
+🐾|발자국,반려동물,흔적,멍냥이|paw prints,pet,trace,paws
+🦃|칠면조,추수감사절|turkey,thanksgiving
+🐔|닭,치킨,꼬꼬|chicken,hen
+🐓|수탉,아침,새벽,기상|rooster,morning,wake up
+🐣|병아리,탄생,부화,시작,초보,신입|hatching chick,new,beginner,born,start
+🐤|병아리,귀여움,삐약|baby chick,cute,chick
+🐥|병아리,귀여움,초보,신입|chick,cute,newbie,junior
+🐦|새,트위터,짹짹,알림|bird,twitter,tweet
+🐧|펭귄,리눅스,추위,남극|penguin,linux,cold,antarctica
+🕊️|비둘기,평화,자유|dove,peace,freedom
+🦅|독수리,미국,자유,예리함|eagle,america,freedom,sharp
+🦆|오리,러버덕,디버깅,꽥|duck,rubber duck,debugging,quack
+🦢|백조,우아함,발레|swan,elegant,grace
+🦉|부엉이,올빼미,지혜,밤샘,야행성|owl,wisdom,night owl,late night,smart
+🦤|도도새,멸종|dodo,extinct
+🪶|깃털,가벼움,글쓰기,펜|feather,light,writing,quill
+🦩|홍학,플라밍고,분홍|flamingo,pink
+🦚|공작,화려함,자랑|peacock,fancy,proud,show off
+🦜|앵무새,따라하기,수다,반복|parrot,repeat,mimic,talkative
+🪽|날개,비행,자유,천사|wing,fly,freedom,angel
+🐦‍⬛|까마귀,검은새|black bird,crow,raven
+🪿|거위,꽥|goose,honk
+🐸|개구리,개굴,페페|frog,pepe,croak
+🐊|악어,위험|crocodile,alligator,danger
+🐢|거북이,느림,천천히,꾸준함|turtle,slow,steady,tortoise
+🦎|도마뱀,파충류|lizard,gecko,reptile
+🐍|뱀,파이썬,교활|snake,python,sly
+🐲|용,드래곤,동양|dragon,dragon face
+🐉|용,드래곤,강함,판타지|dragon,fantasy,power
+🦕|공룡,초식공룡,브라키오사우루스|dinosaur,sauropod,brontosaurus
+🦖|공룡,티렉스,티라노,크롬|t-rex,dinosaur,tyrannosaurus,chrome
+🐳|고래,도커,바다|whale,docker,ocean
+🐋|고래,바다,거대|whale,ocean,huge
+🐬|돌고래,바다,영리,MySQL|dolphin,ocean,smart,mysql
+🦭|물개,바다표범|seal,sea lion
+🐟|물고기,생선,낚시|fish,seafood,fishing
+🐠|열대어,물고기,수족관|tropical fish,aquarium,fish
+🐡|복어,가시|blowfish,pufferfish
+🦈|상어,위험,공격|shark,danger,predator
+🐙|문어,깃허브,촉수,멀티|octopus,github,tentacles,multitask
+🐚|조개껍데기,소라,바다,해변,셸|shell,seashell,beach,terminal
+🪸|산호초,바다,생태계|coral,reef,ocean
+🪼|해파리,바다|jellyfish,ocean
+🦀|게,꽃게,러스트,해산물|crab,rust,seafood
+🦞|랍스터,바닷가재,해산물|lobster,seafood
+🦐|새우,해산물|shrimp,prawn,seafood
+🦑|오징어,해산물|squid,seafood
+🦪|굴,조개,진주|oyster,pearl,clam
+🐌|달팽이,느림,지연,천천히,랙|snail,slow,lag,latency
+🦋|나비,변화,변신,성장,아름다움|butterfly,change,transformation,growth
+🐛|버그,벌레,오류,결함,에러,디버그|bug,error,defect,issue,caterpillar,debug
+🐜|개미,근면,일개미,작은|ant,hard working,small,worker
+🐝|꿀벌,바쁨,근면,협업|bee,busy,hard work,honey
+🪲|딱정벌레,벌레,버그|beetle,bug,insect
+🐞|무당벌레,버그,벌레|ladybug,bug,insect
+🦗|귀뚜라미,조용,정적|cricket,silence,awkward
+🪳|바퀴벌레,해충,끈질김|cockroach,pest,bug
+🕷️|거미,크롤러,벌레|spider,crawler,insect
+🕸️|거미줄,웹,네트워크,연결,크롤링|spider web,web,network,crawling
+🦂|전갈,독,전갈자리|scorpion,poison,scorpio
+🦟|모기,여름,해충|mosquito,summer,pest
+🪰|파리,해충|fly,pest
+🪱|지렁이,벌레,웜|worm,earthworm
+🦠|세균,바이러스,미생물,감염,코로나|microbe,virus,germ,bacteria,infection
+💐|꽃다발,축하,선물,감사,기념일|bouquet,flowers,congrats,gift,thanks
+🌸|벚꽃,봄,꽃,분홍,벚꽃놀이|cherry blossom,spring,sakura,flower
+💮|참잘했어요,도장,흰꽃,칭찬|white flower,well done,stamp,good job
+🪷|연꽃,불교,평화|lotus,buddhism,peace
+🏵️|장식,꽃장식,배지|rosette,decoration,badge
+🌹|장미,사랑,로맨스,고백|rose,love,romance
+🥀|시든꽃,이별,슬픔,끝|wilted flower,sad,end,decline
+🌺|무궁화,꽃,하와이|hibiscus,flower,hawaii
+🌻|해바라기,여름,밝음|sunflower,summer,bright
+🌼|꽃,데이지,봄|blossom,daisy,flower,spring
+🌷|튤립,봄,꽃|tulip,spring,flower
+🪻|히아신스,라벤더,보라꽃|hyacinth,lavender,flower
+🌱|새싹,시작,성장,신규,초기,씨앗,친환경|seedling,sprout,growth,new,start,beginning,eco
+🪴|화분,식물,반려식물,인테리어|potted plant,houseplant,plant
+🌲|소나무,숲,나무,캠핑|evergreen tree,forest,pine,tree
+🌳|나무,자연,숲,트리,구조|tree,nature,forest,tree structure
+🌴|야자수,휴가,여름,휴양지|palm tree,vacation,tropical,beach
+🌵|선인장,사막,가시|cactus,desert,spiky
+🌾|벼,추수,가을,농사,쌀|rice,harvest,grain,autumn,farm
+🌿|허브,풀,식물,자연|herb,leaf,plant,nature
+☘️|토끼풀,세잎클로버,아일랜드|shamrock,clover,ireland
+🍀|네잎클로버,행운,럭키|four leaf clover,luck,lucky
+🍁|단풍,가을,캐나다|maple leaf,autumn,fall,canada
+🍂|낙엽,가을|fallen leaves,autumn,fall
+🍃|나뭇잎,바람,자연|leaf,wind,breeze,nature
+🪹|빈둥지,빈자리,독립|empty nest,empty
+🪺|둥지,알,보금자리|nest with eggs,nest,home
+🍄|버섯,마리오,숲|mushroom,fungus,mario

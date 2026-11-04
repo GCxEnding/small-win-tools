@@ -1,0 +1,163 @@
+# People & Body (성별 변형은 build_data.py가 기본형 태그를 물려받게 처리)
+👋|안녕,인사,손흔들기,환영,작별,하이,바이|hello,hi,wave,bye,greeting,welcome
+🤚|손,멈춤,손등,잠깐|raised hand,stop,wait,hand
+🖐️|손,다섯,하이파이브,멈춤|hand,five,high five,stop
+✋|멈춤,정지,손들기,하이파이브,스톱|stop,hand,halt,high five,raise hand
+🖖|스타트렉,인사,벌칸|vulcan,star trek,live long
+🫱|손,오른쪽,악수|rightwards hand,hand,shake
+🫲|손,왼쪽,악수|leftwards hand,hand
+🫳|손,내려놓기,떨어뜨림,무시|palm down,drop,dismiss
+🫴|손,받기,제안,요청,부탁|palm up,offer,receive,ask
+🫷|밀기,거절,멈춤,하이파이브|push,refuse,stop,wait
+🫸|밀기,거절,멈춤,하이파이브|push,refuse,stop,wait
+👌|오케이,좋아,확인,완벽,승인|ok,okay,perfect,approve,fine
+🤌|뭐라고,이탈리아,강조,제스처|pinched fingers,what,italian,gesture
+🤏|조금,약간,작음,미세|small,little,tiny,pinch,bit
+✌️|브이,평화,승리,사진,피스|victory,peace,v sign,win,photo
+🤞|행운,기원,소원,바람,제발|fingers crossed,luck,hope,wish
+🫰|손하트,사랑,돈,핑거스냅|finger heart,love,money,snap
+🤟|사랑해,수화,락|love you,sign language,rock
+🤘|락,메탈,신남,록|rock,metal,rock on
+🤙|전화,연락,콜,샤카,좋아|call me,phone,shaka,hang loose
+👈|왼쪽,이전,가리키기,저기|left,previous,point,back
+👉|오른쪽,다음,가리키기,여기,참고|right,next,point,see,this
+👆|위,위쪽,가리키기,위참고|up,above,point
+🖕|욕,엿,모욕,빡침|middle finger,rude,insult,fuck
+👇|아래,아래쪽,가리키기,아래참고,하단|down,below,point,see below
+☝️|하나,첫째,주목,요점,잠깐|one,first,point up,attention,important
+🫵|너,당신,지목,가리키기|you,point at viewer,pick
+👍|좋아요,좋아,확인,승인,동의,엄지척,굿|like,thumbs up,good,approve,agree,ok,yes
+👎|싫어요,반대,별로,거절,비추천|dislike,thumbs down,bad,disagree,no,reject
+✊|주먹,파이팅,연대,힘,투쟁|fist,fight,power,solidarity
+👊|주먹,펀치,파이팅,맞짱|punch,fist bump,fight
+🤛|주먹,하이파이브,인사,팀|fist bump,team
+🤜|주먹,하이파이브,인사,팀|fist bump,team
+👏|박수,축하,칭찬,잘했어,브라보|clap,applause,congrats,well done,bravo
+🙌|만세,축하,환호,성공,해냈다|hooray,celebrate,praise,success,raise hands
+🫶|손하트,사랑,감사,애정|heart hands,love,thanks,support
+👐|포옹,환영,열린,오픈|open hands,hug,welcome,open
+🤲|기도,구걸,받기,요청|palms up,pray,ask,receive
+🤝|악수,협력,합의,계약,파트너,협업,제휴|handshake,deal,agreement,partnership,collaboration,contract
+🙏|감사,부탁,기도,제발,소원,고마워|thanks,please,pray,thank you,hope,grateful
+✍️|작성,글쓰기,기록,서명,메모,필기|write,writing,sign,note,author
+💅|매니큐어,네일,뷰티,여유,관리|nail polish,manicure,beauty,sassy
+🤳|셀카,사진,촬영,인스타|selfie,photo,camera,instagram
+💪|힘,근육,운동,헬스,파이팅,강함|strong,muscle,workout,gym,power,flex
+🦾|기계팔,로봇,의수,강화|mechanical arm,robot,prosthetic,cyborg
+🦿|의족,기계다리,로봇|mechanical leg,prosthetic,robot
+🦵|다리,발차기,하체운동|leg,kick,limb
+🦶|발,발자국,발차기|foot,step,kick
+👂|귀,듣기,경청,청취|ear,listen,hear
+🦻|보청기,청각,귀|hearing aid,ear,accessibility
+👃|코,냄새,향기|nose,smell,scent
+🧠|뇌,생각,지식,아이디어,두뇌,학습,지능|brain,mind,smart,knowledge,think,intelligence,learning
+🫀|심장,장기,건강|heart,organ,cardiology,health
+🫁|폐,호흡,숨,건강|lungs,breath,breathing,health
+🦷|치아,이빨,치과,양치|tooth,teeth,dentist
+🦴|뼈,해골,뼈다귀,골격|bone,skeleton
+👀|보기,관찰,확인,주목,궁금,검토중|eyes,look,watch,see,review,check
+👁️|눈,보기,감시,시야|eye,see,vision,watch
+👅|혀,맛,메롱|tongue,taste,lick
+👄|입,입술,말하기,키스|mouth,lips,speak,kiss
+🫦|입술,설렘,긴장,유혹|biting lip,nervous,flirt
+👶|아기,신생아,육아,출산,베이비|baby,infant,newborn,child
+🧒|어린이,아이,아동,키즈|child,kid,children
+👦|남자아이,소년,아들|boy,son,kid
+👧|여자아이,소녀,딸|girl,daughter,kid
+🧑|사람,인물,개인,사용자,유저|person,people,user,individual
+👱|금발,사람|blond,person
+👨|남자,남성,아빠,아저씨|man,male,dad
+🧔|수염,남자,턱수염|beard,bearded,man
+👩|여자,여성,엄마|woman,female,mom
+🧑‍🦰|빨간머리,사람|red hair,person
+🧑‍🦱|곱슬머리,사람|curly hair,person
+🧑‍🦳|백발,흰머리,노인|white hair,person,elder
+🧑‍🦲|대머리,민머리|bald,person
+🧓|노인,어르신,시니어|older person,elder,senior
+👴|할아버지,노인,어르신|grandpa,old man,grandfather
+👵|할머니,노인,어르신|grandma,old woman,grandmother
+🙍|찌푸림,불만,우울|frowning person,upset,unhappy
+🙎|뾰로통,삐짐,불만|pouting person,sulk,upset
+🙅|안됨,금지,거절,엑스,노|no,refuse,deny,not allowed,nope
+🙆|오케이,좋아,동그라미,허락|ok,yes,approve,allowed
+💁|안내,정보,도움말,정보제공,참고|information,tip,help desk,info,sassy
+🙋|질문,손들기,저요,발표,지원|question,raise hand,me,volunteer,ask
+🧏|청각장애,수화,안들림|deaf,sign language,accessibility
+🙇|사과,죄송,감사,인사,절|bow,sorry,apologize,thanks,respect
+🤦|어이없음,한심,실수,망함,에휴|facepalm,mistake,ugh,oops,embarrassing
+🤷|모름,글쎄,어쩔,몰라,상관없음|shrug,dunno,whatever,not sure,idk
+🧑‍⚕️|의사,간호사,병원,의료,건강|doctor,nurse,health,medical,hospital
+🧑‍🎓|학생,졸업,대학,공부,학위|student,graduate,university,study,degree
+🧑‍🏫|선생님,교사,강의,교육,수업,발표,강사|teacher,lecture,education,class,instructor,presentation
+🧑‍⚖️|판사,법,재판,법률,판결|judge,law,court,legal,justice
+🧑‍🌾|농부,농업,농사,텃밭|farmer,agriculture,farm,garden
+🧑‍🍳|요리사,셰프,요리,주방,레시피|cook,chef,cooking,kitchen,recipe
+🧑‍🔧|정비공,수리,기술자,유지보수,고장|mechanic,repair,technician,maintenance,fix
+🧑‍🏭|공장,노동자,제조,생산|factory worker,manufacturing,industry
+🧑‍💼|회사원,직장인,비즈니스,업무,사무직,출근,회사|office worker,business,work,manager,job,company
+🧑‍🔬|과학자,연구,실험,연구원|scientist,research,lab,experiment
+🧑‍💻|개발자,프로그래머,코딩,개발,IT,재택근무,엔지니어|developer,programmer,coding,engineer,it,technologist,remote work
+🧑‍🎤|가수,공연,노래,아이돌,락스타|singer,rock star,performance,idol
+🧑‍🎨|화가,예술가,디자이너,그림,미술|artist,painter,designer,art
+🧑‍✈️|조종사,파일럿,기장,비행|pilot,captain,aviation,flight
+🧑‍🚀|우주비행사,우주,탐험,나사|astronaut,space,explore,nasa
+🧑‍🚒|소방관,화재,구조,긴급|firefighter,fire,rescue,emergency
+👮|경찰,경찰관,치안,단속,보안|police,officer,cop,security,law
+🕵️|탐정,조사,추적,디버깅,수사,스파이|detective,investigate,spy,sleuth,debugging
+💂|근위병,경비,보초,경호|guard,sentry,security
+🥷|닌자,은밀,잠입,몰래,스텔스|ninja,stealth,sneaky,hidden
+👷|공사,건설,작업중,공사중,인부,빌드|construction,worker,under construction,builder,wip
+🫅|왕,군주,왕관,귀족|royalty,monarch,king,noble
+🤴|왕자,왕족|prince,royal
+👸|공주,왕족,프린세스|princess,royal
+👳|터번,사람|turban,person
+👲|중국모자,사람|skullcap,person
+🧕|히잡,스카프,여자|headscarf,hijab,woman
+🤵|턱시도,신랑,결혼,정장|tuxedo,groom,wedding,formal
+👰|신부,결혼,웨딩,면사포|bride,wedding,veil,marriage
+🤰|임신,임산부,출산,태교|pregnant,pregnancy,expecting
+🫃|임신,배|pregnant man,belly
+🫄|임신,임산부|pregnant person
+🤱|수유,모유,육아,아기|breastfeeding,nursing,baby
+🧑‍🍼|수유,육아,아기,분유|feeding baby,parenting,bottle
+👼|아기천사,천사,큐피드|baby angel,angel,cherub
+🎅|산타,크리스마스,선물,성탄절|santa,christmas,xmas,gift
+🤶|산타,크리스마스,성탄절|mrs claus,christmas,xmas
+🧑‍🎄|산타,크리스마스,성탄절|mx claus,christmas,xmas
+🦸|영웅,히어로,슈퍼히어로,구원,해결사|superhero,hero,savior,power
+🦹|악당,빌런,범죄|supervillain,villain,evil,criminal
+🧙|마법사,마법,위저드,마술|wizard,mage,magic,sorcerer
+🧚|요정,판타지,마법|fairy,magic,fantasy
+🧛|뱀파이어,흡혈귀,드라큘라,할로윈|vampire,dracula,halloween
+🧜|인어,바다,판타지|merperson,mermaid,sea,fantasy
+🧝|엘프,요정,판타지|elf,fantasy
+🧞|지니,소원,램프,마법|genie,wish,magic
+🧟|좀비,할로윈,언데드,피곤|zombie,undead,halloween,brain dead
+🧌|트롤,괴물,악플|troll,monster,internet troll
+💆|마사지,힐링,휴식,스파|massage,relax,spa,healing
+💇|미용실,헤어컷,머리자르기,이발|haircut,salon,barber,hair
+🚶|걷기,산책,보행,이동,출근|walking,walk,pedestrian,stroll,commute
+🧍|서있기,대기,기다림|standing,wait,stand
+🧎|무릎꿇기,기도,사과|kneeling,kneel,pray
+🧑‍🦯|시각장애,지팡이,접근성|white cane,blind,accessibility
+🧑‍🦼|휠체어,장애,접근성|motorized wheelchair,accessibility,disability
+🧑‍🦽|휠체어,장애,접근성|manual wheelchair,accessibility,disability
+🏃|달리기,러닝,조깅,급함,서두름,운동|running,run,jogging,hurry,rush,exercise
+💃|춤,댄스,파티,신남|dance,dancing,party,salsa
+🕺|춤,댄스,파티,디스코|dance,dancing,disco,party
+🕴️|정장,부유,비즈니스,공중부양|levitating,suit,business
+👯|토끼귀,파티,춤,친구|bunny ears,party,dancing,friends
+🧖|사우나,찜질방,스파,휴식,목욕|sauna,steam room,spa,relax
+🧗|클라이밍,등반,암벽,도전|climbing,rock climbing,challenge
+🤺|펜싱,검,결투|fencing,sword,duel
+🏇|승마,경마,말|horse racing,jockey,horse
+⛷️|스키,겨울,스포츠|skier,ski,winter
+🏂|스노보드,보드,겨울|snowboarder,snowboard,winter
+🏌️|골프,골프장,스포츠|golfer,golf
+🏄|서핑,파도,바다,여름|surfer,surfing,wave,beach
+🚣|조정,보트,노젓기,카누|rowing,boat,canoe,kayak
+🏊|수영,수영장,운동|swimmer,swimming,pool
+⛹️|농구,공,스포츠|basketball,ball,sports
+🏋️|역도,헬스,운동,근력,웨이트|weightlifting,gym,workout,lift,fitness
+🚴|자전거,라이딩,사이클,출퇴근|cycling,bike,bicycle,riding
+🚵|산악자전거,MTB,라이딩|mountain biking,mtb,bike

@@ -1,0 +1,194 @@
+# Objects
+👓|안경,독서,검토,리뷰|glasses,eyeglasses,read,review
+🕶️|선글라스,멋짐,여름|sunglasses,cool,summer
+🥽|고글,보호,실험,안전|goggles,safety,protection,lab
+🥼|실험복,가운,연구,의사|lab coat,research,scientist,doctor
+🦺|안전조끼,안전,작업|safety vest,safety,work
+👔|넥타이,정장,비즈니스,출근,면접|necktie,tie,business,formal,interview
+👕|티셔츠,옷,캐주얼|t-shirt,shirt,clothes,casual
+👖|청바지,바지,옷|jeans,pants,denim
+🧣|목도리,스카프,겨울|scarf,winter
+🧤|장갑,겨울|gloves,winter
+🧥|코트,외투,겨울|coat,jacket,winter
+🧦|양말|socks
+👗|원피스,드레스,옷,패션|dress,clothes,fashion
+👘|기모노,일본|kimono,japan
+🥻|사리,인도|sari,india
+🩱|수영복,여름|one-piece swimsuit,swimsuit
+🩲|수영복,속옷|briefs,swimsuit
+🩳|반바지,여름|shorts,summer
+👙|비키니,수영복,해변|bikini,swimsuit,beach
+👚|옷,블라우스,패션|clothes,blouse,womans clothes
+🪭|부채,여름,더위|folding fan,fan,summer
+👛|지갑,동전지갑|purse,wallet,coin purse
+👜|핸드백,가방|handbag,bag
+👝|파우치,가방|clutch bag,pouch
+🛍️|쇼핑,쇼핑백,구매,장보기|shopping bags,shopping,purchase,buy
+🎒|가방,책가방,학교,등교,여행|backpack,school bag,school,travel
+🩴|샌들,쪼리,슬리퍼|thong sandal,flip flops,slippers
+👞|구두,신발,정장|mans shoe,shoe,dress shoe
+👟|운동화,신발,러닝|sneaker,running shoe,shoe
+🥾|등산화,하이킹,트레킹|hiking boot,hiking,trekking
+🥿|플랫슈즈,신발|flat shoe,shoe
+👠|하이힐,구두|high-heeled shoe,heels
+👡|샌들,여름|sandal,summer
+🩰|발레,토슈즈|ballet shoes,ballet
+👢|부츠,장화|boot,boots
+🪮|빗,머리빗기|hair pick,comb
+👑|왕관,왕,최고,1등,VIP,관리자,우승|crown,king,queen,best,vip,admin,winner
+👒|모자,여름|womans hat,hat,summer
+🎩|모자,신사,마술|top hat,hat,gentleman,magic
+🎓|졸업,학위,대학,교육,공부,학습|graduation cap,graduation,degree,education,study,learning
+🧢|모자,야구모자,캡|billed cap,baseball cap,cap
+🪖|헬멧,군대,군인|military helmet,army,soldier
+⛑️|안전모,구조,응급|rescue worker helmet,safety,rescue
+📿|묵주,염주,기도|prayer beads,rosary
+💄|립스틱,화장,뷰티,메이크업|lipstick,makeup,beauty
+💍|반지,결혼,약혼,프러포즈|ring,wedding,engagement,proposal
+💎|보석,다이아몬드,가치,프리미엄,루비|gem,diamond,jewel,precious,premium,ruby
+🔇|음소거,무음,조용|muted speaker,mute,silent
+🔈|스피커,소리,볼륨|speaker,sound,volume
+🔉|볼륨,소리작게|speaker medium volume,volume down
+🔊|볼륨,소리크게,오디오|speaker high volume,loud,volume up,audio
+📢|공지,안내,알림,확성기,발표,공지사항|announcement,loudspeaker,notice,broadcast,announce
+📣|홍보,응원,메가폰,공지,마케팅|megaphone,announce,cheer,promotion,marketing
+📯|우편나팔,호른|postal horn,horn
+🔔|알림,종,벨,구독|bell,notification,alert,subscribe
+🔕|알림끔,무음,방해금지|bell with slash,mute,no notifications,do not disturb
+🎼|악보,음악,작곡|musical score,sheet music,music
+🎵|음악,노래,음표,멜로디|music,musical note,song,melody
+🎶|음악,노래,흥얼,플레이리스트|musical notes,music,song,playlist
+🎙️|마이크,팟캐스트,녹음,방송|studio microphone,podcast,recording,broadcast
+🎚️|슬라이더,조절,레벨|level slider,slider,adjust
+🎛️|컨트롤,조절,믹서,설정|control knobs,mixer,controls,settings
+🎤|마이크,노래,노래방,발표,인터뷰|microphone,karaoke,sing,interview,speech
+🎧|헤드폰,음악,집중,팟캐스트,듣기|headphone,music,listen,focus,podcast
+📻|라디오,방송|radio,broadcast
+🎷|색소폰,재즈|saxophone,jazz
+🎺|트럼펫,나팔|trumpet
+🪗|아코디언|accordion
+🎸|기타,락,밴드|guitar,rock,band
+🎹|피아노,건반,음악|piano,keyboard,musical keyboard
+🎻|바이올린,클래식|violin,classical
+🪕|밴조|banjo
+🥁|드럼,북,두구두구,발표|drum,drumroll,announcement
+🪘|북,장구|long drum,drum
+🪇|마라카스,흥|maracas
+🪈|플루트,피리|flute
+📱|휴대폰,스마트폰,모바일,앱,핸드폰|mobile phone,smartphone,mobile,app,phone
+📲|전화,모바일,송신,앱설치|mobile phone with arrow,call,send,mobile
+☎️|전화,연락,통화,고객센터|telephone,phone,call,contact
+📞|전화,통화,연락,콜|telephone receiver,call,phone,contact
+📟|삐삐,호출기,온콜|pager,on-call,beeper
+📠|팩스|fax machine,fax
+🔋|배터리,충전,에너지,전원,컨디션|battery,charge,energy,power
+🪫|배터리부족,방전,지침,번아웃|low battery,drained,tired,burnout
+🔌|플러그,전원,연결,플러그인,충전|electric plug,plug,power,plugin,connect
+💻|노트북,컴퓨터,개발,코딩,업무,PC,랩탑|laptop,computer,coding,work,pc,dev
+🖥️|서버,컴퓨터,데스크톱,모니터,PC|server,desktop computer,computer,monitor,pc
+🖨️|프린터,인쇄,출력|printer,print
+⌨️|키보드,타이핑,입력,단축키|keyboard,typing,input,shortcut
+🖱️|마우스,클릭|computer mouse,mouse,click
+🖲️|트랙볼|trackball
+💽|MD,디스크,저장|computer disk,minidisc,disk
+💾|저장,플로피,세이브,백업|save,floppy disk,backup,storage
+💿|CD,디스크,음반|optical disk,cd,disc,album
+📀|DVD,디스크|dvd,disc
+🧮|주판,계산,회계,수학|abacus,calculation,accounting,math
+🎥|영화,촬영,동영상,비디오,녹화|movie camera,film,video,recording
+🎞️|필름,영화,프레임|film frames,film,movie
+📽️|영사기,영화,상영|film projector,movie,cinema
+🎬|영화,촬영,액션,클립보드,시작|clapper board,movie,film,action,scene
+📺|TV,텔레비전,방송,시청|television,tv,broadcast,watch
+📷|카메라,사진,촬영,스크린샷|camera,photo,photography,screenshot
+📸|사진,촬영,플래시,스냅샷,스크린샷|camera with flash,photo,snapshot,screenshot
+📹|캠코더,동영상,녹화,영상통화|video camera,video,recording,video call
+📼|비디오테이프,VHS,레트로|videocassette,vhs,tape,retro
+🔍|검색,찾기,조사,탐색,돋보기,리서치|search,find,magnifying glass,research,investigate,lookup
+🔎|검색,찾기,확대,자세히,분석|search,find,zoom,inspect,detail,analyze
+🕯️|양초,촛불,추모,분위기|candle,light,memorial
+💡|아이디어,전구,팁,영감,발상,생각|idea,light bulb,tip,inspiration,insight
+🔦|손전등,탐색,조명|flashlight,torch,explore
+🏮|등,등불,축제|red paper lantern,lantern
+🪔|기름램프,디왈리|diya lamp,lamp,diwali
+📔|노트,일기,다이어리,기록|notebook with decorative cover,diary,journal
+📕|책,빨간책,교재|closed book,book,red book
+📖|책,독서,읽기,문서,매뉴얼,가이드|open book,book,reading,read,docs,manual,guide
+📗|책,초록책|green book,book
+📘|책,파란책,가이드|blue book,book,guide
+📙|책,주황책|orange book,book
+📚|책,공부,학습,독서,자료,참고문헌,지식|books,study,learning,reading,library,reference,knowledge
+📓|공책,노트,필기|notebook,notes
+📒|장부,노트,기록|ledger,notebook,log
+📃|문서,페이지,기록|page with curl,document,page
+📜|두루마리,문서,역사,기록,스크립트|scroll,document,history,script,record
+📄|문서,페이지,파일,보고서,서류|document,page,file,report,paper
+📰|뉴스,신문,소식,기사|newspaper,news,article,press
+🗞️|신문,뉴스|rolled-up newspaper,news
+📑|탭,북마크,문서,색인|bookmark tabs,tabs,index,document
+🔖|북마크,책갈피,저장,즐겨찾기|bookmark,save,favorite
+🏷️|태그,라벨,가격표,분류,카테고리|label,tag,price tag,category
+🪙|동전,코인,돈,암호화폐|coin,money,crypto
+💰|돈,돈주머니,예산,수익,매출,재무|money bag,money,budget,revenue,profit,finance
+💴|엔,엔화,돈,일본|yen,money,japan
+💵|달러,돈,현금,급여|dollar,money,cash,salary
+💶|유로,돈,유럽|euro,money,europe
+💷|파운드,돈,영국|pound,money,uk
+💸|지출,돈날림,비용,낭비,결제|money with wings,spending,cost,expense,payment
+💳|신용카드,결제,카드,구매,구독|credit card,payment,card,purchase,subscription
+🧾|영수증,경비,정산,청구서,인보이스|receipt,expense,invoice,bill,reimbursement
+💹|주식,증권,상승,차트,엔화|chart increasing with yen,stocks,market
+✉️|편지,봉투,메일,우편|envelope,letter,mail,email
+📧|이메일,메일,전자우편|e-mail,email,mail
+📨|받은메일,수신,메일|incoming envelope,incoming,mail,receive
+📩|메일발송,보낸메일,편지|envelope with arrow,send mail,outgoing
+📤|보낸편지함,발송,업로드,내보내기|outbox,send,upload,export
+📥|받은편지함,수신,다운로드,가져오기,인박스|inbox,receive,download,import
+📦|패키지,택배,배송,상자,배포,모듈,의존성|package,box,delivery,parcel,shipping,module,dependency
+📫|우편함,메일함|closed mailbox with raised flag,mailbox
+📪|우편함,빈우편함|closed mailbox with lowered flag,mailbox
+📬|우편함,새메일|open mailbox with raised flag,mailbox,new mail
+📭|우편함,빈메일함|open mailbox with lowered flag,empty mailbox
+📮|우체통,우편|postbox,mail
+🗳️|투표,선거,의결,설문|ballot box,vote,election,poll
+✏️|연필,편집,수정,작성,메모|pencil,edit,write,draft,note
+✒️|펜촉,서명,글쓰기|black nib,pen,sign,writing
+🖋️|만년필,서명,계약|fountain pen,pen,signature,contract
+🖊️|펜,볼펜,작성,서명|pen,ballpoint,write,sign
+🖌️|붓,그림,페인트,디자인|paintbrush,paint,brush,design
+🖍️|크레용,그림,낙서|crayon,drawing,doodle
+📝|메모,노트,기록,작성,문서,할일,회의록,필기|memo,note,notes,write,todo,minutes,draft
+💼|서류가방,업무,비즈니스,회사,출장,일|briefcase,work,business,job,office
+📁|폴더,파일,디렉토리,보관|file folder,folder,directory
+📂|폴더열기,디렉토리,파일|open file folder,folder,directory,open
+🗂️|분류,정리,색인,인덱스,카테고리|card index dividers,organize,categories,index
+📅|일정,달력,캘린더,날짜,약속,스케줄|calendar,schedule,date,event,appointment
+📆|달력,일정,캘린더,날짜,마감일|tear-off calendar,calendar,date,schedule,deadline
+🗒️|메모장,노트,스프링노트|spiral notepad,notepad,notes
+🗓️|달력,일정,계획,캘린더,월간|spiral calendar,calendar,plan,schedule,monthly
+📇|명함,연락처,주소록|card index,contacts,rolodex,address book
+📈|상승,증가,성장,차트,그래프,실적,통계|chart increasing,growth,increase,trend up,stats,analytics
+📉|하락,감소,차트,그래프,손실|chart decreasing,decline,decrease,trend down,loss
+📊|차트,그래프,통계,데이터,분석,보고서,대시보드|bar chart,chart,stats,data,analytics,report,dashboard
+📋|클립보드,체크리스트,목록,할일,복사,양식|clipboard,checklist,list,todo,copy,form
+📌|고정,핀,중요,압정,공지|pushpin,pin,pinned,important
+📍|위치,장소,핀,지도|round pushpin,location,place,pin,map
+📎|첨부,클립,첨부파일|paperclip,attachment,attach
+🖇️|연결,클립,링크|linked paperclips,link,attach
+📏|자,측정,길이,기준|straight ruler,ruler,measure
+📐|삼각자,설계,디자인,측정,건축|triangular ruler,design,measure,architecture
+✂️|가위,자르기,잘라내기,편집|scissors,cut,trim,edit
+🗃️|파일상자,보관,아카이브|card file box,archive,storage
+🗄️|데이터베이스,서랍장,보관,DB,캐비닛,파일|database,file cabinet,storage,db,archive
+🗑️|쓰레기통,삭제,휴지통,제거,버림|wastebasket,trash,delete,remove,bin
+🔒|보안,잠금,비공개,암호,잠김,권한,프라이버시|lock,locked,security,private,secure,encryption,permission
+🔓|잠금해제,공개,열림,해제|unlocked,unlock,open,public
+🔏|서명,보안,인증,암호화|locked with pen,signed,privacy,encrypted
+🔐|보안,인증,암호,키,비밀번호|locked with key,security,secure,auth,password
+🔑|열쇠,키,비밀번호,API키,인증,로그인,접근|key,password,api key,auth,login,access,credential
+🗝️|열쇠,오래된열쇠,비밀,해결책|old key,key,secret,clue
+🔨|망치,수리,빌드,만들기,작업|hammer,build,fix,tool,work
+🪓|도끼,자르기,삭감|axe,chop,cut
+⛏️|곡괭이,채굴,마이닝,발굴|pick,mining,dig
+⚒️|망치,곡괭이,작업,도구|hammer and pick,tools,work
+🛠️|도구,수리,유지보수,설정,빌드,툴,고침|hammer and wrench,tools,repair,maintenance,fix,build,tooling
