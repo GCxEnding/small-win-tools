@@ -116,6 +116,8 @@ class App:
         self.tray.show()
 
         self.timer = QTimer()
+        # 초 단위 정밀도면 충분: OS가 다른 타이머와 묶어 깨울 수 있어 CPU 깨움이 줄어든다
+        self.timer.setTimerType(Qt.VeryCoarseTimer)
         self.timer.timeout.connect(self.on_tick)
         self.timer.start(int(float(self.config.get("poll_seconds", 5)) * 1000))
         self.on_tick()

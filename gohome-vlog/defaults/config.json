@@ -5,7 +5,7 @@
   "alarm_time": "17:50",
   "leave_idle_minutes": 30,
   "min_minutes_for_item": 5,
-  "timeline_block_minutes": 15,
+  "timeline_block_minutes": 10,
   "code_top_files": 3,
   "summary_keep_days": 7,
   "exclude_processes": ["KeePassXC.exe", "1Password.exe"],

@@ -70,7 +70,7 @@ def build_summary(records, config: dict, now: datetime | None = None,
     if rules is None:
         rules = load_default_rules()
     min_item = float(config.get("min_minutes_for_item", 5)) * 60
-    block_min = max(1, int(config.get("timeline_block_minutes", 15)))
+    block_min = max(1, int(config.get("timeline_block_minutes", 10)))
     top_files = int(config.get("code_top_files", 3))
 
     spans = _spans(records, rules, now)
@@ -123,7 +123,7 @@ def _flow_label(g: tuple[str, str]) -> str:
 
 
 def build_flow(spans, block_minutes: int):
-    """15분(설정값) 블록별 주 활동. 같은 내용이 이어지는 블록은 합친다. idle만 있는 블록은 생략."""
+    """10분(설정값) 블록별 주 활동. 같은 내용이 이어지는 블록은 합친다. idle만 있는 블록은 생략."""
     step = timedelta(minutes=block_minutes)
     blocks: dict[datetime, dict[tuple[str, str], float]] = defaultdict(lambda: defaultdict(float))
     for s, e, k in spans:

@@ -68,6 +68,13 @@ pythonw.exe "D:\...\small-win-tools\gohome-vlog\gohome_vlog.pyw"
 
 `pythonw.exe` 를 못 찾는다고 하면 `where pythonw` 로 나온 전체 경로를 넣어 주세요.
 
+> 💡 그냥 `pythonw.exe` 라고 쓰면 Python 설치 관리자의 실행기(런처)가 프로세스 하나를 더 띄워 둘 수 있어요(약 15MB).
+> 아래 명령으로 나온 실제 경로를 대상에 넣으면 프로세스가 하나만 떠요.
+>
+> ```bash
+> python -c "import sys; print(sys.executable.replace('python.exe', 'pythonw.exe'))"
+> ```
+
 ## 트레이 메뉴
 
 - **오늘 요약 복사**: 지금까지의 요약을 만들어 파일로 저장하고 클립보드에 복사
@@ -100,14 +107,14 @@ Obsidian 일지에 맞춰 목록은 `-`, 구분은 `:` 로 만들어요.
 
 #### 흐름
 - 09:00 ~ 10:30 : 코드 workflow-core, 서버 dev-was01
-- 10:30 ~ 11:45 : 코드 workflow-core
+- 10:30 ~ 11:40 : 코드 workflow-core
 - 13:00 ~ 14:00 : DB dev-oracle
-- 14:00 ~ 17:45 : 코드 workflow-core
+- 14:00 ~ 17:40 : 코드 workflow-core
 ```
 
 - 활동은 누적 시간이 많은 순서예요. 5분 미만 활동은 "기타"로 묶어요.
 - 코드는 프로젝트 단위로 합치고, 오래 본 파일 상위 3개를 괄호로 붙여요.
-- 흐름은 15분 블록 단위로 주 활동을 보여 주고, 같은 내용이 이어지면 합쳐요. 자리 비움만 있는 블록은 빼요.
+- 흐름은 10분 블록 단위로 주 활동을 보여 주고, 같은 내용이 이어지면 합쳐요. 자리 비움만 있는 블록은 빼요.
 
 ## 내 데이터 (PC마다 따로)
 
@@ -139,7 +146,7 @@ Obsidian 일지에 맞춰 목록은 `-`, 구분은 `:` 로 만들어요.
 | `alarm_time` | `"17:50"` | 퇴근 알림 시각 |
 | `leave_idle_minutes` | `30` | 알림 이후 이 시간 자리 비우면 퇴근으로 보고 최종본 생성 |
 | `min_minutes_for_item` | `5` | 이보다 짧은 활동은 "기타"로 묶음 |
-| `timeline_block_minutes` | `15` | 흐름 블록 길이(분) |
+| `timeline_block_minutes` | `10` | 흐름 블록 길이(분) |
 | `code_top_files` | `3` | 코드 활동에 붙이는 파일 개수 |
 | `summary_keep_days` | `7` | 요약 파일 보관 일수 |
 | `exclude_processes` | `["KeePassXC.exe", "1Password.exe"]` | 이 프로세스는 제목 없이 "제외됨"으로만 기록 |
@@ -199,6 +206,17 @@ gohome-vlog/
 ├─ defaults/              기본 rules.json, config.json
 └─ tests/
 ```
+
+## 성능
+
+느린 PC에서도 티 나지 않게 만들었어요. 직접 재 본 값(Windows 11, Python 3.15, PySide6 6.12):
+
+- **CPU**: 1분에 약 16ms (코어 하나 기준 0.03% 정도)
+- **폴링 1회**: 약 4µs. 같은 창이면 프로세스 이름을 다시 조회하지 않아요(`OpenProcess` 반복 없음, 보안 프로그램 감시 부담도 줄어요).
+- **메모리**: 약 60MB. 대부분 트레이와 알림에 쓰는 Qt 라이브러리 몫이에요.
+- **디스크**: 창이 바뀔 때 한 줄 추가, 진행 중 구간은 30초마다 작은 파일 하나 덮어쓰기(fsync 없음).
+- 타이머는 정밀도를 낮춰(`VeryCoarseTimer`) Windows가 다른 타이머와 묶어서 깨울 수 있게 했어요.
+- 잠금, 절전 중에는 창 정보를 읽지 않아요.
 
 ## 알려진 한계
 

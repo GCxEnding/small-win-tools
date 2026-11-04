@@ -66,12 +66,16 @@ def _window_title(hwnd) -> str:
     return buf.value
 
 
-def _process_name(hwnd) -> str:
+def _window_pid(hwnd) -> int:
     pid = wintypes.DWORD(0)
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    if not pid.value:
+    return pid.value
+
+
+def _process_name(pid: int) -> str:
+    if not pid:
         return UNKNOWN
-    h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
+    h = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not h:
         return UNKNOWN
     try:
@@ -85,7 +89,15 @@ def _process_name(hwnd) -> str:
 
 
 class Win32Api:
-    """collector가 쓰는 실제 구현. 테스트에서는 같은 메서드를 가진 가짜로 교체한다."""
+    """collector가 쓰는 실제 구현. 테스트에서는 같은 메서드를 가진 가짜로 교체한다.
+
+    프로세스 이름은 (hwnd, pid)가 바뀔 때만 다시 조회한다. 같은 창이면 OpenProcess를
+    5초마다 반복하지 않아 보안 프로그램(DLP, 백신)의 프로세스 감시 부담도 줄어든다.
+    """
+
+    def __init__(self):
+        self._last_window: tuple[int, int] | None = None
+        self._last_proc = UNKNOWN
 
     def foreground(self) -> tuple[str, str] | None:
         """(프로세스명, 창 제목). 활성 창이 없으면 None. 읽기 실패는 (알 수 없음)."""
@@ -97,7 +109,12 @@ class Win32Api:
         except OSError:
             title = UNKNOWN
         try:
-            proc = _process_name(hwnd)
+            key = (int(hwnd), _window_pid(hwnd))
+            if key != self._last_window:
+                self._last_proc = _process_name(key[1])
+                # 읽기 실패는 캐시하지 않고 다음 폴링에서 다시 시도
+                self._last_window = key if self._last_proc != UNKNOWN else None
+            proc = self._last_proc
         except OSError:
             proc = UNKNOWN
         return proc, title

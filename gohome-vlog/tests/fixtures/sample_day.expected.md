@@ -15,24 +15,26 @@
 - 기타 : 3분
 
 #### 흐름
-- 09:00 ~ 09:45 : 코드 workflow-core
-- 09:45 ~ 10:00 : 서버 dev-was01
-- 10:00 ~ 10:15 : 코드 workflow-core, 서버 dev-was01
-- 10:15 ~ 10:30 : 코드 workflow-core
-- 10:30 ~ 10:45 : 코드 workflow-core, 서버 dev-batch01
-- 10:45 ~ 11:00 : 파일전송 dev-was01, 서버 dev-batch01
-- 11:00 ~ 11:15 : 코드 workflow-core, 파일전송 dev-was01
-- 11:15 ~ 11:30 : AI Claude, 코드 workflow-core
-- 11:30 ~ 11:45 : AI Claude
-- 11:45 ~ 12:00 : 웹 Chrome
-- 12:45 ~ 13:30 : DB dev-oracle
-- 13:30 ~ 13:45 : DB dev-oracle, 서버 staging-api
-- 13:45 ~ 14:00 : 서버 staging-api, 제외됨
+- 09:00 ~ 09:50 : 코드 workflow-core
+- 09:50 ~ 10:00 : 서버 dev-was01
+- 10:00 ~ 10:10 : 서버 dev-was01, 코드 workflow-core
+- 10:10 ~ 10:40 : 코드 workflow-core
+- 10:40 ~ 10:50 : 서버 dev-batch01
+- 10:50 ~ 11:00 : 파일전송 dev-was01
+- 11:00 ~ 11:10 : 코드 workflow-core, 파일전송 dev-was01
+- 11:10 ~ 11:20 : 코드 workflow-core
+- 11:20 ~ 11:40 : AI Claude
+- 11:40 ~ 11:50 : AI Claude, 기타 notepad.exe
+- 11:50 ~ 12:00 : 웹 Chrome
+- 12:50 ~ 13:40 : DB dev-oracle
+- 13:40 ~ 13:50 : 서버 staging-api
+- 13:50 ~ 14:00 : 서버 staging-api, 제외됨
 - 14:00 ~ 14:30 : 코드 billing-portal
 - 14:30 ~ 15:30 : 코드 mail-gateway
 - 16:00 ~ 16:30 : 코드 workflow-core
-- 16:30 ~ 16:45 : 노트 work-vault
-- 16:45 ~ 17:45 : 코드 workflow-core
-- 17:45 ~ 18:00 : 웹 Chrome
-- 18:30 ~ 19:45 : 코드 workflow-core
-- 23:30 ~ 00:30 : 코드 ops-scripts
+- 16:30 ~ 16:40 : 노트 work-vault
+- 16:40 ~ 17:40 : 코드 workflow-core
+- 17:40 ~ 17:50 : 웹 Chrome, 코드 workflow-core
+- 17:50 ~ 18:00 : 웹 Chrome
+- 18:30 ~ 19:40 : 코드 workflow-core
+- 23:30 ~ 00:20 : 코드 ops-scripts

@@ -71,6 +71,13 @@ def test_idle_and_pause_not_counted():
     assert "- 12:00 ~ 12:30 : 웹 Chrome" in out  # idle 블록 생략으로 이어지지 않음
 
 
+def test_default_block_is_10_minutes():
+    recs = [rec("09:00", "09:08", "chrome.exe", "x"), rec("09:08", "09:20", "putty.exe", "srv - PuTTY")]
+    flow = build_summary(recs, CONFIG, DAY_END).split("#### 흐름\n")[1].splitlines()
+    # 09:00 블록: 웹 8분, 서버 2분(1/3 미만) -> 웹만
+    assert flow == ["- 09:00 ~ 09:10 : 웹 Chrome", "- 09:10 ~ 09:20 : 서버 srv"]
+
+
 def test_excluded_counted_as_time_only():
     recs = [rec("09:00", "09:10", proc=None, excluded=True) | {"proc": "KeePassXC.exe"}]
     out = build_summary(recs, CONFIG, DAY_END)
@@ -101,7 +108,7 @@ def test_flow_blocks_merge_and_secondary():
         rec("09:45", "09:58", "idea64.exe", "proj – A.java"),
         rec("09:58", "10:00", "putty.exe", "srv - PuTTY"),
     ]
-    out = build_summary(recs, CONFIG, DAY_END)
+    out = build_summary(recs, {**CONFIG, "timeline_block_minutes": 15}, DAY_END)
     flow = out.split("#### 흐름\n")[1].splitlines()
     assert flow == [
         "- 09:00 ~ 09:30 : 코드 proj",

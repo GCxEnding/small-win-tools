@@ -50,14 +50,16 @@ def day_bounds(day: date, starts_at: time) -> tuple[datetime, datetime]:
     return start, start + timedelta(days=1)
 
 
-def atomic_write_text(path: Path, text: str) -> None:
+def atomic_write_text(path: Path, text: str, durable: bool = True) -> None:
+    """durable=False면 fsync를 생략한다 (자주 쓰고 잃어도 되는 파일용, 디스크 부담 감소)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             f.write(text)
-            f.flush()
-            os.fsync(f.fileno())
+            if durable:
+                f.flush()
+                os.fsync(f.fileno())
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -205,7 +207,8 @@ class Store:
         if rec is None:
             self.current_path.unlink(missing_ok=True)
             return
-        atomic_write_text(self.current_path, json.dumps(rec, ensure_ascii=False))
+        # 30초마다 쓰는 파일이라 fsync 생략. 정전 시 최대 30초 정도만 잃는다
+        atomic_write_text(self.current_path, json.dumps(rec, ensure_ascii=False), durable=False)
 
     def recover_current(self, starts_at: time) -> bool:
         """지난 실행의 진행 구간을 마지막 저장 시각까지로 확정한다."""
