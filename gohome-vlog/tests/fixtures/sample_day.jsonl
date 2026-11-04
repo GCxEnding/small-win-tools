@@ -1,0 +1,28 @@
+{"start": "2026-11-04T09:02:10", "end": "2026-11-04T09:15:40", "proc": "idea64.exe", "title": "workflow-core – ApprService.java"}
+{"start": "2026-11-04T09:15:40", "end": "2026-11-04T09:21:00", "idle": "away"}
+{"start": "2026-11-04T09:21:00", "end": "2026-11-04T09:48:00", "proc": "idea64.exe", "title": "workflow-core – ApprDao.java"}
+{"start": "2026-11-04T09:48:00", "end": "2026-11-04T10:05:00", "proc": "Tabby.exe", "title": "deploy@dev-was01: ~/logs"}
+{"start": "2026-11-04T10:05:00", "end": "2026-11-04T10:40:00", "proc": "idea64.exe", "title": "workflow-core – src/main/resources/mapper/appr-sql.xml"}
+{"start": "2026-11-04T10:40:00", "end": "2026-11-04T10:52:00", "proc": "putty.exe", "title": "dev-batch01 - PuTTY"}
+{"start": "2026-11-04T10:52:00", "end": "2026-11-04T11:04:00", "proc": "WinSCP.exe", "title": "/home/deploy - dev-was01 - WinSCP"}
+{"start": "2026-11-04T11:04:00", "end": "2026-11-04T11:20:00", "proc": "idea64.exe", "title": "workflow-core – ApprController.java"}
+{"start": "2026-11-04T11:20:00", "end": "2026-11-04T11:45:00", "proc": "claude.exe", "title": "Claude"}
+{"start": "2026-11-04T11:45:00", "end": "2026-11-04T11:48:00", "proc": "notepad.exe", "title": "메모 - Windows 메모장"}
+{"start": "2026-11-04T11:48:00", "end": "2026-11-04T12:00:00", "proc": "chrome.exe", "title": "사내 위키 - 배포 절차 - Chrome"}
+{"start": "2026-11-04T12:00:00", "end": "2026-11-04T12:58:00", "idle": "lock"}
+{"start": "2026-11-04T12:58:00", "end": "2026-11-04T13:40:00", "proc": "dbeaver.exe", "title": "DBeaver 24.2.0 - <dev-oracle> Script-2"}
+{"start": "2026-11-04T13:40:00", "end": "2026-11-04T13:55:00", "proc": "Tabby.exe", "title": "staging-api"}
+{"start": "2026-11-04T13:55:00", "end": "2026-11-04T14:01:00", "proc": "KeePassXC.exe", "excluded": true}
+{"start": "2026-11-04T14:01:00", "end": "2026-11-04T14:30:00", "proc": "Kiro.exe", "title": "● PaymentClient.ts - billing-portal - Kiro"}
+{"start": "2026-11-04T14:30:00", "end": "2026-11-04T15:30:00", "proc": "idea64.exe", "title": "mail-gateway [D:\\work\\mail-gateway] – MailSender.java"}
+{"start": "2026-11-04T15:30:00", "end": "2026-11-04T16:00:00", "idle": "pause"}
+{"start": "2026-11-04T16:00:00", "end": "2026-11-04T16:30:00", "proc": "idea64.exe", "title": "workflow-core – ApprService.java"}
+{"start": "2026-11-04T16:30:00", "end": "2026-11-04T16:42:00", "proc": "Obsidian.exe", "title": "2026-11-04 - work-vault - Obsidian v1.7.4"}
+{"start": "2026-11-04T16:42:00", "end": "2026-11-04T17:45:00", "proc": "idea64.exe", "title": "workflow-core – ApprDao.java"}
+{"start": "2026-11-04T17:45:00", "end": "2026-11-04T17:58:00", "proc": "chrome.exe", "title": "새 탭 - Chrome"}
+{"start": "2026-11-04T17:58:00", "end": "2026-11-04T18:30:00", "idle": "away"}
+{"start": "2026-11-04T18:30:00", "end": "2026-11-04T19:40:00", "proc": "idea64.exe", "title": "workflow-core – ApprService.java"}
+{"start": "2026-11-04T19:40:00", "end": "2026-11-04T23:30:00", "idle": "lock"}
+{"start": "2026-11-04T23:30:00", "end": "2026-11-05T00:10:00", "proc": "Code.exe", "title": "● deploy.sh - ops-scripts - Visual Studio Code"}
+{"start": "2026-11-05T00:10:00", "end": "2026-11-05T00:18:00", "proc": "Code.exe", "title": "README.md - ops-scripts - Visual Studio Code"}
+{"start": "2026-11-05T00:18:00", "end": "2026-11-05T03:59:59", "idle": "sleep"}

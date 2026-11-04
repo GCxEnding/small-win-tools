@@ -1,0 +1,84 @@
+[
+  {
+    "process": "idea64.exe",
+    "name": "IntelliJ IDEA",
+    "category": "코드",
+    "patterns": [
+      "^Welcome to IntelliJ IDEA$",
+      "^(?P<project>[^\\[]+?)(?: \\[[^\\]]*\\])? - (?:.*[\\\\/])?(?P<file>[^\\\\/]+?)(?: \\[[^\\]]*\\])?(?: - IntelliJ IDEA)?$",
+      "^(?P<project>[^\\[]+?)(?: \\[[^\\]]*\\])?(?: - IntelliJ IDEA)?$"
+    ]
+  },
+  {
+    "process": "Code.exe",
+    "name": "VS Code",
+    "category": "코드",
+    "patterns": [
+      "^(?P<file>.+?) - (?P<project>.+?)(?: \\(Workspace\\))?(?: \\[[^\\]]*\\])? - Visual Studio Code",
+      "^(?P<project>.+?)(?: \\(Workspace\\))?(?: \\[[^\\]]*\\])? - Visual Studio Code"
+    ]
+  },
+  {
+    "process": "Kiro.exe",
+    "name": "Kiro",
+    "category": "코드",
+    "patterns": [
+      "^(?P<file>.+?) - (?P<project>.+?)(?: \\(Workspace\\))?(?: \\[[^\\]]*\\])? - Kiro",
+      "^(?P<project>.+?)(?: \\(Workspace\\))?(?: \\[[^\\]]*\\])? - Kiro"
+    ]
+  },
+  {
+    "process": "Tabby.exe",
+    "name": "Tabby",
+    "category": "서버",
+    "patterns": [
+      "@(?P<target>[\\w.-]+)",
+      "^(?P<target>.+?)(?: - Tabby)?$"
+    ]
+  },
+  {
+    "process": "putty.exe",
+    "name": "PuTTY",
+    "category": "서버",
+    "patterns": [
+      "@(?P<target>[\\w.-]+)",
+      "^(?P<target>.+?) - PuTTY$"
+    ]
+  },
+  {
+    "process": "WinSCP.exe",
+    "name": "WinSCP",
+    "category": "파일전송",
+    "patterns": [
+      "^(?:.* - )?(?P<target>.+?) - WinSCP$"
+    ]
+  },
+  {
+    "process": "dbeaver.exe",
+    "name": "DBeaver",
+    "category": "DB",
+    "patterns": [
+      "<(?P<target>[^>]+)>"
+    ]
+  },
+  {
+    "process": "Obsidian.exe",
+    "name": "Obsidian",
+    "category": "노트",
+    "patterns": [
+      "^(?:.* - )?(?P<target>.+?) - Obsidian(?: v[\\d.]+)?$"
+    ]
+  },
+  {
+    "process": "claude.exe",
+    "name": "Claude",
+    "category": "AI",
+    "app_only": true
+  },
+  {
+    "process": "chrome.exe",
+    "name": "Chrome",
+    "category": "웹",
+    "app_only": true
+  }
+]
