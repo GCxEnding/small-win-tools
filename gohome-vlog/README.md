@@ -4,7 +4,7 @@
 
 - 표시 이름은 **gohome** (트레이, 알림)
 - 퇴근 시간(기본 17:50)이 되면 "오늘 브이로그 다 찍었습니다. 이제 집에 가셔도 됩니다." 하고 알려 줘요.
-- 실행 중에는 인터넷을 전혀 안 써요. 회사 망에서도 그냥 돌아갑니다.
+- 실행 중에는 인터넷을 전혀 안 써요. 회사 망에서도 그냥 돌아갑니다. (라이브러리가 없을 때 설치를 허락한 경우만 PyPI에 접속해요)
 
 ## 수집하는 것 / 하지 않는 것
 
@@ -46,6 +46,20 @@ cd small-win-tools/gohome-vlog
 
 ```bash
 pip install -r requirements.txt
+```
+
+> `pip install` 을 깜빡하고 바로 실행해도 괜찮아요. 라이브러리(PySide6)가 없으면 처음 실행할 때 설치할지 물어보고, **예**를 누르면 새 콘솔 창에서 알아서 받아요(약 80MB, 처음 한 번만).
+
+### 오프라인 설치 (인터넷이 막힌 PC)
+
+인터넷 되는 PC에서 wheel 파일을 받아 옮긴 다음 설치하면 돼요. 두 PC의 Python 버전(3.10 이상, 64비트)은 맞춰 주세요.
+
+```bash
+pip download -r requirements.txt -d wheels
+```
+
+```bash
+pip install --no-index --find-links wheels -r requirements.txt
 ```
 
 ## 실행
