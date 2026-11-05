@@ -90,13 +90,19 @@
 5. **트레이 메뉴**
    - `오늘 요약 복사`, `요약 폴더 열기`
    - `일시 정지` (30분 / 1시간 / 다시 시작할 때까지), `재개`
-   - `오늘 기록 삭제` (확인 후 즉시)
+   - `Obsidian 파일 열기` (`obsidian_vault` 설정 시에만 활성, 오늘 요약을 즉시 내보낸 뒤 연다)
+   - `오늘 기록 삭제` (확인 후 즉시), Obsidian에 내보낸 오늘 파일도 삭제
    - `규칙 다시 읽기`, `종료`
    - 일시 정지 중에는 아이콘을 바꿔 표시한다. 일시 정지 구간은 idle과 같이 집계에서 빠진다.
 6. **보존과 삭제**
    - 원본: 업무일 단위 jsonl. 업무일이 지나면 요약 생성 후 삭제.
    - 요약: `summary_keep_days`(기본 7일) 지난 파일 삭제.
    - 앱 시작 시에도 지난 업무일 원본이 남아 있으면 요약 후 삭제한다(재부팅, 강제 종료 대비).
+7. **Obsidian 내보내기** (`obsidian_vault`가 비어 있으면 꺼짐, 기존 동작과 동일)
+   - 볼트의 `<obsidian_folder>/YYYY-MM-DD.md`에 요약을 쓴다. 맨 앞에 자동 생성 주석 한 줄, 시각 등 매번 바뀌는 값은 넣지 않고 내용이 같으면 쓰지 않는다.
+   - 시점: 시작 직후 첫 tick, `obsidian_interval_minutes`(기본 10분)마다, 요약 저장 시, 규칙 다시 읽기 후, 종료 시, 업무일이 바뀌며 만든 지난 날짜 최종 요약.
+   - `.obsidian` 폴더가 없는 경로나 볼트 밖을 가리키는 `obsidian_folder`는 거부. 실패는 같은 오류 문자열당 한 번만 트레이로 알린다.
+   - 볼트 쪽 파일은 보존 기간으로 지우지 않는다. "오늘 기록 삭제"는 오늘 파일만 삭제.
 
 ## 4. 입력과 데이터
 위치: `%LOCALAPPDATA%\gohome-vlog\` (로밍 프로필 서버 동기화를 피하려고 Roaming이 아닌 Local 사용)
@@ -137,7 +143,10 @@
     "summary_keep_days": 7,
     "exclude_processes": ["KeePassXC.exe", "1Password.exe"],
     "exclude_title_patterns": ["(?i)inprivate", "(?i)private browsing"],
-    "mask_title_patterns": []
+    "mask_title_patterns": [],
+    "obsidian_vault": "",
+    "obsidian_folder": "gohome",
+    "obsidian_interval_minutes": 10
   }
   ```
 - 제외: 걸리면 제목 없이 `{"proc": "...", "excluded": true}`로만 기록, 요약에서는 "제외됨"으로 시간만 집계.

@@ -6,13 +6,14 @@ import os
 import sys
 import traceback
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from ctypes import wintypes
 
 from PySide6.QtCore import QAbstractNativeEventFilter, Qt, QTimer
 from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon, QWidget
 
-from . import win32
+from . import obsidian, win32
 from .collector import Collector
 from .rules import Privacy
 from .store import Store, business_day, day_bounds, day_start_time, parse_hhmm
@@ -89,6 +90,8 @@ class App:
         self.store = Store()
         self.store.ensure()
         self.warnings: list[str] = []
+        self._obs_last: datetime | None = None  # 마지막 내보내기 시도 시각
+        self._obs_error: str | None = None  # 이미 알린 내보내기 오류
         self._load_settings()
 
         self.collector = Collector(self.store, self.config, self.privacy, self.starts_at, win32.Win32Api())
@@ -140,6 +143,12 @@ class App:
             self.warnings.append(f"제외/마스킹 설정 오류, 해당 항목 없이 동작합니다: {e}")
             self.privacy = Privacy(frozenset(), [], [])
         self.starts_at = day_start_time(self.config)
+        self.obsidian_vault = str(self.config.get("obsidian_vault") or "").strip()
+        self.obsidian_folder = str(self.config.get("obsidian_folder") or "gohome").strip()
+        try:
+            self.obsidian_interval = timedelta(minutes=max(1.0, float(self.config.get("obsidian_interval_minutes", 10))))
+        except (TypeError, ValueError):
+            self.obsidian_interval = timedelta(minutes=10)
 
     def reload_rules(self) -> None:
         self.warnings = []
@@ -148,6 +157,9 @@ class App:
         self.collector.privacy = self.privacy
         self.collector.starts_at = self.starts_at
         self.timer.setInterval(int(float(self.config.get("poll_seconds", 5)) * 1000))
+        self.obsidian_act.setEnabled(bool(self.obsidian_vault))
+        self._obs_error = None  # 설정을 고쳤을 수 있으니 오류를 다시 알릴 수 있게 한다
+        self._export(self.day, self.today_summary())
         if self.warnings:
             for w in self.warnings:
                 self.notify(w, QSystemTrayIcon.Warning)
@@ -166,6 +178,8 @@ class App:
 
         add(menu, "오늘 요약 복사", self.copy_summary)
         add(menu, "요약 폴더 열기", self.open_summary_dir)
+        self.obsidian_act = add(menu, "Obsidian 파일 열기", self.open_obsidian_file)
+        self.obsidian_act.setEnabled(bool(self.obsidian_vault))
         menu.addSeparator()
         self.pause_menu = menu.addMenu("일시 정지")
         add(self.pause_menu, "30분", lambda: self.pause(30))
@@ -211,6 +225,7 @@ class App:
             self.store.write_summary(self.day, text)
         except OSError as e:
             self.notify(f"요약 파일 저장 실패: {e}", QSystemTrayIcon.Warning)
+        self._export(self.day, text)
         return text
 
     def copy_summary(self) -> None:
@@ -233,10 +248,48 @@ class App:
         self.store.ensure()
         os.startfile(self.store.summary_dir)
 
+    # ---- Obsidian 내보내기 -----------------------------------------------
+    def _export(self, day: date, text: str) -> Path | None:
+        """볼트에 요약을 내보낸다. 설정이 없으면 아무것도 안 한다. 성공하면 파일 경로를 돌려준다."""
+        if not self.obsidian_vault:
+            return None
+        self._obs_last = datetime.now()
+        vault = Path(self.obsidian_vault)
+        try:
+            obsidian.write_export(vault, self.obsidian_folder, day, text)
+            path = obsidian.export_path(vault, self.obsidian_folder, day)
+        except (ValueError, OSError) as e:
+            self._report_export_error(f"Obsidian 내보내기 실패: {e}")
+            return None
+        self._obs_error = None
+        return path
+
+    def _report_export_error(self, msg: str) -> None:
+        if msg == self._obs_error:
+            return
+        self._obs_error = msg
+        if hasattr(self, "tray"):
+            self.notify(msg, QSystemTrayIcon.Warning)
+        else:  # 트레이가 만들어지기 전(시작 중)에는 시작 경고로 모은다
+            self.warnings.append(msg)
+
+    def _export_if_due(self) -> None:
+        if not self.obsidian_vault:
+            return
+        if self._obs_last is None or datetime.now() - self._obs_last >= self.obsidian_interval:
+            self._export(self.day, self.today_summary())
+
+    def open_obsidian_file(self) -> None:
+        path = self._export(self.day, self.today_summary())
+        if path is not None:
+            os.startfile(path)
+
     def _finalize_past(self) -> None:
         def summarize(day, records):
             _, end = day_bounds(day, self.starts_at)
-            return self._summary_text(day, records, end)
+            text = self._summary_text(day, records, end)
+            self._export(day, text)
+            return text
 
         try:
             self.store.finalize_past_days(self.day, summarize)
@@ -307,6 +360,7 @@ class App:
         if self.collector.paused != (self.resume_act.isEnabled()):
             self._refresh_pause_ui()
         self.check_schedule()
+        self._export_if_due()
 
     def on_system_event(self, message: int, wparam: int) -> None:
         if message == win32.WM_WTSSESSION_CHANGE:
@@ -337,12 +391,19 @@ class App:
     def delete_today(self) -> None:
         ans = QMessageBox.question(
             None, APP_NAME,
-            "오늘 기록(원본과 오늘 요약 파일)을 지금 삭제할까요?\n되돌릴 수 없습니다.",
+            "오늘 기록(원본과 오늘 요약 파일)을 지금 삭제할까요?"
+            + (" (Obsidian에 내보낸 오늘 파일 포함)" if self.obsidian_vault else "")
+            + "\n되돌릴 수 없습니다.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if ans != QMessageBox.Yes:
             return
         self.collector.discard_current()
         self.store.delete_day(self.day)
+        if self.obsidian_vault:
+            try:
+                obsidian.delete_export(Path(self.obsidian_vault), self.obsidian_folder, self.day)
+            except (ValueError, OSError) as e:
+                self._report_export_error(f"Obsidian 파일 삭제 실패: {e}")
         self.notify("오늘 기록을 삭제했습니다.")
 
     def quit(self) -> None:
@@ -350,6 +411,10 @@ class App:
         try:
             self.collector.stop()
         except OSError:
+            pass
+        try:
+            self._export(self.day, self.today_summary())
+        except Exception:  # 종료 처리를 깨지 않는다
             pass
         win32.unregister_session_notification(self.sink_hwnd)
         self.tray.hide()

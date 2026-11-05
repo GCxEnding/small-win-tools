@@ -10,5 +10,8 @@
   "summary_keep_days": 7,
   "exclude_processes": ["KeePassXC.exe", "1Password.exe"],
   "exclude_title_patterns": ["(?i)inprivate", "(?i)private browsing"],
-  "mask_title_patterns": []
+  "mask_title_patterns": [],
+  "obsidian_vault": "",
+  "obsidian_folder": "gohome",
+  "obsidian_interval_minutes": 10
 }

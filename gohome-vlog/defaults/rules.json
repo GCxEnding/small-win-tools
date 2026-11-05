@@ -72,13 +72,54 @@
   {
     "process": "claude.exe",
     "name": "Claude",
+    "category": "AI"
+  },
+  {
+    "process": "KiroCrew.exe",
+    "name": "Kiro Crew",
     "category": "AI",
     "app_only": true
+  },
+  {
+    "process": "javaw.exe",
+    "name": "Java 앱",
+    "category": "앱",
+    "patterns": [
+      "^(?P<target>.+)$"
+    ]
+  },
+  {
+    "process": "explorer.exe",
+    "name": "탐색기",
+    "category": "파일",
+    "app_only": true
+  },
+  {
+    "process": "Q-Dir_x64.exe",
+    "name": "Q-Dir",
+    "category": "파일",
+    "app_only": true
+  },
+  {
+    "process": "Everything.exe",
+    "name": "Everything",
+    "category": "파일",
+    "app_only": true
+  },
+  {
+    "process": "pythonw.exe",
+    "name": "Python 도구",
+    "category": "도구",
+    "patterns": [
+      "^(?P<target>.+)$"
+    ]
   },
   {
     "process": "chrome.exe",
     "name": "Chrome",
     "category": "웹",
-    "app_only": true
+    "patterns": [
+      "^(?:\\(\\d+\\)\\s*)?(?P<target>.+?)(?:\\s*\\(\\d+\\))? - (?:Google )?Chrome$"
+    ]
   }
 ]
