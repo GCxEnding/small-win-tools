@@ -7,7 +7,26 @@ from datetime import datetime, timedelta
 from .rules import CODE, EXCLUDED, UNKNOWN, ActivityKey, Rule, load_default_rules, resolve
 
 EMPTY_TEXT = "기록된 활동이 없습니다."
-OTHER_BUCKET = "기타"
+
+# Obsidian(마크다운)이 링크, 태그, 서식으로 해석하는 기호. 창 제목은 글자 그대로 보여야 한다.
+_MD_SPECIAL = set(r"\`*_[]#|<>~=^%!$")
+
+
+def md_escape(text: str) -> str:
+    """창 제목 등 바깥에서 온 글자를 마크다운에서 그대로 보이게 한다."""
+    return "".join("\\" + c if c in _MD_SPECIAL else c for c in text)
+
+
+def category_badge(category: str) -> str:
+    """분류를 인라인 코드로 감싸 눈에 띄게 한다 (태그를 만들지 않음)."""
+    return "`" + category.replace("`", "'") + "`"
+
+
+def item_label(g: tuple[str, str]) -> str:
+    cat, target = g
+    if cat == EXCLUDED:
+        return category_badge(EXCLUDED)
+    return f"{category_badge(cat)} {md_escape(target)}"
 
 
 def fmt_duration(seconds: float) -> str:
@@ -101,13 +120,13 @@ def build_summary(records, config: dict, now: datetime | None = None,
     lines = [f"### 오늘의 브이로그 ({first:%H:%M} ~ {last:%H:%M}, 활동 {fmt_duration(total)})"]
     for g, sec in items:
         cat, target = g
-        label = EXCLUDED if cat == EXCLUDED else f"{cat}: {target}"
+        label = item_label(g)
         if cat == CODE and files.get(g) and top_files > 0:
             ranked = sorted(files[g].items(), key=lambda x: (-x[1], x[0]))[:top_files]
-            label += " (" + ", ".join(f for f, _ in ranked) + ")"
+            label += " (" + ", ".join(md_escape(f) for f, _ in ranked) + ")"
         lines.append(f"- {label} : {fmt_duration(sec)}")
     if other > 0:
-        lines.append(f"- {OTHER_BUCKET} : {fmt_duration(other)}")
+        lines.append(f"- {min_item / 60:g}분 미만 활동 합계 : {fmt_duration(other)}")
 
     # ---- 흐름 ----------------------------------------------------------
     flow = build_flow(spans, block_min)
@@ -115,11 +134,6 @@ def build_summary(records, config: dict, now: datetime | None = None,
         lines += ["", "#### 흐름"]
         lines += [f"- {s:%H:%M} ~ {e:%H:%M} : {', '.join(labels)}" for s, e, labels in flow]
     return "\n".join(lines) + "\n"
-
-
-def _flow_label(g: tuple[str, str]) -> str:
-    cat, target = g
-    return EXCLUDED if cat == EXCLUDED else f"{cat} {target}"
 
 
 def build_flow(spans, block_minutes: int):
@@ -155,5 +169,5 @@ def build_flow(spans, block_minutes: int):
     out = []
     for s, e, _, secs in merged:
         ordered = sorted(secs.items(), key=lambda x: (-x[1], x[0]))
-        out.append((s, e, [_flow_label(g) for g, _ in ordered]))
+        out.append((s, e, [item_label(g) for g, _ in ordered]))
     return out

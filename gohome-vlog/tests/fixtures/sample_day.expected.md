@@ -1,40 +1,41 @@
 ### 오늘의 브이로그 (09:02 ~ 00:18, 활동 9시간 21분)
-- 코드: workflow-core (ApprService.java, ApprDao.java, appr-sql.xml) : 4시간 15분
-- 코드: mail-gateway (MailSender.java) : 1시간 00분
-- 코드: ops-scripts (deploy.sh, README.md) : 48분
-- DB: dev-oracle : 42분
-- 코드: billing-portal (PaymentClient.ts) : 29분
-- AI: Claude : 25분
-- 웹: Chrome : 25분
-- 서버: dev-was01 : 17분
-- 서버: staging-api : 15분
-- 노트: work-vault : 12분
-- 서버: dev-batch01 : 12분
-- 파일전송: dev-was01 : 12분
-- 제외됨 : 6분
-- 기타 : 3분
+- `코드` workflow-core (ApprService.java, ApprDao.java, appr-sql.xml) : 4시간 15분
+- `코드` mail-gateway (MailSender.java) : 1시간 00분
+- `코드` ops-scripts (deploy.sh, README.md) : 48분
+- `DB` dev-oracle : 42분
+- `코드` billing-portal (PaymentClient.ts) : 29분
+- `AI` Claude : 25분
+- `서버` dev-was01 : 17분
+- `서버` staging-api : 15분
+- `웹` 새 탭 : 13분
+- `노트` work-vault : 12분
+- `서버` dev-batch01 : 12분
+- `웹` 사내 위키 - 배포 절차 : 12분
+- `파일전송` dev-was01 : 12분
+- `제외됨` : 6분
+- 5분 미만 활동 합계 : 3분
 
 #### 흐름
-- 09:00 ~ 09:50 : 코드 workflow-core
-- 09:50 ~ 10:00 : 서버 dev-was01
-- 10:00 ~ 10:10 : 서버 dev-was01, 코드 workflow-core
-- 10:10 ~ 10:40 : 코드 workflow-core
-- 10:40 ~ 10:50 : 서버 dev-batch01
-- 10:50 ~ 11:00 : 파일전송 dev-was01
-- 11:00 ~ 11:10 : 코드 workflow-core, 파일전송 dev-was01
-- 11:10 ~ 11:20 : 코드 workflow-core
-- 11:20 ~ 11:40 : AI Claude
-- 11:40 ~ 11:50 : AI Claude, 기타 notepad.exe
-- 11:50 ~ 12:00 : 웹 Chrome
-- 12:50 ~ 13:40 : DB dev-oracle
-- 13:40 ~ 13:50 : 서버 staging-api
-- 13:50 ~ 14:00 : 서버 staging-api, 제외됨
-- 14:00 ~ 14:30 : 코드 billing-portal
-- 14:30 ~ 15:30 : 코드 mail-gateway
-- 16:00 ~ 16:30 : 코드 workflow-core
-- 16:30 ~ 16:40 : 노트 work-vault
-- 16:40 ~ 17:40 : 코드 workflow-core
-- 17:40 ~ 17:50 : 웹 Chrome, 코드 workflow-core
-- 17:50 ~ 18:00 : 웹 Chrome
-- 18:30 ~ 19:40 : 코드 workflow-core
-- 23:30 ~ 00:20 : 코드 ops-scripts
+- 09:00 ~ 09:50 : `코드` workflow-core
+- 09:50 ~ 10:00 : `서버` dev-was01
+- 10:00 ~ 10:10 : `서버` dev-was01, `코드` workflow-core
+- 10:10 ~ 10:40 : `코드` workflow-core
+- 10:40 ~ 10:50 : `서버` dev-batch01
+- 10:50 ~ 11:00 : `파일전송` dev-was01
+- 11:00 ~ 11:10 : `코드` workflow-core, `파일전송` dev-was01
+- 11:10 ~ 11:20 : `코드` workflow-core
+- 11:20 ~ 11:40 : `AI` Claude
+- 11:40 ~ 11:50 : `AI` Claude, `기타` notepad.exe
+- 11:50 ~ 12:00 : `웹` 사내 위키 - 배포 절차
+- 12:50 ~ 13:40 : `DB` dev-oracle
+- 13:40 ~ 13:50 : `서버` staging-api
+- 13:50 ~ 14:00 : `서버` staging-api, `제외됨`
+- 14:00 ~ 14:30 : `코드` billing-portal
+- 14:30 ~ 15:30 : `코드` mail-gateway
+- 16:00 ~ 16:30 : `코드` workflow-core
+- 16:30 ~ 16:40 : `노트` work-vault
+- 16:40 ~ 17:40 : `코드` workflow-core
+- 17:40 ~ 17:50 : `웹` 새 탭, `코드` workflow-core
+- 17:50 ~ 18:00 : `웹` 새 탭
+- 18:30 ~ 19:40 : `코드` workflow-core
+- 23:30 ~ 00:20 : `코드` ops-scripts

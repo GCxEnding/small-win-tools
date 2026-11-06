@@ -20,8 +20,8 @@
   {"proc": "Obsidian.exe", "title": "주간 회의 - work-vault - Obsidian", "expect": "노트: work-vault", "file": null},
   {"proc": "claude.exe", "title": "Claude", "expect": "AI: Claude", "file": null},
   {"proc": "claude.exe", "title": "아무 대화 제목", "expect": "AI: Claude", "file": null},
-  {"proc": "chrome.exe", "title": "사내 위키 - 배포 절차 - Chrome", "expect": "웹: Chrome", "file": null},
-  {"proc": "chrome.exe", "title": "새 탭 - Chrome", "expect": "웹: Chrome", "file": null},
+  {"proc": "chrome.exe", "title": "사내 위키 - 배포 절차 - Chrome", "expect": "웹: 사내 위키 - 배포 절차", "file": null},
+  {"proc": "chrome.exe", "title": "새 탭 - Chrome", "expect": "웹: 새 탭", "file": null},
   {"proc": "notepad.exe", "title": "메모 - Windows 메모장", "expect": "기타: notepad.exe", "file": null},
   {"proc": "(알 수 없음)", "title": "", "expect": "기타: (알 수 없음)", "file": null}
 ]

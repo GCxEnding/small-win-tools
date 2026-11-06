@@ -60,7 +60,7 @@ def test_code_without_project():
 
 
 def test_app_only_ignores_title():
-    assert resolve("chrome.exe", "고객사 포털 - Chrome", RULES) == ActivityKey("웹", "Chrome")
+    assert resolve("KiroCrew.exe", "Kiro Crew - 고객사 포털", RULES) == ActivityKey("AI", "Kiro Crew")
 
 
 def test_bad_rules_raise():

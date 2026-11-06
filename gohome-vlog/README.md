@@ -108,26 +108,27 @@ pythonw.exe "D:\...\small-win-tools\gohome-vlog\gohome_vlog.pyw"
 ## 요약 형식
 
 Obsidian 일지에 맞춰 목록은 `-`, 구분은 `:` 로 만들어요.
+분류는 `` `웹` `` 처럼 인라인 코드로 감싸 눈에 띄게 하고(태그는 만들지 않아요), 창 제목에 든 `[ ] # _ |` 같은 마크다운 기호는 `\` 로 이스케이프해서 링크나 서식으로 바뀌지 않게 해요.
 
 ```markdown
 ### 오늘의 브이로그 (09:02 ~ 18:11, 활동 7시간 12분)
-- 코드: workflow-core (ApprService.java, ApprDao.java, appr-sql.xml) : 3시간 05분
-- 서버: dev-was01 : 1시간 20분
-- DB: dev-oracle : 40분
-- 파일전송: dev-was01 : 12분
-- AI: Claude : 35분
-- 웹: Chrome : 28분
-- 노트: work-vault : 15분
-- 기타 : 17분
+- `코드` workflow-core (ApprService.java, ApprDao.java, appr-sql.xml) : 3시간 05분
+- `서버` dev-was01 : 1시간 20분
+- `DB` dev-oracle : 40분
+- `파일전송` dev-was01 : 12분
+- `AI` Claude : 35분
+- `웹` 사내 위키 - 배포 절차 : 28분
+- `노트` work-vault : 15분
+- 5분 미만 활동 합계 : 17분
 
 #### 흐름
-- 09:00 ~ 10:30 : 코드 workflow-core, 서버 dev-was01
-- 10:30 ~ 11:40 : 코드 workflow-core
-- 13:00 ~ 14:00 : DB dev-oracle
-- 14:00 ~ 17:40 : 코드 workflow-core
+- 09:00 ~ 10:30 : `코드` workflow-core, `서버` dev-was01
+- 10:30 ~ 11:40 : `코드` workflow-core
+- 13:00 ~ 14:00 : `DB` dev-oracle
+- 14:00 ~ 17:40 : `코드` workflow-core
 ```
 
-- 활동은 누적 시간이 많은 순서예요. 5분 미만 활동은 "기타"로 묶어요.
+- 활동은 누적 시간이 많은 순서예요. 5분 미만 활동은 "5분 미만 활동 합계"로 묶어요.
 - 코드는 프로젝트 단위로 합치고, 오래 본 파일 상위 3개를 괄호로 붙여요.
 - 흐름은 10분 블록 단위로 주 활동을 보여 주고, 같은 내용이 이어지면 합쳐요. 자리 비움만 있는 블록은 빼요.
 

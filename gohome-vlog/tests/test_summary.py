@@ -52,9 +52,9 @@ def test_small_items_go_to_other():
         rec("09:34", "09:37", "notepad.exe", "z"),
     ]
     out = build_summary(recs, CONFIG, DAY_END)
-    assert "- 웹: Chrome : 30분" in out
-    assert "- 기타 : 7분" in out
-    assert "AI: Claude" not in out.split("####")[0]
+    assert "- `웹` Chrome : 30분" in out
+    assert "- 5분 미만 활동 합계 : 7분" in out
+    assert "`AI` Claude" not in out.split("####")[0]
 
 
 def test_idle_and_pause_not_counted():
@@ -67,21 +67,21 @@ def test_idle_and_pause_not_counted():
     ]
     out = build_summary(recs, CONFIG, DAY_END)
     assert out.splitlines()[0] == "### 오늘의 브이로그 (09:00 ~ 12:30, 활동 1시간 30분)"
-    assert "- 09:00 ~ 10:00 : 웹 Chrome" in out
-    assert "- 12:00 ~ 12:30 : 웹 Chrome" in out  # idle 블록 생략으로 이어지지 않음
+    assert "- 09:00 ~ 10:00 : `웹` Chrome" in out
+    assert "- 12:00 ~ 12:30 : `웹` Chrome" in out  # idle 블록 생략으로 이어지지 않음
 
 
 def test_default_block_is_10_minutes():
     recs = [rec("09:00", "09:08", "chrome.exe", "x"), rec("09:08", "09:20", "putty.exe", "srv - PuTTY")]
     flow = build_summary(recs, CONFIG, DAY_END).split("#### 흐름\n")[1].splitlines()
     # 09:00 블록: 웹 8분, 서버 2분(1/3 미만) -> 웹만
-    assert flow == ["- 09:00 ~ 09:10 : 웹 Chrome", "- 09:10 ~ 09:20 : 서버 srv"]
+    assert flow == ["- 09:00 ~ 09:10 : `웹` Chrome", "- 09:10 ~ 09:20 : `서버` srv"]
 
 
 def test_excluded_counted_as_time_only():
     recs = [rec("09:00", "09:10", proc=None, excluded=True) | {"proc": "KeePassXC.exe"}]
     out = build_summary(recs, CONFIG, DAY_END)
-    assert "- 제외됨 : 10분" in out
+    assert "- `제외됨` : 10분" in out
     assert "KeePassXC" not in out
 
 
@@ -93,9 +93,9 @@ def test_code_top_files():
         rec("10:30", "10:40", "idea64.exe", "proj – D.java"),
     ]
     out = build_summary(recs, CONFIG, DAY_END)
-    assert "- 코드: proj (A.java, B.java, C.java) : 1시간 40분" in out
+    assert "- `코드` proj (A.java, B.java, C.java) : 1시간 40분" in out
     two = build_summary(recs[:2], CONFIG, DAY_END)
-    assert "- 코드: proj (A.java, B.java) : 1시간 10분" in two
+    assert "- `코드` proj (A.java, B.java) : 1시간 10분" in two
 
 
 def test_flow_blocks_merge_and_secondary():
@@ -111,9 +111,9 @@ def test_flow_blocks_merge_and_secondary():
     out = build_summary(recs, {**CONFIG, "timeline_block_minutes": 15}, DAY_END)
     flow = out.split("#### 흐름\n")[1].splitlines()
     assert flow == [
-        "- 09:00 ~ 09:30 : 코드 proj",
-        "- 09:30 ~ 09:45 : 코드 proj, 서버 srv",
-        "- 09:45 ~ 10:00 : 코드 proj",
+        "- 09:00 ~ 09:30 : `코드` proj",
+        "- 09:30 ~ 09:45 : `코드` proj, `서버` srv",
+        "- 09:45 ~ 10:00 : `코드` proj",
     ]
 
 
@@ -121,3 +121,10 @@ def test_now_clips_in_progress():
     recs = [rec("09:00", "10:00", "chrome.exe", "x")]
     out = build_summary(recs, CONFIG, datetime(2026, 11, 4, 9, 30))
     assert "활동 30분" in out.splitlines()[0]
+
+
+def test_titles_are_markdown_escaped():
+    recs = [rec("09:00", "09:30", "chrome.exe", "[개발 GS에너지_개발] FormWizard #1 - Chrome")]
+    out = build_summary(recs, CONFIG, DAY_END)
+    assert r"- `웹` \[개발 GS에너지\_개발\] FormWizard \#1 : 30분" in out
+    assert r"- 09:00 ~ 09:30 : `웹` \[개발 GS에너지\_개발\] FormWizard \#1" in out
