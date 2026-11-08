@@ -1,0 +1,18 @@
+[
+  {"query": "로그 배포", "expect": ["claude-ai:c1000000-0000-4000-8000-000000000001", "claude-code:code_session"], "top": 5},
+  {"query": "nginx설정", "expect": ["claude-ai:c1000000-0000-4000-8000-000000000001", "claude-code:code_session"], "top": 3},
+  {"query": "nginx 롤백", "expect": ["claude-ai:c1000000-0000-4000-8000-000000000001"], "top": 1},
+  {"query": "logp", "expect": ["claude-ai:c1000000-0000-4000-8000-000000000001"], "top": 3},
+  {"query": "톰캣 느린 요청", "expect": ["claude-ai:c2000000-0000-4000-8000-000000000002"], "top": 1},
+  {"query": "slow-requests", "expect": ["claude-ai:c2000000-0000-4000-8000-000000000002"], "top": 1},
+  {"query": "환경 변수 키", "expect": ["claude-ai:c3000000-0000-4000-8000-000000000003"], "top": 1},
+  {"query": "그냥 제목 이스케이프", "expect": ["claude-ai:c4000000-0000-4000-8000-000000000004"], "top": 1},
+  {"query": "grafana 패널", "expect": ["claude-ai:c5000000-0000-4000-8000-000000000005", "claude-ai:c4000000-0000-4000-8000-000000000004"], "top": 2},
+  {"query": "fluentbit", "expect": ["claude-ai-project:p1000000-0000-4000-8000-000000000001", "claude-ai-memory:main"], "top": 2},
+  {"query": "수집 설계", "expect": ["claude-ai-project:p1000000-0000-4000-8000-000000000001"], "top": 1},
+  {"query": "옵시디언 일지", "expect": ["claude-ai-memory:main"], "top": 1},
+  {"query": "server_name", "expect": ["claude-code:code_session"], "top": 1},
+  {"query": "src:code 커밋", "expect": ["claude-code:code_session"], "top": 1},
+  {"query": "\"로그 위주로\"", "expect": ["claude-code:code_session"], "top": 1},
+  {"query": "라즈베리파이 홈랩", "expect": ["claude-ai-memory:main"], "top": 1}
+]

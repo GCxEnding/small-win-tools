@@ -1,0 +1,14 @@
+{
+ "conversations_memory": "사용자는 옵시디언으로 업무 일지를 쓴다.",
+ "project_memories": {
+  "p1000000-0000-4000-8000-000000000001": "로그 수집 프로젝트는 fluentbit 를 쓴다."
+ },
+ "memory_files": [
+  {
+   "path": "/areas/homelab.md",
+   "content": "라즈베리파이 홈랩 메모",
+   "updated_at": "2026-10-25T00:00:00.000000+00:00"
+  }
+ ],
+ "account_uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+}

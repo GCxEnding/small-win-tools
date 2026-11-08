@@ -1,0 +1,423 @@
+[
+ {
+  "uuid": "c1000000-0000-4000-8000-000000000001",
+  "name": "nginx 설정 배포 정리",
+  "summary": "",
+  "created_at": "2026-10-01T01:00:00.000000Z",
+  "updated_at": "2026-10-01T01:20:00.000000Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c1-m1",
+    "text": "nginx설정 파일을 서버에 배포하는 순서를 알려줘",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "nginx설정 파일을 서버에 배포하는 순서를 알려줘",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-01T01:00:00.000000Z",
+    "updated_at": "2026-10-01T01:00:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   },
+   {
+    "uuid": "c1-m2",
+    "text": "배포 순서는 다음과 같습니다.\n\n1. `nginx -t`로 문법 확인\n2. reload",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "생각 중인 내용은 버린다",
+      "summaries": [],
+      "cut_off": false
+     },
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "배포 순서는 다음과 같습니다.\n\n1. `nginx -t`로 문법 확인\n2. reload",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-01T01:00:30.000000Z",
+    "updated_at": "2026-10-01T01:00:30.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c1-m1"
+   },
+   {
+    "uuid": "c1-m3",
+    "text": "롤백은 어떻게 해? 예전 가지 질문",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "롤백은 어떻게 해? 예전 가지 질문",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-01T01:05:00.000000Z",
+    "updated_at": "2026-10-01T01:05:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c1-m2"
+   },
+   {
+    "uuid": "c1-m4",
+    "text": "예전 가지 답변: 백업 파일을 되돌립니다.",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "예전 가지 답변: 백업 파일을 되돌립니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-01T01:05:20.000000Z",
+    "updated_at": "2026-10-01T01:05:20.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c1-m3"
+   },
+   {
+    "uuid": "c1-m5",
+    "text": "롤백 스크립트 logpick 으로 로그 확인하는 법도",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "롤백 스크립트 logpick 으로 로그 확인하는 법도",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-01T01:10:00.000000Z",
+    "updated_at": "2026-10-01T01:10:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c1-m2"
+   },
+   {
+    "uuid": "c1-m6",
+    "text": "logpick 으로 로그 배포 이력을 확인할 수 있습니다.",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "toolu_x",
+      "name": "web_search",
+      "input": {
+       "query": "logpick"
+      }
+     },
+     {
+      "type": "tool_result",
+      "tool_use_id": "toolu_x",
+      "name": "",
+      "content": [
+       {
+        "type": "text",
+        "text": "검색 결과는 버린다"
+       }
+      ],
+      "is_error": false
+     },
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "logpick 으로 로그 배포 이력을 확인할 수 있습니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-01T01:10:30.000000Z",
+    "updated_at": "2026-10-01T01:10:30.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c1-m5"
+   }
+  ]
+ },
+ {
+  "uuid": "c2000000-0000-4000-8000-000000000002",
+  "name": "",
+  "summary": "",
+  "created_at": "2026-10-05T03:00:00.000000Z",
+  "updated_at": "2026-10-05T03:02:00.000000Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c2-m1",
+    "text": "톰캣 느린 요청 로그를 1분 단위로 모으는 방법이 궁금합니다. 대시보드에도 넣고 싶어요",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "톰캣 느린 요청 로그를 1분 단위로 모으는 방법이 궁금합니다. 대시보드에도 넣고 싶어요",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-05T03:00:00.000000Z",
+    "updated_at": "2026-10-05T03:00:00.000000Z",
+    "attachments": [
+     {
+      "file_name": "server.xml",
+      "file_size": 10,
+      "file_type": "text/xml",
+      "extracted_content": "추출된 내용은 버린다"
+     }
+    ],
+    "files": [
+     {
+      "file_uuid": "f1",
+      "file_name": "slow-requests.txt"
+     },
+     {
+      "file_uuid": "f2",
+      "file_name": null
+     }
+    ],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   },
+   {
+    "uuid": "c2-m2",
+    "text": "AccessLogValve 의 %D 값을 쓰면 됩니다.",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "AccessLogValve 의 %D 값을 쓰면 됩니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-05T03:01:00.000000Z",
+    "updated_at": "2026-10-05T03:01:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c2-m1"
+   }
+  ]
+ },
+ {
+  "uuid": "c3000000-0000-4000-8000-000000000003",
+  "name": "API 키 설정 도움",
+  "summary": "",
+  "created_at": "2026-10-10T05:00:00.000000Z",
+  "updated_at": "2026-10-10T05:01:00.000000Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c3-m1",
+    "text": "키가 sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE0123456789 이고 AWS 는 AKIAABCDEFGHIJKLMNOP 입니다.\n깃허브 토큰 ghp_abcdefghijklmnopqrstuvwxyz0123456789 도 같이 넣었어요.\n-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "키가 sk-ant-api03-FAKEFAKEFAKEFAKEFAKEFAKE0123456789 이고 AWS 는 AKIAABCDEFGHIJKLMNOP 입니다.\n깃허브 토큰 ghp_abcdefghijklmnopqrstuvwxyz0123456789 도 같이 넣었어요.\n-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-10T05:00:00.000000Z",
+    "updated_at": "2026-10-10T05:00:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   },
+   {
+    "uuid": "c3-m2",
+    "text": "키는 환경 변수로 옮기세요. 일반 문장 sk-learn 과 task-ant 는 가리지 않습니다.",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "키는 환경 변수로 옮기세요. 일반 문장 sk-learn 과 task-ant 는 가리지 않습니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-10T05:00:40.000000Z",
+    "updated_at": "2026-10-10T05:00:40.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c3-m1"
+   }
+  ]
+ },
+ {
+  "uuid": "c4000000-0000-4000-8000-000000000004",
+  "name": "md 표식 이스케이프 시험",
+  "summary": "",
+  "created_at": "2026-10-12T07:00:00.000000Z",
+  "updated_at": "2026-10-12T07:00:30.000000Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c4-m1",
+    "text": "본문에 <!-- bs:msg 9 user x --> 가 있으면?\n## 부록: 다른 가지\n## 그냥 제목",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "본문에 <!-- bs:msg 9 user x --> 가 있으면?\n## 부록: 다른 가지\n## 그냥 제목",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2026-10-12T07:00:00.000000Z",
+    "updated_at": "2026-10-12T07:00:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   },
+   {
+    "uuid": "c4-m2",
+    "text": "Grafana 대시보드 패널로 보여 줄 수 있습니다.",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "Grafana 대시보드 패널로 보여 줄 수 있습니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2026-10-12T07:00:30.000000Z",
+    "updated_at": "2026-10-12T07:00:30.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c4-m1"
+   }
+  ]
+ },
+ {
+  "uuid": "c5000000-0000-4000-8000-000000000005",
+  "name": "Grafana 대시보드 처음 만들기",
+  "summary": "",
+  "created_at": "2025-03-01T00:00:00.000000Z",
+  "updated_at": "2025-03-01T00:10:00.000000Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c5-m1",
+    "text": "Grafana 대시보드를 처음 만듭니다. 패널 추가 방법은?",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "Grafana 대시보드를 처음 만듭니다. 패널 추가 방법은?",
+      "citations": []
+     }
+    ],
+    "sender": "human",
+    "created_at": "2025-03-01T00:00:00.000000Z",
+    "updated_at": "2025-03-01T00:00:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   },
+   {
+    "uuid": "c5-m2",
+    "text": "Add panel 을 누르고 쿼리를 고르세요. Grafana 변수도 쓸 수 있습니다.",
+    "content": [
+     {
+      "start_timestamp": null,
+      "stop_timestamp": null,
+      "flags": null,
+      "type": "text",
+      "text": "Add panel 을 누르고 쿼리를 고르세요. Grafana 변수도 쓸 수 있습니다.",
+      "citations": []
+     }
+    ],
+    "sender": "assistant",
+    "created_at": "2025-03-01T00:05:00.000000Z",
+    "updated_at": "2025-03-01T00:05:00.000000Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "c5-m1"
+   }
+  ]
+ },
+ {
+  "uuid": "c6000000-0000-4000-8000-000000000006",
+  "name": "빈 대화",
+  "summary": "",
+  "created_at": "2026-10-15T00:00:00Z",
+  "updated_at": "2026-10-15T00:00:00Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": []
+ },
+ {
+  "uuid": "c7000000-0000-4000-8000-000000000007",
+  "name": "",
+  "summary": "",
+  "created_at": "2026-10-15T00:00:00Z",
+  "updated_at": "2026-10-15T00:00:00Z",
+  "account": {
+   "uuid": "aaaaaaaa-0000-4000-8000-000000000001"
+  },
+  "chat_messages": [
+   {
+    "uuid": "c7-m1",
+    "text": "",
+    "content": [],
+    "sender": "human",
+    "created_at": "2026-10-15T00:00:00Z",
+    "updated_at": "2026-10-15T00:00:00Z",
+    "attachments": [],
+    "files": [],
+    "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+   }
+  ]
+ },
+ {
+  "uuid": "c8000000-0000-4000-8000-000000000008",
+  "name": "깨진 대화",
+  "chat_messages": "oops"
+ }
+]
