@@ -52,6 +52,8 @@
 | `Win+.` | emoji-searcher | 검색 창 | Windows 기본 이모지 패널을 레지스트리로 끄고 사용 |
 | `Ctrl+Alt+E` | emoji-searcher | 보조 단축키 | `Win+.` 등록 실패 시 |
 | `Ctrl+Alt+H` | thought-searcher | 검색 창 | |
+| `Win+Shift+K` | hangul-restore | 클립보드의 깨진 한글 복원 창 | |
+| `Ctrl+Alt+K` | hangul-restore | 보조 단축키 | `Win+Shift+K` 등록 실패 시 |
 | (없음) | gohome-vlog | | 단축키 쓰지 않음 |
 
 - 모든 단축키는 각 도구 `config.json`에서 바꿀 수 있게 합니다. 여기 적는 것은 **기본값**입니다.
@@ -65,6 +67,7 @@
 | `Local\GCxEnding.small-win-tools.emoji-searcher` | emoji-searcher |
 | `Local\GCxEnding.small-win-tools.gohome-vlog` | gohome-vlog |
 | `Local\GCxEnding.small-win-tools.thought-searcher` | thought-searcher |
+| `Local\GCxEnding.small-win-tools.hangul-restore` | hangul-restore |
 
 ### 개인 데이터 위치
 | 도구 | 위치 | 내용 |
@@ -72,6 +75,7 @@
 | emoji-searcher | `%APPDATA%\emoji-searcher\` | config.json, user_tags.json, usage.json |
 | gohome-vlog | `%LOCALAPPDATA%\gohome-vlog\` | 원본 jsonl, 요약, 설정 (PC 밖으로 나가면 안 되는 기록이라 Local) |
 | thought-searcher | `%APPDATA%\thought-searcher\`, `%LOCALAPPDATA%\thought-searcher\` | 설정/상태는 APPDATA, 색인/원본 복사/로그는 LOCALAPPDATA |
+| hangul-restore | `%APPDATA%\hangul-restore\` | config.json, hints.json |
 
 - 기준: 작은 설정과 상태는 `%APPDATA%\<폴더 이름>\`, 크거나 다시 만들 수 있는 것(캐시, 색인, 로그)과 PC 밖으로 나가면 안 되는 기록은 `%LOCALAPPDATA%\<폴더 이름>\`.
 - 저장소 안에는 개인 데이터를 절대 두지 않습니다. 실제 샘플은 `tests/local/`이나 도구 `.gitignore`에 넣은 폴더에만.
@@ -82,6 +86,7 @@
 | emoji-searcher | `emoji-searcher` | 🔍 |
 | gohome-vlog | `gohome` | 🏠 (일시 정지 시 변형) |
 | thought-searcher | `생각 검색기` | 🧠 (보관 폴더 없으면 ⚠ 겹침) |
+| hangul-restore | `hangul-restore` | 한 |
 
 ### 저장소 밖에 손대는 것
 | 도구 | 대상 | 되돌리는 방법 |
@@ -111,6 +116,8 @@
 | 원본 | 복사본 | 상태 |
 |---|---|---|
 | `emoji-searcher/app/hotkey.py` | `thought-searcher/app/hotkey.py` | 동일 |
+| `emoji-searcher/app/hotkey.py` | `hangul-restore/app/hotkey.py` | 동일 |
+| `emoji-searcher/_deps.py` | `gohome-vlog/_deps.py`, `hangul-restore/_deps.py` | 동일 (PySide6 없으면 첫 실행 때 설치 제안) |
 
 ## 6. 문서와 커밋 규칙
 - 사용자와의 대화, 문서는 한국어 존댓말.

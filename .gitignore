@@ -9,6 +9,9 @@ venv/
 emoji-searcher/tools/.cache/
 emoji-searcher/registry/backup/
 
+# hangul-restore: 로컬 시험용 실제 파일 (고객사 데이터라 공개 저장소에 올리지 않음)
+hangul-restore/*.sql
+
 # 편집기 / OS
 .vscode/
 .idea/

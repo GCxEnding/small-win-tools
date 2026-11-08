@@ -12,6 +12,7 @@ Windows에서 쓰는 작은 도구들을 모아 두는 곳이에요. 🧰
 | 1 | [emoji-searcher](emoji-searcher/) | Win+. 으로 띄우는 한국어 이모지 검색기. `배포` → 🚀, 초성(`ㅂㅍ`)과 한영 오타(`qovh`)도 알아들어요. |
 | 2 | [gohome-vlog](gohome-vlog/) | 활성 창 기준으로 하루 일한 프로그램·프로젝트·서버를 기록해 퇴근 전에 Obsidian 일지용 요약을 만들어 줘요. 입력 내용은 수집하지 않아요. |
 | 3 | [thought-searcher](thought-searcher/) | Claude 채팅 기록(claude.ai 내보내기, Claude Code 세션)을 md로 영구 보관하고 Ctrl+Alt+H로 단어 몇 개만으로 찾아요. 전부 로컬, 토큰 0. |
+| 4 | [hangul-restore](hangul-restore/) | 깨진 한글을 복사하고 Win+Shift+K. `寃곗옱` → `결재`. `°áÀç`, URL, `\u` 이스케이프, Base64까지 풀고 어디서 깨졌는지 원인 힌트도 알려 줘요. |
 
 앞으로 더 늘어날 수도 있어요. 몇 개가 될지는 저도 모릅니다. 🙂
 

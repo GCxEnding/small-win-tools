@@ -1,0 +1,76 @@
+{
+  "_설명": "실제로 만난 깨진 문자열. input을 넣으면 expected가 1위여야 한다. path는 기대 경로(연산 id, 생략 가능). 공개 저장소이므로 고객사명·개인정보는 넣지 마세요.",
+  "cases": [
+    {
+      "input": "寃곗옱",
+      "expected": "결재",
+      "path": [
+        "utf8_as_cp949"
+      ],
+      "note": "UTF-8을 CP949로 읽음"
+    },
+    {
+      "input": "°áÀç",
+      "expected": "결재",
+      "path": [
+        "cp949_as_latin1"
+      ],
+      "note": "CP949를 Latin-1로 읽음"
+    },
+    {
+      "input": "%EA%B2%B0%EC%9E%AC",
+      "expected": "결재",
+      "path": [
+        "url_utf8"
+      ]
+    },
+    {
+      "input": "\\uacb0\\uc7ac",
+      "expected": "결재",
+      "path": [
+        "unicode_escape"
+      ]
+    },
+    {
+      "input": "&#44208;&#51116;",
+      "expected": "결재",
+      "path": [
+        "html_entity"
+      ]
+    },
+    {
+      "input": "6rKw7J6sIOyalOyyrSDsmYTro4w=",
+      "expected": "결재 요청 완료",
+      "path": [
+        "base64_utf8"
+      ]
+    },
+    {
+      "input": "%E5%AF%83%EA%B3%97%EC%98%B1",
+      "expected": "결재",
+      "path": [
+        "url_utf8",
+        "utf8_as_cp949"
+      ],
+      "note": "2단계"
+    },
+    {
+      "input": "test",
+      "expected": "test",
+      "path": [],
+      "note": "정상 입력, 후보 없음"
+    },
+    {
+      "input": "admin",
+      "expected": "admin",
+      "path": [],
+      "note": "정상 입력, 후보 없음"
+    },
+    {
+      "input": "50% 완료",
+      "expected": "50% 완료",
+      "path": [],
+      "note": "원문 유지"
+    }
+  ]
+}

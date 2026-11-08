@@ -1,0 +1,7 @@
+{
+  "hotkey": "win+shift+k",
+  "fallback_hotkey": "ctrl+alt+k",
+  "max_depth": 3,
+  "max_candidates": 5,
+  "max_input_chars": 20000
+}

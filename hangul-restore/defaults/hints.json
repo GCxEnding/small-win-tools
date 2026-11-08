@@ -1,0 +1,42 @@
+{
+  "_설명": "복원 경로에 steps 중 하나라도(min_count가 있으면 그 횟수 이상) 들어 있으면 hint를 보여 줍니다. 위에서부터 처음 맞는 규칙 하나만 씁니다. 연산 id는 README 참고.",
+  "rules": [
+    {
+      "steps": ["utf8_as_cp949", "utf8_as_euckr"],
+      "hint": "UTF-8 데이터를 MS949/EUC-KR로 읽음. JSP pageEncoding, 응답 Content-Type charset, JVM file.encoding, 터미널/로그 뷰어 인코딩 확인"
+    },
+    {
+      "steps": ["cp949_as_latin1", "cp949_as_cp1252"],
+      "hint": "EUC-KR/MS949 데이터를 ISO-8859-1로 읽음. 요청 파라미터 인코딩(request.setCharacterEncoding, Tomcat URIEncoding), 서블릿 필터 확인"
+    },
+    {
+      "steps": ["cp949_as_utf8"],
+      "hint": "MS949 데이터를 UTF-8로 읽음. 원본이 손실되었을 가능성 높음. 파일 저장 인코딩, DB NLS_CHARACTERSET 확인"
+    },
+    {
+      "steps": ["utf8_as_latin1", "utf8_as_cp1252"],
+      "hint": "UTF-8 데이터를 ISO-8859-1로 읽음. Tomcat URIEncoding(기본 ISO-8859-1), request.setCharacterEncoding 호출 순서, new String(s.getBytes(\"ISO-8859-1\"), \"UTF-8\") 같은 수동 변환 확인"
+    },
+    {
+      "steps": ["url_utf8", "url_cp949"],
+      "min_count": 2,
+      "hint": "URL 인코딩이 두 번 적용됨. 인코딩 필터나 encodeURIComponent/URLEncoder가 중복 적용됐는지 확인"
+    },
+    {
+      "steps": ["unicode_escape"],
+      "hint": "properties 파일 native2ascii 결과이거나 JSON 직렬화 이스케이프"
+    },
+    {
+      "steps": ["url_utf8", "url_cp949"],
+      "hint": "URL/폼 파라미터 인코딩. 이중 인코딩이면 인코딩 필터가 두 번 적용됐는지 확인"
+    },
+    {
+      "steps": ["html_entity"],
+      "hint": "HTML 엔티티. 화면 출력용 이스케이프(c:out, fn:escapeXml, XSS 필터)가 저장/전송 데이터에 적용됐는지 확인"
+    },
+    {
+      "steps": ["base64_utf8", "base64_cp949"],
+      "hint": "Base64 인코딩 값. 헤더, 쿠키, 첨부 파일명, 토큰 등에 담긴 값인지 확인"
+    }
+  ]
+}
