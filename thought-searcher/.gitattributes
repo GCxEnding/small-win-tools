@@ -1,0 +1,2 @@
+# 기대 md와 fixture는 바이트 단위로 비교하므로 어느 PC에서 clone해도 LF로 둔다
+tests/fixtures/** text eol=lf
