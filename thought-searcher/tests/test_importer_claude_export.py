@@ -104,7 +104,8 @@ def test_detect_rejects_other_zips(tmp_path):
     notzip.write_bytes(b"not a zip")
     for p in (chatgpt, other, notzip):
         assert not imp.detect(p)
-        assert detect(p) is None
+    assert detect(chatgpt).name == "chatgpt"   # ChatGPT 가져오기가 맡음
+    assert detect(other) is None and detect(notzip) is None
 
 
 def test_broken_json_detected_then_fails(tmp_path):

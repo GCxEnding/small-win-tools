@@ -19,7 +19,7 @@ class Message:
 @dataclass
 class Conversation:
     conv_id: str                 # "<source>:<native id>"
-    source: str                  # "claude-ai" | "claude-code" | "claude-ai-project" | "claude-ai-memory"
+    source: str                  # "claude-ai" | "claude-code" | "claude-ai-project" | "claude-ai-memory" | "chatgpt"
     title: str
     project: str
     created: datetime

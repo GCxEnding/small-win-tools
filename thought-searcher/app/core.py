@@ -331,7 +331,7 @@ class Core:
             st = {"by_source": {}, "size": 0}
             self._warn(f"색인 상태 읽기 실패: {e}")
         names = {"claude-ai": "claude.ai 대화", "claude-code": "Claude Code", "claude-ai-project": "프로젝트",
-                 "claude-ai-memory": "메모리"}
+                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT"}
         lines = [
             f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}",
             f"마지막 zip 가져오기: {fmt(self.state.get('last_zip_import'))}",

@@ -1,6 +1,6 @@
 # thought-searcher (생각 검색기) 🧠
 
-Claude 채팅 기록을 내 PC에 영구 보관하고, 흐릿한 기억(단어 몇 개)만으로 예전 대화를 찾는 트레이 도구예요.
+Claude(와 ChatGPT) 채팅 기록을 내 PC에 영구 보관하고, 흐릿한 기억(단어 몇 개)만으로 예전 대화를 찾는 트레이 도구예요.
 "정리"하지 않고 "다 저장하고 검색"합니다. 수집, 변환, 검색 모두 로컬에서 하고 AI 토큰을 쓰지 않아요.
 
 - claude.ai 데이터 내보내기 zip이 다운로드 폴더에 들어오면 자동으로 md로 바꾸고 색인합니다.
@@ -31,6 +31,7 @@ pythonw thought_searcher.pyw
 2. claude.ai 대화는 트레이 메뉴 `claude.ai 내보내기 받으러 가기`로 내보내기 페이지를 열어 zip을 받으면 됩니다(메일로 링크가 와요). 다운로드 폴더에 들어오면 자동으로 가져옵니다.
    내보내기는 `conversations-000.zip`, `projects-000.zip`, `memories-000.zip` 등 여러 개로 나뉘어 오는데, 필요한 것만 알아서 읽고 나머지는 무시합니다.
    처리한 zip은 지우거나 옮기지 않아요. 같은 zip을 다시 넣어도 중복되지 않습니다.
+3. ChatGPT 내보내기 zip(`<긴 해시>-<날짜>-<해시>.zip`)도 다운로드 폴더에 두면 자동으로 가져옵니다. 파일 이름이 아니라 안의 `conversations.json` 구조로 알아봐요. 생각 과정, 도구 호출, 첨부 원본은 담지 않습니다.
 
 ### 시작 프로그램 등록
 
@@ -48,7 +49,7 @@ pythonw thought_searcher.pyw
 | `log` | 영어는 앞부분만 맞아도 찾음 (`logpick`, `logcut`) |
 | `"nginx 설정"` | 구문: 붙어서 나와야 함 |
 | `-롤백` | 제외: 이 단어가 있는 대화는 뺌 |
-| `src:ai` `src:code` `src:project` `src:memory` | 출처 필터 |
+| `src:ai` `src:code` `src:project` `src:memory` `src:gpt` | 출처 필터 |
 | `proj:small` | 프로젝트 이름 일부 |
 | `after:2026-10` `before:2026-11-05` | 날짜 범위 |
 | `배` (1글자) | 제목에서만 찾음 |
@@ -119,9 +120,9 @@ pytest
 - 실제 샘플 테스트(`test_real_sample.py`)는 `tests/local/`이 있을 때만 돕니다. 이 폴더에는 실제 대화가 들어 있으니 **커밋하지 마세요**(`.gitignore`에 들어 있음).
 - 합성 fixture는 `tests/fixtures/make_fixtures.py`, 기대 md 초안은 `make_expected.py`로 다시 만들 수 있어요.
 
-## 새 출처 추가 (ChatGPT 등)
+## 새 출처 추가
 
-`app/importers/`에 파일 하나를 만들어 `detect`, `iter_conversations`, `snapshot_time`, `is_full_snapshot`, `snapshot_sources`를 구현하고 `base.py`의 `registry()`에 한 줄 추가하면 됩니다. 본체는 고치지 않아요.
+`app/importers/`에 파일 하나를 만들어 `detect`, `iter_conversations`, `snapshot_time`, `is_full_snapshot`, `snapshot_sources`를 구현하고 `base.py`의 `registry()`에 한 줄 추가합니다. 새 출처 이름(`source`)으로 보관 폴더를 쓰려면 `archive.py`의 `SOURCE_DIRS`, `ARCHIVE_SUBDIRS`에, 검색 필터와 배지는 `query.py`의 `SOURCE_ALIASES`, `window.py`의 `BADGE`에 한 줄씩 넣으세요(`chatgpt.py` 참고).
 
 ## 다른 곳의 대화 md 넣기
 

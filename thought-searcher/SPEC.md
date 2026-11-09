@@ -16,7 +16,7 @@
   - 다운로드 폴더 감시: claude.ai 내보내기 zip이 들어오면 자동 변환과 색인 갱신
   - Claude Code 세션 주기 수집: md 변환 + 원본 jsonl 로컬 복사
   - 주간 내보내기 알림 (Windows 알림)
-- 가져오기 모듈 교체 구조 (claude.ai 내보내기, Claude Code 세션 2종 구현. ChatGPT 등은 모듈 추가로 확장)
+- 가져오기 모듈 교체 구조 (claude.ai 내보내기, ChatGPT 내보내기, Claude Code 세션 3종 구현. 그 밖의 출처는 모듈 추가로 확장)
 - claude.ai 내보내기의 대화, 프로젝트 문서, 메모리
 - md 생성(덮어쓰기), 원본에서 사라진 대화 표시, 알려진 형식의 비밀 값 가림
 - SQLite FTS5 색인과 검색어 문법(구문, 제외어, 필터)
@@ -24,7 +24,7 @@
 
 ### 제외 (Out of scope)
 - AI 요약, 임베딩, 의미 검색 등 토큰을 쓰는 기능
-- ChatGPT 내보내기 가져오기 (구조만 대비)
+- ChatGPT의 생각 과정(thoughts, reasoning_recap), 도구 호출과 결과, 첨부 원본(file_*.dat)
 - Claude 데스크톱 앱 Cowork(에이전트) 세션 (`AppData\Local\Claude-Data`)
 - 서브에이전트 세션의 md 변환 (원본 jsonl 복사에는 포함)
 - 첨부 파일 추출 텍스트, 아티팩트(tool_use로 만든 문서), thinking 블록
@@ -395,6 +395,7 @@ class MatchedMessage:
 - 시간은 모두 로컬 시간대(+09:00)로 md에 적는다.
 - 알림은 PySide6 트레이 알림을 쓴다(별도 토스트 라이브러리 없음). 클릭 동작은 `messageClicked` 신호로 처리.
 - claude.ai 프로젝트 문서와 메모리도 같은 검색 대상이며, 필터 `src:project`, `src:memory`로 구분한다.
+- ChatGPT 대화는 `chatgpt:<conversation_id>`, 보관 위치 `chatgpt/YYYY/`, 필터 `src:gpt`. 화면에 보이는 가지는 `current_node`에서 `parent`를 따라 올라간 경로이고, 나머지 노드는 부록(다른 가지)으로 둔다.
 
 ## 10. 미결 사항
 - **claude.ai 내보내기 실제 구조**: 파일명(`projects.json`, `memories.json`), 메시지 부모 필드(가지 정보) 유무, 첨부 표기 방식, 내보내기 시각을 어디서 얻는지(zip 안 정보 또는 파일 수정 시각). 사용자가 줄 실제 zip으로 확정하고, 이 명세 3번과 4번을 고친다.

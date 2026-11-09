@@ -1,6 +1,6 @@
 """가져오기 모듈 인터페이스와 등록 목록.
 
-새 출처(ChatGPT 등)는 이 폴더에 파일 하나를 만들고 아래 REGISTRY에 한 줄 추가한다.
+새 출처는 이 폴더에 파일 하나를 만들고 아래 REGISTRY에 한 줄 추가한다.
 본체(archive, index, watcher)는 원본 형식을 모른다.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ class ImportFailed(Exception):
 
 
 class Importer(Protocol):
-    name: str                                       # "claude-ai", "claude-code"
+    name: str                                       # "claude-ai", "claude-code", "chatgpt" 등
 
     def detect(self, path: Path) -> bool: ...       # zip 또는 폴더 내용으로 판별
 
@@ -35,11 +35,13 @@ class Importer(Protocol):
 
 def registry() -> list[Importer]:
     from .claude_code import ClaudeCodeImporter
+    from .chatgpt import ChatGPTImporter
     from .claude_export import ClaudeExportImporter
     return [
         ClaudeExportImporter(),
+        ChatGPTImporter(),
         ClaudeCodeImporter(),
-        # ChatGPTImporter(),  ← 새 출처는 여기에 한 줄
+        # 새 출처는 여기에 한 줄
     ]
 
 
