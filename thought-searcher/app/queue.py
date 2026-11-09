@@ -13,9 +13,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-QUEUE_SOURCES = ("claude-code", "claude-ai", "note")
+QUEUE_SOURCES = ("claude-code", "claude-ai", "note")   # 색인 문서 중 큐에 오르는 것. 그 밖에 "journal"(연결 안 된 일지 항목)
 DAY = 86400.0
 CLOSE_KINDS = ("done", "drop")
+REOPEN = "open"
+STATE_LABEL = {" ": "할 일", "/": "진행", "x": "완료", "-": "버림"}
 _JOURNAL_REL = re.compile(r"^\d{4}[\\/]\d{2}[\\/]\d{4}-\d{2}-\d{2}\.md$", re.IGNORECASE)
 
 
@@ -104,8 +106,8 @@ def trace_of(doc: QueueDoc) -> float:
 
 
 def closed_ts(rec) -> tuple[str, float] | None:
-    """queue_closed 기록 하나 -> (종류, 닫은 시각). 형식이 이상하면 None."""
-    if not isinstance(rec, dict) or rec.get("kind") not in CLOSE_KINDS:
+    """queue_closed 기록 하나 -> (종류, 시각). 종류는 done/drop 또는 open(다시 열기). 형식이 이상하면 None."""
+    if not isinstance(rec, dict) or rec.get("kind") not in (*CLOSE_KINDS, REOPEN):
         return None
     at = rec.get("at")
     try:
@@ -118,23 +120,65 @@ def closed_ts(rec) -> tuple[str, float] | None:
     return rec["kind"], ts
 
 
+def _latest(entries: list) -> object:
+    """가장 늦은 날짜의 일지 항목 (같은 날이면 파일에서 뒤에 있는 것)."""
+    return max(entries, key=lambda e: (e.day, e.line))
+
+
 def compute(docs: list[QueueDoc], closed: dict, now: float, days: int = 14, focus: int = 5,
-            filters: Filters | None = None) -> QueueResult:
-    """문서 목록과 닫힘 기록으로 열린 일 목록을 만든다."""
+            filters: Filters | None = None, journal: list | None = None) -> QueueResult:
+    """문서 목록, 일지 항목(journal.JournalEntry), 닫힘 기록으로 열린 일 목록을 만든다.
+
+    - 일지 항목이 [session::]으로 가리키는 채팅에는 그 항목 날짜의 흔적이 더해진다.
+    - 연결된(또는 같은 제목의) 일지 항목 중 가장 늦은 것이 [x]/[-]이고 남은 하위 할 일이 없으면 닫힘.
+    - 직접 닫기와 일지 닫기 모두, 닫은 시각보다 늦은 흔적이 있으면 다시 열린다.
+    """
     since = now - days * DAY
-    open_items: list[QueueItem] = []
-    closed_items: list[QueueItem] = []
-    for d in docs:
-        if d.source not in QUEUE_SOURCES:
-            continue
-        trace = trace_of(d)
+    closed = closed or {}
+    by_id = {d.conv_id: d for d in docs if d.source in QUEUE_SOURCES}
+    linked: dict[str, list] = {}
+    unlinked: dict[str, list] = {}
+    for e in journal or []:
+        ids = [i for i in e.sessions if i in by_id]
+        if ids:
+            for i in ids:
+                linked.setdefault(i, []).append(e)
+        else:
+            unlinked.setdefault(e.title, []).append(e)
+
+    candidates: list[tuple[QueueItem, list]] = []
+    for d in by_id.values():
+        ents = linked.get(d.conv_id, [])
+        trace = max([trace_of(d), *(e.at for e in ents)])
         if trace < since:
             continue
         if filters and filters.excluded(d.path):
             continue
         it = QueueItem(d.conv_id, d.source, d.title, d.project, d.path, d.line, trace)
-        c = closed_ts((closed or {}).get(d.conv_id))
-        if c and c[1] >= trace:
+        if ents:
+            last = _latest(ents)
+            it.subtitle = f"일지 {last.day:%m-%d} · {STATE_LABEL.get(last.state, '')} · {last.title}"
+        candidates.append((it, ents))
+    for title, ents in unlinked.items():
+        last = _latest(ents)
+        trace = max(e.at for e in ents)
+        if trace < since:
+            continue
+        candidates.append((QueueItem(f"journal:{title}", "journal", title, "", last.path, last.line, trace), ents))
+
+    open_items: list[QueueItem] = []
+    closed_items: list[QueueItem] = []
+    for it, ents in candidates:
+        closes = []
+        c = closed_ts(closed.get(it.id))
+        if c:
+            closes.append(c)
+        if ents:
+            last = _latest(ents)
+            if last.closed_kind:
+                closes.append((last.closed_kind, last.at))
+        c = max(closes, key=lambda x: x[1]) if closes else None
+        if c and c[0] in CLOSE_KINDS and c[1] >= it.trace_ts:
             it.closed_kind, it.closed_at = c
             if c[1] >= since:
                 closed_items.append(it)
@@ -153,8 +197,10 @@ def close(closed: dict, item_id: str, kind: str, now: datetime | None = None) ->
     closed[item_id] = {"kind": kind, "at": at}
 
 
-def reopen(closed: dict, item_id: str) -> None:
-    closed.pop(item_id, None)
+def reopen(closed: dict, item_id: str, now: datetime | None = None) -> None:
+    """다시 열기. 일지 [x]로 닫힌 일도 열리도록 '열림' 기록을 남긴다(이후 더 늦은 [x]가 오면 다시 닫힘)."""
+    at = (now or datetime.now(timezone.utc).astimezone()).isoformat(timespec="seconds")
+    closed[item_id] = {"kind": REOPEN, "at": at}
 
 
 def prune(closed: dict, now: float, keep_days: int) -> int:
@@ -166,24 +212,37 @@ def prune(closed: dict, now: float, keep_days: int) -> int:
 
 
 # ---- 색인 읽기 -------------------------------------------------------------
-def load_docs(conn: sqlite3.Connection, since: float) -> list[QueueDoc]:
-    """색인에서 흔적이 since 뒤인 큐 대상 문서를 읽는다. 채팅은 마지막 본문(가지 아님) 메시지 줄을 같이."""
+_DOC_COLS = """d.conv_id, d.source, d.title, d.project, d.path, d.updated_ts, d.md_mtime,
+                   CASE WHEN d.source='note' THEN 1 ELSE
+                     (SELECT max(m.line_no) FROM messages m WHERE m.doc_id=d.id AND m.is_branch=0) END"""
+
+
+def load_docs(conn: sqlite3.Connection, since: float, extra_ids=()) -> list[QueueDoc]:
+    """색인에서 흔적이 since 뒤인 큐 대상 문서를 읽는다. 채팅은 마지막 본문(가지 아님) 메시지 줄을 같이.
+    extra_ids: 흔적이 오래됐어도 읽을 문서 id (일지가 가리키는 채팅)."""
     marks = ",".join("?" for _ in QUEUE_SOURCES)
     rows = conn.execute(
-        f"""SELECT d.conv_id, d.source, d.title, d.project, d.path, d.updated_ts, d.md_mtime,
-                   CASE WHEN d.source='note' THEN 1 ELSE
-                     (SELECT max(m.line_no) FROM messages m WHERE m.doc_id=d.id AND m.is_branch=0) END
-            FROM docs d
+        f"""SELECT {_DOC_COLS} FROM docs d
             WHERE d.source IN ({marks})
               AND ((d.source='note' AND d.md_mtime>=?) OR (d.source!='note' AND d.updated_ts>=?))""",
         (*QUEUE_SOURCES, since, since)).fetchall()
+    got = {r[0] for r in rows}
+    rest = [i for i in dict.fromkeys(extra_ids) if i not in got]
+    for k in range(0, len(rest), 500):
+        part = rest[k:k + 500]
+        rows += conn.execute(
+            f"""SELECT {_DOC_COLS} FROM docs d
+                WHERE d.source IN ({marks}) AND d.conv_id IN ({",".join("?" for _ in part)})""",
+            (*QUEUE_SOURCES, *part)).fetchall()
     return [QueueDoc(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", float(r[5] or 0), float(r[6] or 0),
                      int(r[7] or 1)) for r in rows]
 
 
 # ---- 표시 도우미 -----------------------------------------------------------
 def relative_time(ts: float, now: float) -> str:
-    s = max(0.0, now - ts)
+    s = now - ts
+    if s < 0:
+        return "오늘"          # 시계가 어긋난 경우
     if s < 60:
         return "방금"
     if s < 3600:

@@ -21,9 +21,11 @@ K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus",
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
 HINT_SEARCH = "Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기"
 HINT_QUEUE = "열린 일 · Enter 열기 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
-BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex"}
+BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
+         "journal": "일지"}
 BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
-               "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04", "codex": "#0d9488"}
+               "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04", "codex": "#0d9488",
+               "journal": "#7c3aed"}
 DEBOUNCE_MS = 150
 WIN_W, WIN_H = 820, 560
 

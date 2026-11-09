@@ -1,7 +1,4 @@
-"""열린 일 큐 (SPEC-queue.md 3-A, 12번 test_queue.py 중 1단계 범위).
-
-일지 연결(`[x]` 닫힘, 하위 `[ ]`, 가장 늦은 날짜 항목, 연결 안 된 항목)은 2단계에서 이 파일에 더한다.
-"""
+"""열린 일 큐 (SPEC-queue.md 3-A, 12번 test_queue.py). 1단계(큐 기본)와 2단계(일지 연결)."""
 import json
 import os
 import time
@@ -11,6 +8,7 @@ import pytest
 
 from app import queue
 from app.index import Index, connect
+from app.journal import JournalEntry
 from app.queue import DAY, Filters, QueueDoc, compute
 
 NOW = datetime(2026, 11, 9, 15, 0).timestamp()
@@ -156,11 +154,130 @@ def test_close_reopen_prune_helpers():
     with pytest.raises(ValueError):
         queue.close(closed, "x", "later")
     queue.reopen(closed, "claude-code:a")
-    assert closed == {}
+    assert closed["claude-code:a"]["kind"] == "open"
+    res = compute([doc("claude-code:a", H)], closed, NOW)
+    assert ids(res.focus) == ["claude-code:a"]
     closed = {"old": {"kind": "done", "at": _at(40 * DAY)}, "new": {"kind": "drop", "at": _at(DAY)},
               "bad": {"kind": "done"}}
     assert queue.prune(closed, NOW, 28) == 2
     assert list(closed) == ["new"]
+
+
+# ---- 일지 연결 (2단계) ---------------------------------------------------------
+def entry(title, ago_days, state="/", sessions=(), open_children=False, line=8):
+    """ago_days일 전 일지 항목. 흔적 시각은 그날 23:59 대신 단순히 NOW - ago_days일."""
+    day = datetime.fromtimestamp(NOW - ago_days * DAY).date()
+    return JournalEntry(day, f"C:/vault/{day:%Y}/{day:%m}/{day:%Y-%m-%d}.md", line, state, title, title,
+                        list(sessions), open_children, [], NOW - ago_days * DAY)
+
+
+def test_journal_link_adds_trace_and_subtitle():
+    chat = doc("claude-code:s1", 20 * DAY)          # 채팅 자체는 오래됨
+    e = entry("게시판 검토", 2, "/", ["claude-code:s1"])
+    res = compute([chat], {}, NOW, journal=[e])
+    assert ids(res.focus) == ["claude-code:s1"]
+    it = res.focus[0]
+    assert it.trace_ts == pytest.approx(NOW - 2 * DAY)
+    assert "게시판 검토" in it.subtitle and "진행" in it.subtitle
+    assert it.path == chat.path and it.line == chat.line     # 열기는 채팅
+
+
+def test_journal_done_closes_and_drop_closes():
+    for state, kind in (("x", "done"), ("-", "drop")):
+        chat = doc("claude-code:s1", 3 * DAY)
+        res = compute([chat], {}, NOW, journal=[entry("일", 2, state, ["claude-code:s1"])])
+        assert res.focus == [] and ids(res.closed) == ["claude-code:s1"]
+        assert res.closed[0].closed_kind == kind
+
+
+def test_journal_done_with_open_children_stays_open():
+    chat = doc("claude-code:s1", 3 * DAY)
+    res = compute([chat], {}, NOW, journal=[entry("일", 2, "x", ["claude-code:s1"], open_children=True)])
+    assert ids(res.focus) == ["claude-code:s1"]
+
+
+def test_latest_journal_entry_decides():
+    chat = doc("claude-code:s1", 10 * DAY)
+    old_done_new_doing = [entry("일", 5, "x", ["claude-code:s1"]), entry("일", 2, "/", ["claude-code:s1"])]
+    old_doing_new_done = [entry("일", 5, "/", ["claude-code:s1"]), entry("일", 2, "x", ["claude-code:s1"])]
+    assert ids(compute([chat], {}, NOW, journal=old_done_new_doing).focus) == ["claude-code:s1"]
+    assert ids(compute([chat], {}, NOW, journal=old_doing_new_done).closed) == ["claude-code:s1"]
+
+
+def test_journal_close_reopens_on_new_chat_trace():
+    chat = doc("claude-code:s1", 1 * DAY)           # [x] 적은 다음 날 그 세션에서 새 대화
+    res = compute([chat], {}, NOW, journal=[entry("일", 2, "x", ["claude-code:s1"])])
+    assert ids(res.focus) == ["claude-code:s1"]
+
+
+def test_reopen_overrides_journal_close_until_later_done():
+    chat = doc("claude-code:s1", 5 * DAY)
+    journal = [entry("일", 3, "x", ["claude-code:s1"])]
+    closed = {"claude-code:s1": {"kind": "open", "at": _at(2 * DAY)}}
+    assert ids(compute([chat], closed, NOW, journal=journal).focus) == ["claude-code:s1"]
+    later = journal + [entry("일", 1, "x", ["claude-code:s1"])]
+    assert ids(compute([chat], closed, NOW, journal=later).closed) == ["claude-code:s1"]
+
+
+def test_two_sessions_in_one_entry():
+    docs = [doc("claude-code:s1", 4 * DAY), doc("claude-ai:s2", 4 * DAY, source="claude-ai")]
+    e = entry("일", 2, "x", ["claude-code:s1", "claude-ai:s2"])
+    res = compute(docs, {}, NOW, journal=[e])
+    assert sorted(ids(res.closed)) == ["claude-ai:s2", "claude-code:s1"]
+
+
+def test_unlinked_entries_same_title_across_days_are_one_work():
+    es = [entry("문서 검토", 5, " ", line=9), entry("문서 검토", 1, "/", line=12), entry("다른 일", 3, " ")]
+    res = compute([], {}, NOW, journal=es)
+    assert ids(res.focus) == ["journal:문서 검토", "journal:다른 일"]
+    it = res.focus[0]
+    assert it.source == "journal" and it.title == "문서 검토"
+    assert it.trace_ts == pytest.approx(NOW - DAY) and it.line == 12 and it.path == es[1].path
+    # 가장 늦은 날 [x]면 닫힘
+    res = compute([], {}, NOW, journal=es + [entry("문서 검토", 0.5, "x")])
+    assert ids(res.closed) == ["journal:문서 검토"]
+
+
+def test_unknown_session_id_is_unlinked():
+    e = entry("수집 전 세션", 1, "/", ["claude-code:not-yet"])
+    res = compute([doc("claude-code:other", H)], {}, NOW, journal=[e])
+    assert sorted(ids(res.focus)) == ["claude-code:other", "journal:수집 전 세션"]
+
+
+def test_session_to_non_queue_source_is_unlinked():
+    e = entry("코덱스 일", 1, "/", ["codex:t1"])
+    res = compute([doc("codex:t1", H, source="codex")], {}, NOW, journal=[e])
+    assert ids(res.focus) == ["journal:코덱스 일"]
+
+
+def test_old_journal_entries_hidden():
+    res = compute([], {}, NOW, journal=[entry("오래된 일", 15, " ")])
+    assert res.open_count == 0
+
+
+def test_direct_close_of_journal_item():
+    es = [entry("문서 검토", 1, " ")]
+    closed = {"journal:문서 검토": {"kind": "drop", "at": _at(H)}}
+    assert ids(compute([], closed, NOW, journal=es).closed) == ["journal:문서 검토"]
+
+
+def test_core_reads_journal_files_and_loads_old_linked_chat(core_env, db, tmp_path):
+    core = core_env
+    vault = tmp_path / "vault"
+    sid = "11111111-2222-3333-4444-555555555555"
+    _fill(db, [(f"claude-code:{sid}", "claude-code", NOW - 30 * DAY, 0, [(7, 0)])])   # 큐 기간 밖 채팅
+    day = datetime.fromtimestamp(NOW).date()
+    p = vault / f"{day:%Y}" / f"{day:%m}" / f"{day:%Y-%m-%d}.md"
+    p.parent.mkdir(parents=True)
+    p.write_text(f"## 업무\n- [/] #개발 큐 만들기 [session:: {sid}]\n- [ ] 혼자 있는 일\n", encoding="utf-8")
+    core.config["journal_dir"] = str(vault)
+    res = core.compute_queue(db, NOW)
+    assert sorted(ids(res.focus)) == [f"claude-code:{sid}", "journal:혼자 있는 일"]
+    chat = next(i for i in res.focus if i.source == "claude-code")
+    assert "큐 만들기" in chat.subtitle
+    core.config["journal_dir"] = str(tmp_path / "없는 폴더")
+    assert core.compute_queue(db, NOW).open_count == 0
+    assert any("업무 일지 폴더가 없습니다" in w for w in core.warnings)
 
 
 def test_relative_time():

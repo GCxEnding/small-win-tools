@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from . import codex, collector, queue
+from .journal import JournalReader
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
 from .index import Index
@@ -78,6 +79,8 @@ class Core:
         self.index = Index(self.store.index_path)
         self.index.tz = self.tz
         self._apply_note_dirs()
+        self._journal = JournalReader()
+        self._journal_warned = False
 
     # ---- 공통 -----------------------------------------------------------
     def _warn(self, msg: str | None) -> None:
@@ -380,13 +383,32 @@ class Core:
         return queue.Filters.build(self.note_dirs, self.config.get("queue_note_exclude") or [],
                                    self.archive_dir, expand(jd) if jd else "")
 
+    @property
+    def journal_dir(self) -> Path | None:
+        jd = str(self.config.get("journal_dir") or "").strip()
+        return Path(expand(jd)) if jd else None
+
+    def read_journal(self, now: float, days: int) -> list:
+        root = self.journal_dir
+        if root is None:
+            return []
+        if not root.is_dir():
+            if not self._journal_warned:
+                self._journal_warned = True
+                self._warn(f"업무 일지 폴더가 없습니다: {root}")
+            return []
+        return self._journal.read_recent(root, datetime.fromtimestamp(now).date(), days)
+
     def compute_queue(self, conn, now: float | None = None) -> queue.QueueResult:
         now = datetime.now().timestamp() if now is None else now
         days = self._int_cfg("queue_days", 14)
-        docs = queue.load_docs(conn, now - days * queue.DAY)
+        entries = self.read_journal(now, days)
+        extra = [i for e in entries for i in e.sessions]
+        docs = queue.load_docs(conn, now - days * queue.DAY, extra)
         with self.lock:
             closed = dict(self.state.get("queue_closed") or {})
-        return queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters())
+        return queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters(),
+                             entries)
 
     def close_item(self, item_id: str, kind: str) -> None:
         with self.lock:
