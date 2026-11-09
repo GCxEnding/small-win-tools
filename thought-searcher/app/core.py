@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from . import collector
+from . import codex, collector
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
 from .index import Index
@@ -169,6 +169,10 @@ class Core:
     def projects_dir(self) -> Path:
         return Path(expand(str(self.config.get("code_projects_dir") or "%USERPROFILE%\\.claude\\projects")))
 
+    @property
+    def codex_dir(self) -> Path:
+        return Path(expand(str(self.config.get("codex_dir") or "%USERPROFILE%\\.codex")))
+
     def reindex_paths(self, paths: list[Path]) -> None:
         if paths and self.archive_dir:
             self.index.sync(self.archive_dir, only=paths)
@@ -283,6 +287,11 @@ class Core:
         with self.lock:
             res = collector.collect(self.projects_dir, self.store.raw_dir, archive, self.state, force,
                                     progress)
+            # Codex는 Claude Code 다음에: 옮겨 온 대화가 Claude Code md와 겹치는지 보려면 그쪽이 먼저 있어야 한다
+            cx = codex.collect(self.codex_dir, archive, self.state, force)
+            res.new += cx.new
+            res.changed += cx.changed
+            res.written += cx.written
             self.state["last_code_collect"] = _now_iso()
         self.save_state()
         self.reindex_paths(res.written)
@@ -369,7 +378,7 @@ class Core:
             st = {"by_source": {}, "size": 0}
             self._warn(f"색인 상태 읽기 실패: {e}")
         names = {"claude-ai": "claude.ai 대화", "claude-code": "Claude Code", "claude-ai-project": "프로젝트",
-                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트"}
+                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex"}
         lines = [
             f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}",
             f"마지막 zip 가져오기: {fmt(self.state.get('last_zip_import'))}",

@@ -237,7 +237,7 @@ class App:
             progress=lambda i, n: self.bridge.step.emit(f"Claude Code 대화 가져오는 중 ({i}/{n})"))
 
     # ---- 진행 표시 ---------------------------------------------------------
-    JOB_LABELS = {"collect": "Claude Code 대화 가져오는 중", "sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
+    JOB_LABELS = {"collect": "Claude Code, Codex 대화 가져오는 중", "sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
                   "rebuild-index": "검색 색인 다시 만드는 중", "rebuild-all": "대화 md 다시 만드는 중"}
 
     def on_job_started(self, name: str):

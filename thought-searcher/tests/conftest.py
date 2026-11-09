@@ -52,7 +52,8 @@ def core_env(tmp_path, monkeypatch):
     for d in (roam, local, arch, proj):
         d.mkdir()
     (roam / "config.json").write_text(json.dumps({
-        "archive_dir": str(arch), "code_projects_dir": str(proj), "watch_dir": str(tmp_path / "dl")}),
+        "archive_dir": str(arch), "code_projects_dir": str(proj), "watch_dir": str(tmp_path / "dl"),
+        "codex_dir": str(tmp_path / "codex")}),
         encoding="utf-8")
     core = Core(Store(roam, local), tz=KST)
     return core

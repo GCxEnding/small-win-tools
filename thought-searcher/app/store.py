@@ -25,6 +25,7 @@ DEFAULT_CONFIG = {
                 "recency_half_life_days": 180},
     "extra_redact_patterns": [],
     "note_dirs": [],
+    "codex_dir": "%USERPROFILE%\\.codex",
 }
 
 DEFAULT_STATE = {

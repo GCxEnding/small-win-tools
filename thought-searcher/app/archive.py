@@ -22,10 +22,10 @@ _FORBIDDEN_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 _RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
 SLUG_LEN = 60
 
-SOURCE_DIRS = {"claude-ai": "claude-ai", "claude-code": "claude-code", "chatgpt": "chatgpt"}
+SOURCE_DIRS = {"claude-ai": "claude-ai", "claude-code": "claude-code", "chatgpt": "chatgpt", "codex": "codex"}
 # 보관 폴더에서 도구가 읽고 쓰는 하위 폴더. 이 밖의 md는 보지 않는다 (보관 폴더가 드라이브 최상위여도 안전)
 IMPORTED_DIR = "imported"   # 사람이 직접 넣는 md (MD_IMPORT.md 형식). 도구는 읽기만 하고 고치지 않는다
-ARCHIVE_SUBDIRS = ("claude-ai", "claude-code", "chatgpt", IMPORTED_DIR)
+ARCHIVE_SUBDIRS = ("claude-ai", "claude-code", "chatgpt", "codex", IMPORTED_DIR)
 
 
 def md_files(root: Path):

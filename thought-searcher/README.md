@@ -6,6 +6,8 @@ Claude(와 ChatGPT) 채팅 기록을 내 PC에 영구 보관하고, 흐릿한 �
 - claude.ai 데이터 내보내기 zip이 다운로드 폴더에 들어오면 자동으로 md로 바꾸고 색인합니다.
 - Claude Code 세션(`%USERPROFILE%\.claude\projects`)을 30분마다 md로 바꾸고, 원본 jsonl도 따로 복사해 둡니다(30일 자동 삭제 대비).
   md에는 사람 입력과 Claude 답변 글만 담고, 도구 호출(Bash, Read 등)과 그 결과는 뺍니다.
+- Codex 대화(`%USERPROFILE%\.codex`)도 같은 때 같이 모읍니다. Codex DB를 읽기만 하고, 사람 입력과 답변 글만 담습니다.
+  Claude Code 세션을 Codex로 옮겨 온 대화는 같은 세션의 Claude Code md가 이미 있으면 건너뛰고, 원본이 지워져 Codex에만 남은 것만 들어옵니다.
 - 가져오는 동안 트레이 아이콘에 ⏳가 붙고, 아이콘에 마우스를 올리면 진행 상황(`Claude Code 대화 가져오는 중 (3/14)`)이 보여요. `지금 가져오기`를 누르면 끝났을 때 `가져오기 완료: 새 대화 N개, 바뀐 대화 M개` 알림이 뜹니다.
 - `Ctrl+Alt+H`로 검색 창을 띄웁니다.
 - 마지막 가져오기 후 7일이 지나면 내보내기를 받으라고 알려 드려요.
@@ -50,7 +52,7 @@ pythonw thought_searcher.pyw
 | `log` | 영어는 앞부분만 맞아도 찾음 (`logpick`, `logcut`) |
 | `"nginx 설정"` | 구문: 붙어서 나와야 함 |
 | `-롤백` | 제외: 이 단어가 있는 대화는 뺌 |
-| `src:ai` `src:code` `src:project` `src:memory` `src:gpt` `src:note` | 출처 필터 (`src:노트`도 됨) |
+| `src:ai` `src:code` `src:codex` `src:project` `src:memory` `src:gpt` `src:note` | 출처 필터 (`src:노트`도 됨) |
 | `proj:small` | 프로젝트 이름 일부 |
 | `after:2026-10` `before:2026-11-05` | 날짜 범위 |
 | `배` (1글자) | 제목에서만 찾음 |
@@ -76,7 +78,7 @@ pythonw thought_searcher.pyw
 | 메뉴 | 하는 일 |
 |---|---|
 | 검색 (Ctrl+Alt+H) | 검색 창 열기 |
-| 지금 가져오기 | 30분을 기다리지 않고 Claude Code 대화와 노트 폴더를 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
+| 지금 가져오기 | 30분을 기다리지 않고 Claude Code, Codex 대화와 노트 폴더를 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
 | claude.ai 내보내기 받으러 가기 | claude.ai 데이터 내보내기 페이지를 브라우저로 열기 |
 | 대화 보관 폴더 열기 | 대화 md가 쌓인 폴더 열기 |
 | 상태 보기 | 마지막 가져오기 시각, 대화 수, 경고 |
@@ -141,4 +143,4 @@ Obsidian 일지, 메모처럼 직접 쓴 md는 `고급 > 노트 폴더 추가...
 
 ## 다른 곳의 대화 md 넣기
 
-Codex 기록처럼 이미 md로 가지고 있는 대화는 보관 폴더의 `imported\`에 정해진 형식으로 넣으면 같이 검색됩니다. 형식과 방법은 [MD_IMPORT.md](MD_IMPORT.md)를 보세요.
+다른 도구에서 md로 내보낸 대화는 보관 폴더의 `imported\`에 정해진 형식으로 넣으면 같이 검색됩니다. 형식과 방법은 [MD_IMPORT.md](MD_IMPORT.md)를 보세요.

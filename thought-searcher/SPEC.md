@@ -398,6 +398,7 @@ class MatchedMessage:
 - claude.ai 메모리는 공식 내보내기의 `memories-000.zip`(JSON) 대신 메모리 화면에서 받은 md 묶음(`claude-memory-YYYY-MM-DD.zip`)으로도 들어온다. 둘 다 같은 문서(`claude-ai-memory:main`, `claude-ai/memories.md`)가 되고 더 새것이 남는다. md 묶음만 가져온 것은 주간 내보내기 알림 기준(`last_zip_import`)을 바꾸지 않는다.
 - 노트 폴더(`config.json`의 `note_dirs`)의 일반 md는 변환 없이 제자리에서 읽어 색인한다. id `note:<절대 경로 소문자>`, source `note`, 배지 `노트`, 필터 `src:note`. 파일 하나가 문서 하나이고 `#` 제목마다 구역(메시지)으로 나눈다. 보관 폴더에는 쓰지 않고, 보관 폴더가 노트 폴더 안에 있어도 보관 폴더 쪽은 노트로 보지 않는다. 폴더를 빼면 색인에서만 지운다.
 - ChatGPT 대화는 `chatgpt:<conversation_id>`, 보관 위치 `chatgpt/YYYY/`, 필터 `src:gpt`. 화면에 보이는 가지는 `current_node`에서 `parent`를 따라 올라간 경로이고, 나머지 노드는 부록(다른 가지)으로 둔다.
+- Codex 대화는 Claude Code 수집 직후 같은 작업에서 모은다(`app/codex.py`). 원본 `sessions/**/*.jsonl.zst`는 zstd라 표준 라이브러리로 못 풀어서, `state_<N>.sqlite`(threads)와 `thread_history_<N>.sqlite`(thread_items)를 읽기 전용(`mode=ro`)으로 연다. id `codex:<thread id>`, 보관 위치 `codex/YYYY/`, 필터 `src:codex`. userMessage, agentMessage만 쓰고 `[external_agent_tool_...]` 메시지는 뺀다. `external_agent_session_imports.json`에 Claude Code 세션에서 옮겨 온 것으로 기록된 대화는 `claude-code:<세션 id>` md가 있으면 건너뛴다. Codex에서 지운 대화는 md를 남기고 missing 표시.
 
 ## 10. 미결 사항
 - **claude.ai 내보내기 실제 구조**: 파일명(`projects.json`, `memories.json`), 메시지 부모 필드(가지 정보) 유무, 첨부 표기 방식, 내보내기 시각을 어디서 얻는지(zip 안 정보 또는 파일 수정 시각). 사용자가 줄 실제 zip으로 확정하고, 이 명세 3번과 4번을 고친다.

@@ -18,6 +18,7 @@ SOURCE_ALIASES = {
     "memory": "claude-ai-memory", "mem": "claude-ai-memory", "m": "claude-ai-memory",
     "gpt": "chatgpt", "chatgpt": "chatgpt",
     "note": "note", "노트": "note", "n": "note",
+    "codex": "codex", "cx": "codex",
 }
 
 _DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$")
@@ -59,7 +60,7 @@ class Query:
     def filter_labels(self) -> list[str]:
         out = []
         rev = {"claude-ai": "ai", "claude-code": "code", "claude-ai-project": "project",
-               "claude-ai-memory": "memory", "chatgpt": "gpt", "note": "note"}
+               "claude-ai-memory": "memory", "chatgpt": "gpt", "note": "note", "codex": "codex"}
         out += [f"src:{rev.get(s, s)}" for s in self.sources]
         out += [f"proj:{p}" for p in self.projects]
         if self.after:

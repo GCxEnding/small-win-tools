@@ -11,9 +11,9 @@ from .search import Hit
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
 ROLE_HIT = Qt.UserRole + 1
 ROLE_IDX = Qt.UserRole + 2
-BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트"}
+BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex"}
 BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
-               "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04"}
+               "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04", "codex": "#0d9488"}
 DEBOUNCE_MS = 150
 WIN_W, WIN_H = 820, 560
 
@@ -225,7 +225,7 @@ class SearchWindow(QWidget):
         inner.setContentsMargins(10, 10, 10, 8)
         inner.setSpacing(6)
         self.edit = QueryEdit()
-        self.edit.setPlaceholderText("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|gpt|note|memory|project  proj:  after:2026-10)")
+        self.edit.setPlaceholderText("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
         self.list = QListWidget()
         self.list.setItemDelegate(HitDelegate(self.t, font, self.list))
         self.list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
