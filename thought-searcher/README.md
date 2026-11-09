@@ -31,6 +31,7 @@ pythonw thought_searcher.pyw
 2. claude.ai 대화는 트레이 메뉴 `claude.ai 내보내기 받으러 가기`로 내보내기 페이지를 열어 zip을 받으면 됩니다(메일로 링크가 와요). 다운로드 폴더에 들어오면 자동으로 가져옵니다.
    내보내기는 `conversations-000.zip`, `projects-000.zip`, `memories-000.zip` 등 여러 개로 나뉘어 오는데, 필요한 것만 알아서 읽고 나머지는 무시합니다.
    처리한 zip은 지우거나 옮기지 않아요. 같은 zip을 다시 넣어도 중복되지 않습니다.
+   `memories-000.zip`이 안 받아지면 claude.ai 메모리 화면에서 받은 `claude-memory-YYYY-MM-DD.zip`(md 묶음)을 다운로드 폴더에 두세요. 같은 메모리 문서로 들어가고, 둘 중 더 새것이 남습니다.
 3. ChatGPT 내보내기 zip(`<긴 해시>-<날짜>-<해시>.zip`)도 다운로드 폴더에 두면 자동으로 가져옵니다. 파일 이름이 아니라 안의 `conversations.json` 구조로 알아봐요. 생각 과정, 도구 호출, 첨부 원본은 담지 않습니다.
 
 ### 시작 프로그램 등록

@@ -37,8 +37,10 @@ def registry() -> list[Importer]:
     from .claude_code import ClaudeCodeImporter
     from .chatgpt import ChatGPTImporter
     from .claude_export import ClaudeExportImporter
+    from .claude_memory_md import ClaudeMemoryMdImporter
     return [
         ClaudeExportImporter(),
+        ClaudeMemoryMdImporter(),
         ChatGPTImporter(),
         ClaudeCodeImporter(),
         # 새 출처는 여기에 한 줄
