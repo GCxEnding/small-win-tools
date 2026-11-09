@@ -3,6 +3,7 @@
 > 저장소: `GCxEnding/small-win-tools` (공개)
 > 위치: `small-win-tools/thought-searcher/`
 > 표시 이름: 생각 검색기 (트레이, 알림에 표시)
+> 확장: 열린 일 큐, 업무 일지 연결, AI 요약, claude.ai 자동 수집은 `SPEC-queue.md`. 이 문서의 "AI 토큰을 쓰지 않는다", "claude.ai 자동 내보내기 제외"에 대한 예외가 그쪽에 있다.
 
 ## 1. 개요
 - 목적: Claude 채팅 기록을 PC에 영구 보관하고, 흐릿한 기억(단어 몇 개, 용어 일부)만으로 예전 대화를 빠르게 찾는다. "정리"하지 않고 "다 저장하고 검색"한다.

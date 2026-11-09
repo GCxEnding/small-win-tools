@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from . import codex, collector
+from . import codex, collector, queue
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
 from .index import Index
@@ -368,6 +368,38 @@ class Core:
         self.save_state()
 
     # ---- 상태 ----------------------------------------------------------
+    # ---- 열린 일 큐 ---------------------------------------------------------
+    def _int_cfg(self, key: str, default: int) -> int:
+        try:
+            return max(1, int(self.config.get(key) or default))
+        except (TypeError, ValueError):
+            return default
+
+    def queue_filters(self) -> queue.Filters:
+        jd = str(self.config.get("journal_dir") or "").strip()
+        return queue.Filters.build(self.note_dirs, self.config.get("queue_note_exclude") or [],
+                                   self.archive_dir, expand(jd) if jd else "")
+
+    def compute_queue(self, conn, now: float | None = None) -> queue.QueueResult:
+        now = datetime.now().timestamp() if now is None else now
+        days = self._int_cfg("queue_days", 14)
+        docs = queue.load_docs(conn, now - days * queue.DAY)
+        with self.lock:
+            closed = dict(self.state.get("queue_closed") or {})
+        return queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters())
+
+    def close_item(self, item_id: str, kind: str) -> None:
+        with self.lock:
+            closed = self.state.setdefault("queue_closed", {})
+            queue.close(closed, item_id, kind)
+            queue.prune(closed, datetime.now().timestamp(), self._int_cfg("queue_days", 14) * 2)
+        self.save_state()
+
+    def reopen_item(self, item_id: str) -> None:
+        with self.lock:
+            queue.reopen(self.state.setdefault("queue_closed", {}), item_id)
+        self.save_state()
+
     def status_text(self) -> str:
         def fmt(v):
             dt = parse_iso(v)

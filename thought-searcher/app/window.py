@@ -1,16 +1,26 @@
 """검색 창 UI."""
 from __future__ import annotations
 
+from datetime import datetime
+
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QLabel, QLineEdit, QListWidget, QListWidgetItem, QStyle, QStyledItemDelegate,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QStyle,
+                               QStyledItemDelegate, QVBoxLayout, QWidget)
 
+from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit
 
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
 ROLE_HIT = Qt.UserRole + 1
 ROLE_IDX = Qt.UserRole + 2
+ROLE_KIND = Qt.UserRole + 3
+ROLE_TEXT = Qt.UserRole + 4
+# 목록 항목 종류: 검색 결과, 큐(크게/한 줄), 접기 줄, 빈 큐 안내
+K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus", "row", "rest", "closed", "empty"
+CLOSE_LABEL = {"done": "완료", "drop": "버림"}
+HINT_SEARCH = "Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기"
+HINT_QUEUE = "열린 일 · Enter 열기 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex"}
 BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
                "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04", "codex": "#0d9488"}
@@ -48,6 +58,7 @@ class QueryEdit(QLineEdit):
     navigate = Signal(int)
     switchMatch = Signal(int)
     accepted = Signal(str)        # "open" | "copy_msg" | "copy_conv"
+    itemKey = Signal(str)         # 큐: "done"(F4) | "drop"(Shift+F4) | "summary"(F2)
     cancelled = Signal()
 
     def __init__(self, parent=None):
@@ -84,6 +95,10 @@ class QueryEdit(QLineEdit):
                 self.accepted.emit("copy_conv")
             else:
                 self.accepted.emit("open")
+        elif k == Qt.Key_F4 and not (mods & (Qt.AltModifier | Qt.ControlModifier)):
+            self.itemKey.emit("drop" if mods & Qt.ShiftModifier else "done")
+        elif k == Qt.Key_F2:
+            self.itemKey.emit("summary")
         elif k == Qt.Key_Escape:
             self.cancelled.emit()
         else:
@@ -132,11 +147,104 @@ class HitDelegate(QStyledItemDelegate):
         self.small = QFont(font)
         self.small.setPointSizeF(font.pointSizeF() * 0.9)
 
+        self.title_big = QFont(font)
+        self.title_big.setPointSizeF(font.pointSizeF() * 1.15)
+        self.title_big.setBold(True)
+        self.now = 0.0      # 큐 상대 시각 기준 (창이 채운다)
+
     def sizeHint(self, option, index):
         fm = QFontMetrics(self.font)
-        return QSize(option.rect.width(), fm.height() * 2 + 14)
+        kind = index.data(ROLE_KIND) or K_HIT
+        if kind == K_HIT:
+            return QSize(option.rect.width(), fm.height() * 2 + 14)
+        if kind == K_FOCUS:
+            it: QueueItem = index.data(ROLE_HIT)
+            extra = sum(1 for s in (it.subtitle, it.summary) if s)
+            fms = QFontMetrics(self.small)
+            return QSize(option.rect.width(),
+                         QFontMetrics(self.title_big).height() + fms.height() * (1 + extra) + 6 + 3 * extra + 16)
+        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED):
+            return QSize(option.rect.width(), fm.height() + 16)
+        return QSize(option.rect.width(), fm.height() + 10)
+
+    def _badge(self, p: QPainter, x: int, top: int, line_h: int, source: str) -> int:
+        fms = QFontMetrics(self.small)
+        badge = BADGE.get(source, "MD")
+        bw = fms.horizontalAdvance(badge) + 10
+        rect = QRect(x, top + (line_h - fms.height()) // 2 - 1, bw, fms.height() + 2)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(BADGE_COLOR.get(source, "#888888")))
+        p.drawRoundedRect(rect, 4, 4)
+        p.setFont(self.small)
+        p.setPen(QColor("#ffffff"))
+        p.drawText(rect, Qt.AlignCenter, badge)
+        return bw
+
+    def _paint_queue(self, p: QPainter, option, index, kind: str) -> None:
+        r = option.rect
+        p.save()
+        if option.state & QStyle.State_Selected:
+            p.fillRect(r, self.t.sel)
+        x0, max_x = r.left() + 10, r.right() - 10
+        fm, fms = QFontMetrics(self.font), QFontMetrics(self.small)
+        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY):
+            if kind != K_EMPTY:
+                p.setPen(QPen(self.t.border))
+                p.drawLine(r.left() + 6, r.top() + 2, r.right() - 6, r.top() + 2)
+            p.setFont(self.font)
+            p.setPen(self.t.sub)
+            p.drawText(QRect(x0, r.top() + 2, max_x - x0, r.height() - 2), Qt.AlignVCenter | Qt.AlignLeft,
+                       index.data(ROLE_TEXT) or "")
+            p.restore()
+            return
+        it: QueueItem = index.data(ROLE_HIT)
+        closed = bool(it.closed_kind)
+        if closed:
+            right = f"{CLOSE_LABEL.get(it.closed_kind, '')} · {relative_time(it.closed_at, self.now)}"
+        else:
+            right = relative_time(it.trace_ts, self.now)
+        rw = fms.horizontalAdvance(right)
+        if kind == K_FOCUS:
+            fmt = QFontMetrics(self.title_big)
+            top = r.top() + 8
+            bw = self._badge(p, x0, top, fmt.height(), it.source)
+            y1 = top + fmt.ascent()
+            p.setFont(self.title_big)
+            _draw_runs(p, x0 + bw + 8, y1, max_x - rw - 12, it.title or "(제목 없음)", [], fmt, self.t.text,
+                       self.t.mark_bg)
+            p.setFont(self.small)
+            p.setPen(self.t.sub)
+            p.drawText(max_x - rw, y1, right)
+            y = top + fmt.height() + 4 + fms.ascent()
+            parts = [s for s in (it.project, datetime.fromtimestamp(it.trace_ts).strftime("%m-%d %H:%M")) if s]
+            p.drawText(x0 + bw + 8, y, fms.elidedText("  ·  ".join(parts), Qt.ElideRight, max_x - x0 - bw - 8))
+            for s in (it.subtitle, it.summary):
+                if s:
+                    y += fms.height() + 3
+                    p.setFont(self.font if s is it.subtitle else self.small)
+                    p.setPen(self.t.text if s is it.subtitle else self.t.sub)
+                    p.drawText(x0 + bw + 8, y, QFontMetrics(p.font()).elidedText(s, Qt.ElideRight,
+                                                                                max_x - x0 - bw - 8))
+        else:
+            top = r.top() + 5
+            bw = self._badge(p, x0 + 12, top, fm.height(), it.source)
+            y1 = top + fm.ascent()
+            p.setFont(self.font)
+            title = it.title or "(제목 없음)"
+            if it.project:
+                title += f"   {it.project}"
+            _draw_runs(p, x0 + 12 + bw + 8, y1, max_x - rw - 12, title, [], fm,
+                       self.t.sub if closed else self.t.text, self.t.mark_bg)
+            p.setFont(self.small)
+            p.setPen(self.t.sub)
+            p.drawText(max_x - rw, y1, right)
+        p.restore()
 
     def paint(self, p: QPainter, option, index):
+        kind = index.data(ROLE_KIND) or K_HIT
+        if kind != K_HIT:
+            self._paint_queue(p, option, index, kind)
+            return
         hit: Hit = index.data(ROLE_HIT)
         if hit is None:
             return
@@ -227,20 +335,27 @@ class SearchWindow(QWidget):
         self.edit = QueryEdit()
         self.edit.setPlaceholderText("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
         self.list = QListWidget()
-        self.list.setItemDelegate(HitDelegate(self.t, font, self.list))
+        self.delegate = HitDelegate(self.t, font, self.list)
+        self.list.setItemDelegate(self.delegate)
         self.list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self.list.setFocusPolicy(Qt.NoFocus)
         self.list.itemDoubleClicked.connect(lambda _i: self._emit("open"))
-        self.list.itemClicked.connect(lambda _i: self.edit.setFocus())
+        self.list.itemClicked.connect(self._on_clicked)
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._context_menu)
         self.status = QLabel("")
         inner.addWidget(self.edit)
         inner.addWidget(self.list, 1)
         inner.addWidget(self.status)
-        hint = QLabel("Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기")
+        self.hint = QLabel(HINT_SEARCH)
         f = QFont(font)
         f.setPointSizeF(8.5)
-        hint.setFont(f)
-        inner.addWidget(hint)
+        self.hint.setFont(f)
+        inner.addWidget(self.hint)
+        self.mode = "search"
+        self._queue: QueueResult | None = None
+        self._show_rest = False
+        self._show_closed = False
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -251,6 +366,7 @@ class SearchWindow(QWidget):
         self.edit.navigate.connect(self._navigate)
         self.edit.switchMatch.connect(self._switch)
         self.edit.accepted.connect(self._emit)
+        self.edit.itemKey.connect(self._item_key)
         self.edit.cancelled.connect(self.hide)
 
     # ---- 표시 ---------------------------------------------------------
@@ -263,6 +379,7 @@ class SearchWindow(QWidget):
         self.activateWindow()
         self.edit.setFocus()
         self.edit.selectAll()
+        self._show_rest = self._show_closed = False
         self.refresh()
 
     def refresh(self) -> None:
@@ -283,15 +400,108 @@ class SearchWindow(QWidget):
         self._timer.start()
 
     def set_results(self, hits: list[Hit], status: str) -> None:
+        self.mode = "search"
+        self.hint.setText(HINT_SEARCH)
         self.list.clear()
         for h in hits:
             it = QListWidgetItem()
+            it.setData(ROLE_KIND, K_HIT)
             it.setData(ROLE_HIT, h)
             it.setData(ROLE_IDX, 0)
             self.list.addItem(it)
         if hits:
             self.list.setCurrentRow(0)
         self.status.setText(status)
+
+    # ---- 큐 --------------------------------------------------------------
+    def _add_row(self, kind: str, item: QueueItem | None = None, text: str = "") -> None:
+        it = QListWidgetItem()
+        it.setData(ROLE_KIND, kind)
+        it.setData(ROLE_HIT, item)
+        it.setData(ROLE_TEXT, text)
+        it.setData(ROLE_IDX, 0)
+        self.list.addItem(it)
+
+    def set_queue(self, result: QueueResult, status: str, now: float, keep: str | None = None) -> None:
+        """빈 검색어일 때의 열린 일 목록. keep: 다시 그린 뒤 고를 항목 id(없으면 같은 줄 번호)."""
+        old_row = self.list.currentRow()
+        self.mode = "queue"
+        self._queue = result
+        self.delegate.now = now
+        self.hint.setText(HINT_QUEUE)
+        self.list.clear()
+        if not result.open_count:
+            self._add_row(K_EMPTY, text=f"최근 {result.days}일 동안 흔적이 있는 일이 없습니다")
+        for q in result.focus:
+            self._add_row(K_FOCUS, q)
+        if result.rest:
+            arrow = "▾" if self._show_rest else "▸"
+            self._add_row(K_TOGGLE_REST, text=f"{arrow} 나머지 {len(result.rest)}개")
+            if self._show_rest:
+                for q in result.rest:
+                    self._add_row(K_ROW, q)
+        if result.closed:
+            arrow = "▾" if self._show_closed else "▸"
+            self._add_row(K_TOGGLE_CLOSED, text=f"{arrow} 닫은 일 보기 ({len(result.closed)}, 최근 {result.days}일)")
+            if self._show_closed:
+                for q in result.closed:
+                    self._add_row(K_ROW, q)
+        row = 0
+        if keep is not None:
+            for i in range(self.list.count()):
+                q = self.list.item(i).data(ROLE_HIT)
+                if q is not None and q.id == keep:
+                    row = i
+                    break
+            else:
+                row = max(0, min(old_row, self.list.count() - 1))
+        if self.list.count():
+            self.list.setCurrentRow(row)
+        self.status.setText(status)
+
+    def _toggle(self, kind: str) -> bool:
+        if self.mode != "queue" or self._queue is None or kind not in (K_TOGGLE_REST, K_TOGGLE_CLOSED):
+            return False
+        if kind == K_TOGGLE_REST:
+            self._show_rest = not self._show_rest
+        else:
+            self._show_closed = not self._show_closed
+        row = self.list.currentRow()
+        self.set_queue(self._queue, self.status.text(), self.delegate.now)
+        self.list.setCurrentRow(max(0, min(row, self.list.count() - 1)))
+        return True
+
+    def _on_clicked(self, it: QListWidgetItem) -> None:
+        self._toggle(it.data(ROLE_KIND))
+        self.edit.setFocus()
+
+    def _current_queue_item(self) -> QueueItem | None:
+        it = self.list.currentItem()
+        if self.mode != "queue" or not it or it.data(ROLE_KIND) not in (K_FOCUS, K_ROW):
+            return None
+        return it.data(ROLE_HIT)
+
+    def _item_key(self, kind: str) -> None:
+        q = self._current_queue_item()
+        if q is None:
+            return
+        if kind in ("done", "drop") and q.closed_kind:
+            kind = "reopen"       # 닫은 일 보기에서는 F4가 다시 열기
+        self.action.emit(kind, q, 0)
+
+    def _context_menu(self, pos) -> None:
+        it = self.list.itemAt(pos)
+        if not it or self.mode != "queue" or it.data(ROLE_KIND) not in (K_FOCUS, K_ROW):
+            return
+        self.list.setCurrentItem(it)
+        q: QueueItem = it.data(ROLE_HIT)
+        menu = QMenu(self)
+        acts = [("열기\tEnter", "open"), ("대화 복사\tShift+Enter", "copy_conv")]
+        acts += [("다시 열기\tF4", "reopen")] if q.closed_kind else [("완료\tF4", "done"), ("버림\tShift+F4", "drop")]
+        for label, kind in acts:
+            menu.addAction(label).triggered.connect(lambda _=False, k=kind: self.action.emit(k, q, 0))
+        menu.exec(self.list.viewport().mapToGlobal(pos))
+        self.edit.setFocus()
 
     # ---- 키 --------------------------------------------------------------
     def _navigate(self, step: int) -> None:
@@ -303,7 +513,7 @@ class SearchWindow(QWidget):
 
     def _switch(self, step: int) -> None:
         it = self.list.currentItem()
-        if not it:
+        if not it or it.data(ROLE_KIND) != K_HIT:
             return
         hit: Hit = it.data(ROLE_HIT)
         if not hit.matches:
@@ -315,5 +525,10 @@ class SearchWindow(QWidget):
     def _emit(self, kind: str) -> None:
         it = self.list.currentItem()
         if not it:
+            return
+        k = it.data(ROLE_KIND)
+        if self._toggle(k):
+            return
+        if k == K_EMPTY or (k != K_HIT and kind == "copy_msg"):
             return
         self.action.emit(kind, it.data(ROLE_HIT), int(it.data(ROLE_IDX) or 0))

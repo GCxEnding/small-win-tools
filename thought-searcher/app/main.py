@@ -21,6 +21,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox, QSy
 from .core import Core, setup_logging
 from .hotkey import HotkeyManager
 from .index import connect, fts5_available
+from .queue import QueueItem
 from .search import Hit, Searcher
 from .store import Store
 from .watcher import ZipPoller
@@ -449,6 +450,9 @@ class App:
 
     def on_query(self, text: str):
         self._last_query = text
+        if not text.strip():
+            self.show_queue()
+            return
         try:
             hits = self.searcher.search(text)
         except Exception as e:  # noqa: BLE001
@@ -470,7 +474,48 @@ class App:
             status += "   ⚠ 보관 폴더 없음"
         return status
 
-    def on_action(self, kind: str, hit: Hit, idx: int):
+    def show_queue(self, keep: str | None = None):
+        now = time.time()
+        t0 = time.perf_counter()
+        try:
+            res = self.core.compute_queue(self.search_conn, now)
+        except Exception as e:  # noqa: BLE001
+            log.exception("큐 계산 실패")
+            self.window.set_results([], f"열린 일 계산 오류: {e}")
+            return
+        ms = (time.perf_counter() - t0) * 1000
+        status = f"열린 일 {res.open_count}개 · 최근 {res.days}일 · {ms:.0f}ms"
+        if self._busy:
+            status = f"⏳ {self._busy}   ·   {status}"
+        if not self.core.archive_ok():
+            status += "   ⚠ 보관 폴더 없음"
+        self.window.set_queue(res, status, now, keep)
+
+    def on_queue_action(self, kind: str, item: QueueItem):
+        if kind == "open":
+            self.window.hide()
+            self.open_md(Path(item.path), item.line)
+        elif kind == "copy_conv":
+            try:
+                text = Path(item.path).read_text(encoding="utf-8")
+            except OSError as e:
+                self.notify(f"파일을 읽지 못했습니다: {e}", QSystemTrayIcon.Warning)
+                return
+            QApplication.clipboard().setText(text)
+            self.window.hide()
+            self.notify("복사됨 (대화 전체)")
+        elif kind in ("done", "drop"):
+            self.core.close_item(item.id, kind)
+            self.show_queue(keep=None)
+        elif kind == "reopen":
+            self.core.reopen_item(item.id)
+            self.show_queue(keep=item.id)
+        # "summary"(F2)는 3단계
+
+    def on_action(self, kind: str, hit, idx: int):
+        if isinstance(hit, QueueItem):
+            self.on_queue_action(kind, hit)
+            return
         m = hit.matches[min(idx, len(hit.matches) - 1)] if hit.matches else None
         if kind == "open":
             self.window.hide()

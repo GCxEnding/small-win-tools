@@ -26,6 +26,10 @@ DEFAULT_CONFIG = {
     "extra_redact_patterns": [],
     "note_dirs": [],
     "codex_dir": "%USERPROFILE%\\.codex",
+    "queue_days": 14,           # 열린 일로 보는 기간 (SPEC-queue.md)
+    "queue_focus": 5,           # 크게 보여 줄 개수
+    "queue_note_exclude": [],   # 큐에서 뺄 노트 폴더 (노트 폴더 기준 상대 경로)
+    "journal_dir": "",          # 업무 일지 보관함 루트. 비면 일지 기능 끔
 }
 
 DEFAULT_STATE = {
@@ -37,6 +41,7 @@ DEFAULT_STATE = {
     "last_reminder": "",
     "code_files": {},         # 원본 복사 기록: 상대 경로 -> [크기, 수정 시각 ns]
     "code_sessions": {},      # md 변환 기록: 상대 경로 -> [크기, 수정 시각 ns, 원본 있음]
+    "queue_closed": {},       # 큐에서 직접 닫은 일: id -> {"kind": "done"|"drop", "at": 시각}
 }
 
 
