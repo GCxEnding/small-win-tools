@@ -21,6 +21,8 @@ cd small-win-tools/thought-searcher
 pip install -r requirements.txt
 ```
 
+> `pip install`을 깜빡하고 바로 실행해도 괜찮아요. PySide6가 없으면 처음 실행할 때 설치할지 물어보고, **예**를 누르면 새 콘솔 창에서 받아요(약 80MB, 처음 한 번만).
+
 ## 첫 실행
 
 ```bash

@@ -117,7 +117,7 @@
 |---|---|---|
 | `emoji-searcher/app/hotkey.py` | `thought-searcher/app/hotkey.py` | 동일 |
 | `emoji-searcher/app/hotkey.py` | `hangul-restore/app/hotkey.py` | 동일 |
-| `emoji-searcher/_deps.py` | `gohome-vlog/_deps.py`, `hangul-restore/_deps.py` | 동일 (PySide6 없으면 첫 실행 때 설치 제안) |
+| `emoji-searcher/_deps.py` | `gohome-vlog/_deps.py`, `hangul-restore/_deps.py`, `thought-searcher/_deps.py` | 동일 (PySide6 없으면 첫 실행 때 설치 제안) |
 
 ## 6. 문서와 커밋 규칙
 - 사용자와의 대화, 문서는 한국어 존댓말.
