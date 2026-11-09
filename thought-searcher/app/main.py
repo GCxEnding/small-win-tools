@@ -141,6 +141,10 @@ class App:
         self._add("zip 파일 직접 고르기...", self.import_zip_dialog, adv)
         self._add("대화 보관 폴더 바꾸기...", self.choose_archive, adv)
         adv.addSeparator()
+        self._add("노트 폴더 추가...", self.add_note_dir, adv)
+        self.note_menu = adv.addMenu("노트 폴더 빼기")
+        self.note_menu.aboutToShow.connect(self._fill_note_menu)
+        adv.addSeparator()
         self._add("검색 색인 다시 만들기", self.rebuild_index, adv)
         self._add("대화 md 전부 다시 만들기", self.rebuild_all, adv)
         self.menu.addSeparator()
@@ -233,7 +237,7 @@ class App:
             progress=lambda i, n: self.bridge.step.emit(f"Claude Code 대화 가져오는 중 ({i}/{n})"))
 
     # ---- 진행 표시 ---------------------------------------------------------
-    JOB_LABELS = {"collect": "Claude Code 대화 가져오는 중", "sync": "검색 색인 확인 중",
+    JOB_LABELS = {"collect": "Claude Code 대화 가져오는 중", "sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
                   "rebuild-index": "검색 색인 다시 만드는 중", "rebuild-all": "대화 md 다시 만드는 중"}
 
     def on_job_started(self, name: str):
@@ -283,6 +287,34 @@ class App:
     def collect_now(self):
         if self.update_archive_state():
             self.worker.submit("collect", self._collect)
+        self.worker.submit("notes", self.core.sync_notes)
+
+    # ---- 노트 폴더 ----------------------------------------------------------
+    def add_note_dir(self):
+        d = QFileDialog.getExistingDirectory(None, "노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)", str(Path.home()))
+        if not d:
+            return
+        if not self.core.add_note_dir(Path(d)):
+            self.notify("이미 등록된 노트 폴더입니다.")
+            return
+        self.notify(f"노트 폴더를 추가했습니다: {d}\n파일은 읽기만 하고 고치지 않습니다.")
+        self.worker.submit("notes", self.core.sync_notes)
+
+    def _fill_note_menu(self):
+        self.note_menu.clear()
+        dirs = self.core.note_dirs
+        if not dirs:
+            act = QAction("(등록된 폴더 없음)", self.note_menu)
+            act.setEnabled(False)
+            self.note_menu.addAction(act)
+            return
+        for p in dirs:
+            self._add(str(p), lambda _=False, p=p: self.remove_note_dir(p), self.note_menu)
+
+    def remove_note_dir(self, path: Path):
+        self.core.remove_note_dir(path)
+        self.notify(f"노트 폴더를 뺐습니다: {path}\n검색에서만 빠지고 파일은 그대로입니다.")
+        self.worker.submit("notes", self.core.sync_notes)
 
     def poll_zips(self):
         if not self.core.archive_ok():

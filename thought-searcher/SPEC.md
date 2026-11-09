@@ -396,6 +396,7 @@ class MatchedMessage:
 - 알림은 PySide6 트레이 알림을 쓴다(별도 토스트 라이브러리 없음). 클릭 동작은 `messageClicked` 신호로 처리.
 - claude.ai 프로젝트 문서와 메모리도 같은 검색 대상이며, 필터 `src:project`, `src:memory`로 구분한다.
 - claude.ai 메모리는 공식 내보내기의 `memories-000.zip`(JSON) 대신 메모리 화면에서 받은 md 묶음(`claude-memory-YYYY-MM-DD.zip`)으로도 들어온다. 둘 다 같은 문서(`claude-ai-memory:main`, `claude-ai/memories.md`)가 되고 더 새것이 남는다. md 묶음만 가져온 것은 주간 내보내기 알림 기준(`last_zip_import`)을 바꾸지 않는다.
+- 노트 폴더(`config.json`의 `note_dirs`)의 일반 md는 변환 없이 제자리에서 읽어 색인한다. id `note:<절대 경로 소문자>`, source `note`, 배지 `노트`, 필터 `src:note`. 파일 하나가 문서 하나이고 `#` 제목마다 구역(메시지)으로 나눈다. 보관 폴더에는 쓰지 않고, 보관 폴더가 노트 폴더 안에 있어도 보관 폴더 쪽은 노트로 보지 않는다. 폴더를 빼면 색인에서만 지운다.
 - ChatGPT 대화는 `chatgpt:<conversation_id>`, 보관 위치 `chatgpt/YYYY/`, 필터 `src:gpt`. 화면에 보이는 가지는 `current_node`에서 `parent`를 따라 올라간 경로이고, 나머지 노드는 부록(다른 가지)으로 둔다.
 
 ## 10. 미결 사항

@@ -50,7 +50,7 @@ pythonw thought_searcher.pyw
 | `log` | 영어는 앞부분만 맞아도 찾음 (`logpick`, `logcut`) |
 | `"nginx 설정"` | 구문: 붙어서 나와야 함 |
 | `-롤백` | 제외: 이 단어가 있는 대화는 뺌 |
-| `src:ai` `src:code` `src:project` `src:memory` `src:gpt` | 출처 필터 |
+| `src:ai` `src:code` `src:project` `src:memory` `src:gpt` `src:note` | 출처 필터 (`src:노트`도 됨) |
 | `proj:small` | 프로젝트 이름 일부 |
 | `after:2026-10` `before:2026-11-05` | 날짜 범위 |
 | `배` (1글자) | 제목에서만 찾음 |
@@ -76,12 +76,14 @@ pythonw thought_searcher.pyw
 | 메뉴 | 하는 일 |
 |---|---|
 | 검색 (Ctrl+Alt+H) | 검색 창 열기 |
-| 지금 가져오기 | 30분을 기다리지 않고 Claude Code 세션을 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
+| 지금 가져오기 | 30분을 기다리지 않고 Claude Code 대화와 노트 폴더를 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
 | claude.ai 내보내기 받으러 가기 | claude.ai 데이터 내보내기 페이지를 브라우저로 열기 |
 | 대화 보관 폴더 열기 | 대화 md가 쌓인 폴더 열기 |
 | 상태 보기 | 마지막 가져오기 시각, 대화 수, 경고 |
 | 고급 > zip 파일 직접 고르기... | 다운로드 폴더 밖에 있는 zip 가져오기 |
 | 고급 > 대화 보관 폴더 바꾸기... | md를 쌓을 폴더 바꾸기 |
+| 고급 > 노트 폴더 추가... | 내 md 폴더(Obsidian 볼트 등)를 검색에 넣기 |
+| 고급 > 노트 폴더 빼기 | 등록한 노트 폴더를 검색에서 빼기 (파일은 그대로) |
 | 고급 > 검색 색인 다시 만들기 | 검색이 이상할 때. md에서 색인만 새로 만듦 |
 | 고급 > 대화 md 전부 다시 만들기 | 도구를 업데이트한 뒤 안내가 뜰 때. 받아 둔 zip과 Code 세션 복사본에서 md를 새로 만듦 |
 
@@ -105,7 +107,7 @@ python -m app.cli search 로그 배포
 
 | 위치 | 내용 |
 |---|---|
-| `%APPDATA%\thought-searcher\config.json` | 설정 (보관 폴더, 단축키, 감시 폴더, 가중치 등) |
+| `%APPDATA%\thought-searcher\config.json` | 설정 (보관 폴더, 노트 폴더, 단축키, 감시 폴더, 가중치 등) |
 | `%APPDATA%\thought-searcher\state.json` | zip 처리 이력, 마지막 가져오기/수집/알림 시각 |
 | `%LOCALAPPDATA%\thought-searcher\index.db` | 검색 색인 (지워도 md에서 다시 만듦) |
 | `%LOCALAPPDATA%\thought-searcher\raw\claude-code\` | Code 원본 jsonl 복사본 |
@@ -124,6 +126,18 @@ pytest
 ## 새 출처 추가
 
 `app/importers/`에 파일 하나를 만들어 `detect`, `iter_conversations`, `snapshot_time`, `is_full_snapshot`, `snapshot_sources`를 구현하고 `base.py`의 `registry()`에 한 줄 추가합니다. 새 출처 이름(`source`)으로 보관 폴더를 쓰려면 `archive.py`의 `SOURCE_DIRS`, `ARCHIVE_SUBDIRS`에, 검색 필터와 배지는 `query.py`의 `SOURCE_ALIASES`, `window.py`의 `BADGE`에 한 줄씩 넣으세요(`chatgpt.py` 참고).
+
+## 내 노트 md 넣기 (노트 폴더)
+
+Obsidian 일지, 메모처럼 직접 쓴 md는 `고급 > 노트 폴더 추가...`로 폴더를 고르면 형식 변환 없이 그대로 검색됩니다.
+
+- 파일은 **읽기만** 합니다. 복사하거나 고치지 않고, 보관 폴더에도 쓰지 않아요.
+- 하위 폴더까지 모두 읽고, 점으로 시작하는 폴더(`.obsidian`, `.git` 등)는 건너뜁니다.
+- 검색 결과에 `노트` 배지로 나오고, `src:note`로 노트만 찾을 수 있어요. `proj:`에는 `폴더 이름/하위 폴더`가 들어갑니다(예: `proj:MyVault/2026`).
+- 제목은 파일 이름(frontmatter `title`이 있으면 그것)입니다.
+- 날짜는 frontmatter `date`, 파일 이름의 `YYYY-MM-DD`/`YYYYMMDD`, 파일 수정 시각 순으로 정합니다. 일지는 고친 날이 아니라 일지 날짜로 정렬돼요.
+- `#` 제목마다 구역으로 나눠 색인하고, 구역 제목도 검색됩니다. Enter를 누르면 원본 파일이 맞은 줄에서 열립니다.
+- 바뀐 노트는 30분마다(`지금 가져오기`를 누르면 바로) 반영됩니다.
 
 ## 다른 곳의 대화 md 넣기
 

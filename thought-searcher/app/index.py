@@ -1,4 +1,4 @@
-"""SQLite FTS5 색인. 보관 폴더의 md만 읽어 만든다 (언제든 버리고 다시 만들 수 있는 소모품)."""
+"""SQLite FTS5 색인. 보관 폴더의 md와 노트 폴더의 md를 읽어 만든다 (언제든 버리고 다시 만들 수 있는 소모품)."""
 from __future__ import annotations
 
 import logging
@@ -11,6 +11,7 @@ from typing import Callable
 
 from .archive import md_files
 from .mdparse import ParsedDoc, parse_file
+from .notes import SOURCE as NOTE_SOURCE, iter_note_files, parse_note
 from .timeutil import parse_iso
 from .tokenize import normalize, token_string
 
@@ -91,6 +92,32 @@ class Index:
         self.lock = threading.Lock()          # 쓰기 직렬화
         self.progress: tuple[int, int] | None = None   # 다시 만드는 중이면 (완료, 전체)
         self.warnings: list[str] = []
+        self.note_roots: list[Path] = []      # 노트 폴더 (core가 설정에서 채운다)
+        self.note_exclude: list[Path] = []    # 노트로 보지 않을 폴더 (보관 폴더)
+        self.tz = None
+        self._note_of: dict[str, Path] = {}   # 이번 대조에서 찾은 노트 파일 -> 노트 폴더
+
+    def _note_files(self) -> dict[str, Path]:
+        found = {str(p): root for p, root in iter_note_files(self.note_roots, self.note_exclude)}
+        self._note_of = found
+        return found
+
+    def _note_root(self, path: str) -> Path | None:
+        if path in self._note_of:
+            return self._note_of[path]
+        for r in self.note_roots:
+            try:
+                Path(path).resolve().relative_to(Path(r).resolve())
+                return Path(r)
+            except (ValueError, OSError):
+                continue
+        return None
+
+    def _parse(self, path: str) -> ParsedDoc | None:
+        root = self._note_root(path)
+        if root is not None:
+            return parse_note(Path(path), root, self.tz)
+        return parse_file(Path(path))
 
     # ---- 열기 ---------------------------------------------------------
     def open(self) -> sqlite3.Connection:
@@ -177,6 +204,8 @@ class Index:
             first = mid if first is None else first
             last = mid
             label = pm.heading[5:] if pm.heading.startswith("## 📄 ") else ""
+            if m.get("source") == NOTE_SOURCE and pm.heading:
+                label = pm.heading.lstrip("#").strip()     # 노트는 구역 제목도 검색
             tok = token_string(f"{label}\n{pm.text}" if label else pm.text)
             conn.execute("INSERT INTO msg_fts(rowid, tok) VALUES(?, ?)", (mid, tok))
             body_parts.append(tok)
@@ -197,20 +226,38 @@ class Index:
                 if own:
                     conn.close()
 
-    def _sync(self, conn, root: Path, progress, only) -> SyncResult:
+    def sync_notes(self, progress: ProgressFn | None = None) -> SyncResult:
+        """노트 폴더만 다시 확인한다 (보관 폴더는 건드리지 않음). 빠진 폴더의 노트는 색인에서 지운다."""
+        with self.lock:
+            conn = self.open()
+            try:
+                return self._sync(conn, None, progress, None, notes_only=True)
+            finally:
+                conn.close()
+
+    @staticmethod
+    def _stat_all(paths) -> dict[str, tuple[float, int]]:
+        out = {}
+        for p in paths:
+            try:
+                st = os.stat(p)
+            except OSError:
+                continue
+            out[str(p)] = (st.st_mtime, st.st_size)
+        return out
+
+    def _sync(self, conn, root: Path | None, progress, only, notes_only: bool = False) -> SyncResult:
         res = SyncResult(duplicates=[])
         known = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT path, mtime, size FROM files")}
-        if only is None:
-            current: dict[str, tuple[float, int]] = {}
-            if root.is_dir():
-                for p in md_files(root):
-                    if p.name.startswith("."):
-                        continue
-                    try:
-                        st = p.stat()
-                    except OSError:
-                        continue
-                    current[str(p)] = (st.st_mtime, st.st_size)
+        if notes_only:
+            current = self._stat_all(self._note_files())
+            note_paths = {r[0] for r in conn.execute("SELECT path FROM files WHERE conv_id LIKE 'note:%'")}
+            gone = [p for p in note_paths if p not in current]
+        elif only is None:
+            current = {}
+            if root is not None and root.is_dir():
+                current = self._stat_all(p for p in md_files(root) if not p.name.startswith("."))
+            current.update(self._stat_all(self._note_files()))
             gone = [p for p in known if p not in current]
         else:
             current = {}
@@ -234,7 +281,7 @@ class Index:
                     self._resolve(conn, row[0], res)
                 done += 1
             for p in changed:
-                doc = parse_file(Path(p))     # 파일은 한 번만 읽는다
+                doc = self._parse(p)     # 파일은 한 번만 읽는다
                 cid = doc.conv_id if doc is not None else None
                 old = conn.execute("SELECT conv_id FROM files WHERE path=?", (p,)).fetchone()
                 mt, sz = current[p]
@@ -274,7 +321,7 @@ class Index:
             if parsed and parsed[0] == r[0]:
                 doc = parsed[1]
             else:
-                doc = parse_file(Path(r[0]))
+                doc = self._parse(r[0])
             if doc is not None and doc.conv_id == cid:
                 winner = r
                 break

@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
     "weights": {"title": 10.0, "body": 1.0, "same_message_bonus": 0.3, "recency": 0.2,
                 "recency_half_life_days": 180},
     "extra_redact_patterns": [],
+    "note_dirs": [],
 }
 
 DEFAULT_STATE = {

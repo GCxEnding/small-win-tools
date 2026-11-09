@@ -76,6 +76,8 @@ class Core:
         for e in self.redactor.errors:
             self._warn(e)
         self.index = Index(self.store.index_path)
+        self.index.tz = self.tz
+        self._apply_note_dirs()
 
     # ---- 공통 -----------------------------------------------------------
     def _warn(self, msg: str | None) -> None:
@@ -121,6 +123,42 @@ class Core:
     def set_archive_dir(self, path: Path) -> None:
         self.config["archive_dir"] = str(path)
         self.store.save_config(self.config)
+        self._apply_note_dirs()
+
+    # ---- 노트 폴더 ----------------------------------------------------------
+    @property
+    def note_dirs(self) -> list[Path]:
+        raw = self.config.get("note_dirs") or []
+        return [Path(expand(str(p))) for p in raw if isinstance(p, str) and p.strip()]
+
+    def _apply_note_dirs(self) -> None:
+        self.index.note_roots = self.note_dirs
+        d = self.archive_dir if self.config.get("archive_dir") or self.default_archive.is_dir() else None
+        self.index.note_exclude = [d] if d else []
+
+    def add_note_dir(self, path: Path) -> bool:
+        """노트 폴더 추가. 이미 있으면 False."""
+        key = str(Path(path))
+        cur = [str(p) for p in self.config.get("note_dirs") or []]
+        if any(Path(expand(p)) == Path(key) for p in cur):
+            return False
+        self.config["note_dirs"] = cur + [key]
+        self.store.save_config(self.config)
+        self._apply_note_dirs()
+        return True
+
+    def remove_note_dir(self, path: Path) -> None:
+        cur = [str(p) for p in self.config.get("note_dirs") or []]
+        self.config["note_dirs"] = [p for p in cur if Path(expand(p)) != Path(path)]
+        self.store.save_config(self.config)
+        self._apply_note_dirs()
+
+    def sync_notes(self, progress=None):
+        res = self.index.sync_notes(progress)
+        missing = [str(p) for p in self.note_dirs if not p.is_dir()]
+        if missing:
+            self._warn("노트 폴더가 없습니다: " + ", ".join(missing))
+        return res
 
     @property
     def watch_dir(self) -> Path:
@@ -331,12 +369,13 @@ class Core:
             st = {"by_source": {}, "size": 0}
             self._warn(f"색인 상태 읽기 실패: {e}")
         names = {"claude-ai": "claude.ai 대화", "claude-code": "Claude Code", "claude-ai-project": "프로젝트",
-                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT"}
+                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트"}
         lines = [
             f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}",
             f"마지막 zip 가져오기: {fmt(self.state.get('last_zip_import'))}",
             f"마지막 Code 수집: {fmt(self.state.get('last_code_collect'))}",
             "대화 수: " + (", ".join(f"{names.get(k, k)} {v}" for k, v in sorted(st['by_source'].items())) or "0"),
+            "노트 폴더: " + (", ".join(str(p) for p in self.note_dirs) or "없음"),
             f"색인 크기: {st['size'] / 1_048_576:.1f} MB",
             "최근 경고:",
         ]
