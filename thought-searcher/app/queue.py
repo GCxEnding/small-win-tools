@@ -13,7 +13,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-QUEUE_SOURCES = ("claude-code", "claude-ai", "note")   # 색인 문서 중 큐에 오르는 것. 그 밖에 "journal"(연결 안 된 일지 항목)
+# 색인 문서 중 큐에 오르는 것의 기본값(설정 queue_sources가 없을 때). 그 밖에 "journal"(연결 안 된 일지 항목)
+QUEUE_SOURCES = ("claude-code", "claude-ai", "note")
+ALL_SOURCES = ("claude-ai", "chatgpt", "claude-code", "codex", "note")   # 설정으로 고를 수 있는 것
 DAY = 86400.0
 CLOSE_KINDS = ("done", "drop")
 REOPEN = "open"
@@ -49,6 +51,7 @@ class QueueItem:
     summary: str = ""                   # 저장된 요약 첫 줄
     summary_text: str = ""              # 저장된 요약 전체
     summary_stale: bool = False         # 요약 뒤 새 흔적이 생김
+    summary_model: str = ""             # 요약한 모델 ('claude:haiku', 'codex:gpt-6-luna')
     journal: list = field(default_factory=list)   # 연결된 일지 항목 (연결 안 된 일지 일은 자기 항목들)
 
 
@@ -129,7 +132,7 @@ def _latest(entries: list) -> object:
 
 
 def compute(docs: list[QueueDoc], closed: dict, now: float, days: int = 14, focus: int = 5,
-            filters: Filters | None = None, journal: list | None = None) -> QueueResult:
+            filters: Filters | None = None, journal: list | None = None, sources=QUEUE_SOURCES) -> QueueResult:
     """문서 목록, 일지 항목(journal.JournalEntry), 닫힘 기록으로 열린 일 목록을 만든다.
 
     - 일지 항목이 [session::]으로 가리키는 채팅에는 그 항목 날짜의 흔적이 더해진다.
@@ -138,7 +141,8 @@ def compute(docs: list[QueueDoc], closed: dict, now: float, days: int = 14, focu
     """
     since = now - days * DAY
     closed = closed or {}
-    by_id = {d.conv_id: d for d in docs if d.source in QUEUE_SOURCES}
+    allowed = set(sources) & set(ALL_SOURCES)
+    by_id = {d.conv_id: d for d in docs if d.source in allowed}
     linked: dict[str, list] = {}
     unlinked: dict[str, list] = {}
     for e in journal or []:
@@ -222,15 +226,18 @@ _DOC_COLS = """d.conv_id, d.source, d.title, d.project, d.path, d.updated_ts, d.
                      (SELECT max(m.line_no) FROM messages m WHERE m.doc_id=d.id AND m.is_branch=0) END"""
 
 
-def load_docs(conn: sqlite3.Connection, since: float, extra_ids=()) -> list[QueueDoc]:
+def load_docs(conn: sqlite3.Connection, since: float, extra_ids=(), sources=QUEUE_SOURCES) -> list[QueueDoc]:
     """색인에서 흔적이 since 뒤인 큐 대상 문서를 읽는다. 채팅은 마지막 본문(가지 아님) 메시지 줄을 같이.
     extra_ids: 흔적이 오래됐어도 읽을 문서 id (일지가 가리키는 채팅)."""
-    marks = ",".join("?" for _ in QUEUE_SOURCES)
+    srcs = tuple(s for s in ALL_SOURCES if s in set(sources))
+    if not srcs:
+        return []
+    marks = ",".join("?" for _ in srcs)
     rows = conn.execute(
         f"""SELECT {_DOC_COLS} FROM docs d
             WHERE d.source IN ({marks})
               AND ((d.source='note' AND d.md_mtime>=?) OR (d.source!='note' AND d.updated_ts>=?))""",
-        (*QUEUE_SOURCES, since, since)).fetchall()
+        (*srcs, since, since)).fetchall()
     got = {r[0] for r in rows}
     rest = [i for i in dict.fromkeys(extra_ids) if i not in got]
     for k in range(0, len(rest), 500):
@@ -238,7 +245,7 @@ def load_docs(conn: sqlite3.Connection, since: float, extra_ids=()) -> list[Queu
         rows += conn.execute(
             f"""SELECT {_DOC_COLS} FROM docs d
                 WHERE d.source IN ({marks}) AND d.conv_id IN ({",".join("?" for _ in part)})""",
-            (*QUEUE_SOURCES, *part)).fetchall()
+            (*srcs, *part)).fetchall()
     return [QueueDoc(r[0], r[1], r[2] or "", r[3] or "", r[4] or "", float(r[5] or 0), float(r[6] or 0),
                      int(r[7] or 1)) for r in rows]
 

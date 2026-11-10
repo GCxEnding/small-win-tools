@@ -18,12 +18,15 @@ from PySide6.QtCore import QFileSystemWatcher, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox, QSystemTrayIcon
 
-from .ask import AskError
+from . import hotkey as hk
+from . import settings as S
+from .ask import OFF_MESSAGE, AskError
 from .core import Core, setup_logging
 from .hotkey import HotkeyManager
 from .index import connect, fts5_available
 from .queue import QueueItem
-from .search import Hit, Searcher
+from .search import DEFAULT_WEIGHTS, Hit, Searcher
+from .settings_window import Hooks, SettingsWindow
 from .store import Store
 from .watcher import ZipPoller
 from .window import SearchWindow
@@ -62,6 +65,27 @@ def make_icon(warn: bool = False, busy: bool = False) -> QIcon:
         p.end()
         icon.addPixmap(pm)
     return icon
+
+
+def swap_hotkey(mgr: HotkeyManager, text: str) -> tuple[bool, str]:
+    """새 키를 먼저 등록해 보고, 성공하면 옛 키를 해제한다 (SPEC-settings.md 3-E-4). 실패하면 옛 키 그대로.
+    hotkey.py는 emoji-searcher 복사본이라 고치지 않고 여기서 ID를 번갈아 쓴다(같은 ID로 두 번 등록하지 않게)."""
+    if mgr.registered and S.same_hotkey(mgr.registered, text):
+        return True, ""
+    try:
+        mods, vk = hk.parse_hotkey(text)
+    except ValueError as e:
+        return False, str(e)
+    old_id = mgr.HOTKEY_ID
+    new_id = HotkeyManager.HOTKEY_ID + 1 if old_id == HotkeyManager.HOTKEY_ID else HotkeyManager.HOTKEY_ID
+    if not hk.user32.RegisterHotKey(mgr.hwnd, new_id, mods | hk.MOD_NOREPEAT, vk):
+        err = ctypes.get_last_error()
+        return False, ctypes.FormatError(err).strip() if err else "등록 실패"
+    if mgr.registered:
+        hk.user32.UnregisterHotKey(mgr.hwnd, old_id)
+    mgr.HOTKEY_ID = new_id        # 인스턴스 값: 이후 unregister()가 이 ID를 해제한다
+    mgr.registered = text
+    return True, ""
 
 
 class Bridge(QObject):
@@ -109,7 +133,11 @@ class AskBridge(QObject):
 class App:
     def __init__(self, qapp: QApplication):
         self.qapp = qapp
-        self.core = Core()
+        self.core = Core(create_config=False)
+        # config.json이 없는 첫 실행: 시작 안내가 끝날 때까지 수집하지 않는다 (SPEC-settings.md 3-K)
+        self._setup_pending = self.core.store.config_missing
+        self.settings_win: SettingsWindow | None = None
+        self._paused_hotkey = ""
         self.bridge = Bridge()
         self.bridge.done.connect(self.on_job_done)
         self.bridge.progress.connect(self.on_progress)
@@ -131,6 +159,8 @@ class App:
         self.window = SearchWindow()
         self.window.searchRequested.connect(self.on_query)
         self.window.action.connect(self.on_action)
+        self.window.settingsRequested.connect(self._settings_from_search)
+        self.window.set_ask_enabled(self.core.ask_provider != "off")
         self.ask_bridge = AskBridge()
         self.ask_bridge.finished.connect(self.on_ask_finished)
         self._asking: set[str] = set()
@@ -140,20 +170,16 @@ class App:
         self.tray.messageClicked.connect(self.on_message_clicked)
         self.tray.activated.connect(self.on_tray_activated)
         self.menu = QMenu()
-        self._add("검색 (Ctrl+Alt+H)", self.show_search)
+        self.act_search = self._add("검색", self.show_search)
+        self._add("설정...", lambda: self.open_settings())
         self.menu.addSeparator()
         self._add("지금 가져오기", self.import_now)
-        self._add("claude.ai 내보내기 받으러 가기", self.open_export_page)
+        self.act_export = self._add("claude.ai 내보내기 받으러 가기", self.open_export_page)
         self.menu.addSeparator()
         self._add("대화 보관 폴더 열기", self.open_archive)
         self._add("상태 보기", self.show_status)
         adv = self.menu.addMenu("고급")
         self._add("zip 파일 직접 고르기...", self.import_zip_dialog, adv)
-        self._add("대화 보관 폴더 바꾸기...", self.choose_archive, adv)
-        adv.addSeparator()
-        self._add("노트 폴더 추가...", self.add_note_dir, adv)
-        self.note_menu = adv.addMenu("노트 폴더 빼기")
-        self.note_menu.aboutToShow.connect(self._fill_note_menu)
         adv.addSeparator()
         self._add("검색 색인 다시 만들기", self.rebuild_index, adv)
         self._add("대화 md 전부 다시 만들기", self.rebuild_all, adv)
@@ -164,15 +190,20 @@ class App:
 
         self.hotkey = HotkeyManager(qapp)
         self.hotkey.activated.connect(self.toggle)
-        key = str(self.core.config.get("hotkey") or "ctrl+alt+h")
+        key = str(self.core.config.get("hotkey") or S.DEFAULT_HOTKEY)
         ok, why = self.hotkey.register(key)
         if not ok:
-            self.notify(f"단축키 {key} 등록 실패({why}).\n트레이 메뉴 '검색'으로 사용하세요.", QSystemTrayIcon.Warning)
+            self.notify(f"단축키 {S.display_hotkey(key)} 등록 실패({why}).\n트레이 메뉴 '검색'으로 사용하세요. "
+                        "설정 > 일반에서 바꿀 수 있습니다.", QSystemTrayIcon.Warning, kind="hotkey")
+        self._refresh_menu()
 
         for w in list(self.core.warnings):
             self.notify(w, QSystemTrayIcon.Warning)
 
-        self.start_jobs()
+        if self._setup_pending:
+            QTimer.singleShot(1000, lambda: self.open_settings(setup=True))
+        else:
+            self.start_jobs()
 
         self.fs = QFileSystemWatcher()
         self._watch_folder()
@@ -189,11 +220,18 @@ class App:
         QTimer.singleShot(8000, self.check_reminder)
 
     # ---- 도우미 ---------------------------------------------------------
-    def _add(self, text, slot, menu=None):
+    def _add(self, text, slot, menu=None) -> QAction:
         menu = menu or self.menu
         act = QAction(text, menu)
         act.triggered.connect(slot)
         menu.addAction(act)
+        return act
+
+    def _refresh_menu(self) -> None:
+        """검색 메뉴의 단축키 글자, 쓰는 서비스에 따른 메뉴 숨김."""
+        key = self.hotkey.registered or str(self.core.config.get("hotkey") or S.DEFAULT_HOTKEY)
+        self.act_search.setText(f"검색 ({S.display_hotkey(key)})")
+        self.act_export.setVisible(self.core.service_on("claude_ai"))
 
     def notify(self, msg: str, icon=QSystemTrayIcon.Information, kind: str = "") -> None:
         self._notice_kind = kind
@@ -216,11 +254,11 @@ class App:
             self.tray.setIcon(make_icon(warn=not ok))
             if not ok:
                 d = self.core.archive_dir
-                msg = (f"보관 폴더가 없습니다: {d}\n가져오기를 멈췄습니다. 트레이 메뉴 '고급 > 대화 보관 폴더 바꾸기'로 고르세요."
-                       if d else "보관 폴더가 설정되지 않아 가져오기를 멈췄습니다. 트레이 메뉴 '고급 > 대화 보관 폴더 바꾸기'로 고르세요.")
+                msg = (f"보관 폴더가 없습니다: {d}\n가져오기를 멈췄습니다. 트레이 메뉴 '설정...'에서 고르세요."
+                       if d else "보관 폴더가 설정되지 않아 가져오기를 멈췄습니다. 트레이 메뉴 '설정...'에서 고르세요.")
                 self.tray.setToolTip(f"{APP_NAME} ⚠ 보관 폴더 없음")
                 if self._archive_was_ok is not None or d:
-                    self.notify(msg, QSystemTrayIcon.Warning)
+                    self.notify(msg, QSystemTrayIcon.Warning, kind="archive")
                 self.core._warn(msg.split("\n")[0])
             else:
                 self.tray.setToolTip(APP_NAME)
@@ -231,7 +269,7 @@ class App:
 
     # ---- 시작 ---------------------------------------------------------
     def start_jobs(self):
-        if not self.update_archive_state():
+        if self._setup_pending or not self.update_archive_state():
             return
         self.worker.submit("sync", lambda: self.core.sync_index(self._progress))
         self.worker.submit("collect", self._collect)
@@ -246,14 +284,22 @@ class App:
         return self.core.collect_code(
             progress=lambda i, n: self.bridge.step.emit(f"Claude Code 대화 가져오는 중 ({i}/{n})"))
 
+    def _code_label(self) -> str:
+        """켠 서비스 기준의 'Claude Code, Codex 대화' 글자. 둘 다 껐으면 빈 문자열."""
+        src = self.core.sources
+        names = [n for n, on in (("Claude Code", src["claude_code"]), ("Codex", src["codex"])) if on]
+        return f"{', '.join(names)} 대화" if names else ""
+
     # ---- 진행 표시 ---------------------------------------------------------
-    JOB_LABELS = {"collect": "Claude Code, Codex 대화 가져오는 중", "sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
+    JOB_LABELS = {"sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
                   "rebuild-index": "검색 색인 다시 만드는 중", "rebuild-all": "대화 md 다시 만드는 중",
-                  "capture": "claude.ai 수집 파일 가져오는 중"}
+                  "capture": "자동 수집 파일 가져오는 중"}
 
     def on_job_started(self, name: str):
         if name.startswith("zip:"):
             self.set_busy(f"zip 가져오는 중 ({Path(name[4:]).name})")
+        elif name == "collect":
+            self.set_busy(f"{self._code_label() or '대화'} 가져오는 중")
         else:
             self.set_busy(self.JOB_LABELS.get(name, "작업 중"))
 
@@ -272,6 +318,9 @@ class App:
     # ---- 작업 ------------------------------------------------------------
     def import_now(self):
         """Code 세션 수집 + 감시 폴더의 아직 안 가져온 zip 즉시 확인."""
+        if self._setup_pending:
+            self.notify("시작 안내를 마치면 가져오기를 시작합니다.")
+            return
         if not self.update_archive_state():
             return
         if self._batch is not None:
@@ -293,42 +342,19 @@ class App:
             self._batch["names"].add(f"zip:{p}")
             self.worker.submit(f"zip:{p}", lambda p=p: self.core.import_zip(p))
             n += 1
-        self.notify("가져오는 중입니다" + (f" (Claude Code 대화 + 새 zip {n}개)" if n else " (Claude Code 대화)") +
-                    ". 끝나면 알려 드릴게요.")
+        parts = [p for p in (self._code_label(), f"새 zip {n}개" if n else "") if p]
+        self.notify("가져오는 중입니다" + (f" ({' + '.join(parts)})" if parts else "") + ". 끝나면 알려 드릴게요.")
 
     def collect_now(self):
+        if self._setup_pending:
+            return
         if self.update_archive_state():
             self.worker.submit("collect", self._collect)
         self.worker.submit("notes", self.core.sync_notes)
 
-    # ---- 노트 폴더 ----------------------------------------------------------
-    def add_note_dir(self):
-        d = QFileDialog.getExistingDirectory(None, "노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)", str(Path.home()))
-        if not d:
-            return
-        if not self.core.add_note_dir(Path(d)):
-            self.notify("이미 등록된 노트 폴더입니다.")
-            return
-        self.notify(f"노트 폴더를 추가했습니다: {d}\n파일은 읽기만 하고 고치지 않습니다.")
-        self.worker.submit("notes", self.core.sync_notes)
-
-    def _fill_note_menu(self):
-        self.note_menu.clear()
-        dirs = self.core.note_dirs
-        if not dirs:
-            act = QAction("(등록된 폴더 없음)", self.note_menu)
-            act.setEnabled(False)
-            self.note_menu.addAction(act)
-            return
-        for p in dirs:
-            self._add(str(p), lambda _=False, p=p: self.remove_note_dir(p), self.note_menu)
-
-    def remove_note_dir(self, path: Path):
-        self.core.remove_note_dir(path)
-        self.notify(f"노트 폴더를 뺐습니다: {path}\n검색에서만 빠지고 파일은 그대로입니다.")
-        self.worker.submit("notes", self.core.sync_notes)
-
     def poll_zips(self):
+        if self._setup_pending:
+            return
         if not self.core.archive_ok():
             self.update_archive_state()
             return
@@ -441,6 +467,8 @@ class App:
 
     # ---- 알림 ------------------------------------------------------------
     def check_reminder(self):
+        if self._setup_pending:
+            return
         msg = self.core.reminder_due()
         if msg:
             self.core.mark_reminded()
@@ -453,6 +481,96 @@ class App:
     def on_message_clicked(self):
         if self._notice_kind == "reminder":
             self.open_export_page()
+        elif self._notice_kind in ("archive", "hotkey"):
+            self.open_settings("general")
+
+    # ---- 설정 창 (SPEC-settings.md) ---------------------------------------------
+    def _settings_from_search(self):
+        self.window.hide()
+        self.open_settings()
+
+    def open_settings(self, tab: str | None = None, setup: bool = False):
+        """창은 하나만. 이미 열려 있으면 앞으로 가져온다."""
+        w = self.settings_win
+        if w is not None:
+            try:
+                if w.isVisible():
+                    if tab and not w.setup_mode:
+                        w.select_tab(tab)
+                    w.raise_()
+                    w.activateWindow()
+                    return
+            except RuntimeError:          # 이미 지워진 창
+                pass
+        hooks = Hooks(open_url=lambda url: QDesktopServices.openUrl(QUrl(url)), try_hotkey=self._try_hotkey,
+                      recording=self._hotkey_recording, applied=self.apply_settings,
+                      setup_finished=self._setup_finished)
+        w = SettingsWindow(self.core, hooks, setup=setup, tab=tab or "general")
+        w.finished.connect(lambda _r: setattr(self, "settings_win", None))
+        self.settings_win = w
+        w.show()
+        w.raise_()
+        w.activateWindow()
+
+    def _try_hotkey(self, text: str) -> tuple[bool, str]:
+        ok, why = swap_hotkey(self.hotkey, text)
+        if ok:
+            log.info("단축키 교체: %s", text)
+            self._refresh_menu()
+        return ok, why
+
+    def _hotkey_recording(self, on: bool):
+        """설정 창 단축키 칸이 기록 중이면 전역 키를 잠시 풀어 같은 조합도 기록되게 한다."""
+        if on and self.hotkey.registered:
+            self._paused_hotkey = self.hotkey.registered
+            self.hotkey.unregister()
+        elif not on and self._paused_hotkey:
+            key, self._paused_hotkey = self._paused_hotkey, ""
+            ok, why = self.hotkey.register(key)
+            if not ok:
+                log.warning("단축키 다시 등록 실패 %s: %s", key, why)
+
+    def apply_settings(self, changed: set, old: dict, start: bool = True):
+        """저장 즉시 적용 (SPEC-settings.md 3-F). 바뀐 키만. 본체 쪽(Redactor, 노트 폴더)은 Core.update_config가 했다."""
+        if not changed:
+            return
+        new = self.core.config
+        log.info("설정 바뀜: %s", ", ".join(sorted(changed)))
+        if changed & {"hotkey", "sources"}:
+            self._refresh_menu()
+        if changed & {"sources", "watch_dir", "capture_dir"}:
+            self._watch_folder()
+            self.poller.done.clear()          # 새로 켠 서비스의 zip을 다시 보게
+        if "code_collect_minutes" in changed:
+            self.collect_timer.start(max(1, self.core._int_cfg("code_collect_minutes", 30)) * 60_000)
+        if changed & {"weights", "max_results"}:
+            self.searcher.w = {**DEFAULT_WEIGHTS, **(new.get("weights") or {})}
+            self.searcher.max_results = self.core._int_cfg("max_results", 50)
+        if "ask_provider" in changed:
+            self.window.set_ask_enabled(self.core.ask_provider != "off")
+        if start and not self._setup_pending:
+            if "archive_dir" in changed:
+                self._archive_was_ok = None
+                self.start_jobs()
+            if "note_dirs" in changed:
+                self.worker.submit("notes", self.core.sync_notes)
+            was, now = S.read_sources(old), self.core.sources
+            if any(now[s] and not was[s] for s in S.SERVICES) and self._batch is None:
+                self.import_now()             # 새로 켠 서비스: '지금 가져오기'와 같은 작업
+        if self.window.isVisible():
+            self.on_query(self._last_query)
+
+    def _setup_finished(self, finished: bool, changed: set, old: dict):
+        self._setup_pending = False
+        self.apply_settings(changed, old, start=False)
+        self._archive_was_ok = None
+        self.start_jobs()
+        self.worker.submit("notes", self.core.sync_notes)
+        if finished:
+            key = S.display_hotkey(self.hotkey.registered or str(self.core.config.get("hotkey") or S.DEFAULT_HOTKEY))
+            self.notify(f"준비됐습니다. {key}로 검색 창을 엽니다.")
+        else:
+            self.notify("설정은 트레이 메뉴 '설정...'에서 바꿀 수 있습니다.")
 
     def open_export_page(self):
         QDesktopServices.openUrl(QUrl(str(self.core.config.get("export_page_url"))))
@@ -540,9 +658,11 @@ class App:
     def start_summary(self, item: QueueItem):
         if item.id in self._asking:
             return
+        if self.core.ask_provider == "off":
+            self.window.set_ask_state(item.id, OFF_MESSAGE)
+            return
         self._asking.add(item.id)
-        model = str(self.core.config.get("ask_model") or "haiku")
-        self.window.set_ask_state(item.id, f"⏳ 요약 중... ({model})")
+        self.window.set_ask_state(item.id, f"⏳ 요약 중... ({self.core.ask_model_label()})")
         threading.Thread(target=self._summary_thread, args=(item,), name="ask", daemon=True).start()
 
     def _summary_thread(self, item: QueueItem):
@@ -611,17 +731,8 @@ class App:
         if d and d.is_dir():
             os.startfile(str(d))
         else:
-            self.notify("대화 보관 폴더가 없습니다. '고급 > 대화 보관 폴더 바꾸기'로 고르세요.", QSystemTrayIcon.Warning)
-
-    def choose_archive(self, first: bool = False):
-        start = str(self.core.archive_dir or Path.home())
-        d = QFileDialog.getExistingDirectory(None, "보관 폴더 선택 (대화 md를 저장할 곳)", start)
-        if not d:
-            self.update_archive_state()
-            return
-        self.core.set_archive_dir(Path(d))
-        self._archive_was_ok = None
-        self.start_jobs()
+            self.notify("대화 보관 폴더가 없습니다. 트레이 메뉴 '설정...'에서 고르세요.", QSystemTrayIcon.Warning,
+                        kind="archive")
 
     def show_status(self):
         box = QMessageBox()

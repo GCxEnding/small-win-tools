@@ -18,8 +18,10 @@ from .mdparse import parse_file
 from .queue import STATE_LABEL
 from .store import atomic_json
 
-SOURCE_LABEL = {"claude-code": "Claude Code 대화", "claude-ai": "claude.ai 대화", "note": "노트",
-                "journal": "업무 일지 항목"}
+SOURCE_LABEL = {"claude-code": "Claude Code 대화", "claude-ai": "claude.ai 대화", "chatgpt": "ChatGPT 대화",
+                "codex": "Codex 대화", "note": "노트", "journal": "업무 일지 항목"}
+CHAT_SOURCES = ("claude-code", "claude-ai", "chatgpt", "codex")   # 재료가 '마지막 메시지들'인 출처
+PROVIDER_EXE = {"claude": "claude", "codex": "codex"}
 ROLE_LABEL = {"user": "사용자", "assistant": "AI"}
 JOURNAL_DAYS = 3                       # 재료에 넣는 연결된 일지 항목: 최근 3일치
 MAX_LINES = 12                         # 답이 길게 와도 이만큼만 저장
@@ -28,6 +30,21 @@ CLI_FLAGS = ["--no-session-persistence", "--disable-slash-commands", "--strict-m
 # 앱이 Claude Code 안에서 실행됐을 때 중첩 실행으로 보이지 않게 지우는 환경 변수
 _STRIP_ENV = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_CHILD_SESSION",
               "CLAUDE_CODE_HOST_SESSION_ID")
+# Codex: 앱이 Codex 안에서 실행됐을 때 이어받는 세션, 샌드박스 표시(CODEX_THREAD_ID, CODEX_SANDBOX 등)를 뺀다.
+# CODEX_HOME은 인증 위치라 남긴다
+_KEEP_CODEX_ENV = ("CODEX_HOME",)
+# codex exec 고정 인자 (SPEC-settings.md 3-J-6, 2026-11-10 codex-cli 0.163.0-alpha.10.2에서 확인)
+#   --ephemeral: 세션 파일을 남기지 않음(요약 호출이 Codex 수집에 새 대화로 잡히지 않음)
+#   -s read-only: 명령을 실행하더라도 파일을 바꾸지 못하게. --ignore-user-config: 사용자 config.toml(모델, 추론, 플러그인) 무시
+CODEX_FLAGS = ["--ephemeral", "--skip-git-repo-check", "-s", "read-only", "--ignore-user-config", "--color", "never"]
+
+
+def clean_env(provider: str = "claude") -> dict:
+    """하위 CLI에 넘길 환경 변수 (앱이 Claude Code나 Codex 안에서 돌 때 중첩 세션으로 보이지 않게)."""
+    env = {k: v for k, v in os.environ.items() if k not in _STRIP_ENV}
+    if provider == "codex":
+        env = {k: v for k, v in env.items() if not k.upper().startswith("CODEX_") or k.upper() in _KEEP_CODEX_ENV}
+    return env
 
 # 답의 세 덩어리와 덩어리마다 남기는 항목 수 (프롬프트와 같은 수)
 SECTIONS = ("어디까지 했나", "남은 일", "다음 한 걸음")
@@ -106,7 +123,7 @@ def build_material(item, limits: Limits, today: date | None = None) -> str:
     budget = limits.max_chars - len(head_text) - len(journal) - 40
 
     body = ""
-    if item.source in ("claude-code", "claude-ai"):
+    if item.source in CHAT_SOURCES:
         doc = parse_file(Path(item.path))
         if doc is None:
             raise AskError("대화 md를 읽지 못했습니다")
@@ -134,7 +151,13 @@ def build_material(item, limits: Limits, today: date | None = None) -> str:
 
 
 # ---- 실행 ---------------------------------------------------------------
-def build_command(ask_command: list[str], model: str) -> list[str]:
+def build_command(ask_command: list[str], model: str, provider: str = "claude", effort: str = "low",
+                  out_file: Path | str | None = None) -> list[str]:
+    """Claude: claude -p --model <m> ... / Codex: codex exec -m <m> -c model_reasoning_effort=... -o <파일> -"""
+    if provider == "codex":
+        cmd = [str(c) for c in (ask_command or ["codex"])]
+        return [*cmd, "exec", "-m", model or "gpt-6-luna", "-c", f'model_reasoning_effort="{effort or "low"}"',
+                *CODEX_FLAGS, "-o", str(out_file or "answer.txt"), "-"]
     cmd = [str(c) for c in (ask_command or ["claude"])]
     exe = shutil.which(cmd[0])
     if exe:
@@ -142,25 +165,54 @@ def build_command(ask_command: list[str], model: str) -> list[str]:
     return [*cmd, "-p", "--model", model or "haiku", *CLI_FLAGS]
 
 
-def run_claude(cmd: list[str], prompt: str, cwd: Path, timeout: float) -> str:
+def _run(cmd: list[str], prompt: str, cwd: Path, timeout: float, name: str) -> subprocess.CompletedProcess:
     cwd.mkdir(parents=True, exist_ok=True)
-    env = {k: v for k, v in os.environ.items() if k not in _STRIP_ENV}
     try:
-        proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=timeout, cwd=str(cwd), env=env,
+        return subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout, cwd=str(cwd), env=clean_env(name),
                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except FileNotFoundError as e:
-        raise AskError("claude 명령을 찾지 못했습니다 (설정 ask_command 확인)") from e
+        raise AskError(f"{name} 명령을 찾지 못했습니다 (설정 > 요약 AI에서 확인)") from e
     except subprocess.TimeoutExpired as e:
         raise AskError(f"시간 초과 ({timeout:.0f}초)") from e
     except OSError as e:
-        raise AskError(f"claude 실행 실패: {e}") from e
+        raise AskError(f"{name} 실행 실패: {e}") from e
+
+
+def run_claude(cmd: list[str], prompt: str, cwd: Path, timeout: float) -> str:
+    proc = _run(cmd, prompt, cwd, timeout, "claude")
     out = (proc.stdout or "").strip()
     if proc.returncode != 0:
         msg = _last_line(proc.stderr) or _last_line(proc.stdout) or "알 수 없는 오류"
         raise AskError(f"claude 오류 종료 (코드 {proc.returncode}): {msg}")
     if not out:
         raise AskError("claude가 빈 답을 돌려줬습니다" + (f": {_last_line(proc.stderr)}" if proc.stderr else ""))
+    return out
+
+
+def run_codex(cmd: list[str], prompt: str, cwd: Path, timeout: float, out_file: Path) -> str:
+    """답은 -o 파일에서 읽는다. 표준 출력에는 머리말, 사용 토큰, MCP 오류 같은 잡음이 섞인다."""
+    out_file = Path(out_file)
+    try:
+        out_file.unlink()
+    except OSError:
+        pass
+    try:
+        proc = _run(cmd, prompt, cwd, timeout, "codex")
+        try:
+            out = out_file.read_text(encoding="utf-8", errors="replace").strip()
+        except OSError:
+            out = ""
+    finally:
+        try:
+            out_file.unlink()
+        except OSError:
+            pass
+    if proc.returncode != 0:
+        msg = _last_line(proc.stderr) or _last_line(proc.stdout) or "알 수 없는 오류"
+        raise AskError(f"codex 오류 종료 (코드 {proc.returncode}): {msg}")
+    if not out:
+        raise AskError("codex가 빈 답을 돌려줬습니다" + (f": {_last_line(proc.stderr)}" if proc.stderr else ""))
     return out
 
 
@@ -237,10 +289,30 @@ def headline(text: str) -> str:
     return next((ln.strip() for ln in (text or "").splitlines() if ln.strip()), "")
 
 
-def summarize(item, *, ask_command: list[str], model: str, limits: Limits, cwd: Path, timeout: float,
-              today: date | None = None) -> str:
+OFF_MESSAGE = "요약 AI가 꺼져 있습니다 (설정 > 요약 AI)"
+
+
+def summarize(item, *, ask_command: list[str] | None, model: str, limits: Limits, cwd: Path, timeout: float,
+              today: date | None = None, provider: str = "claude", effort: str = "low") -> str:
+    """provider: claude | codex | off. codex는 ask_command가 None이면 찾지 못한 것으로 본다."""
+    if provider == "off":
+        raise AskError(OFF_MESSAGE)
     material = build_material(item, limits, today)
-    return clean_answer(run_claude(build_command(ask_command, model), PROMPT + material, cwd, timeout))
+    if provider == "codex":
+        if not ask_command:
+            raise AskError("codex 명령을 찾지 못했습니다 (설정 > 요약 AI에서 확인)")
+        out_file = Path(cwd) / f"answer-{os.getpid()}-{datetime.now():%H%M%S%f}.txt"
+        cmd = build_command(ask_command, model, "codex", effort, out_file)
+        return clean_answer(run_codex(cmd, PROMPT + material, cwd, timeout, out_file))
+    return clean_answer(run_claude(build_command(ask_command or ["claude"], model), PROMPT + material, cwd, timeout))
+
+
+def model_label(model: str) -> str:
+    """summaries.json의 model 값 -> 'claude:haiku' (예전 값 'haiku'는 Claude로 읽음)."""
+    m = str(model or "").strip()
+    if not m:
+        return ""
+    return m if ":" in m else f"claude:{m}"
 
 
 # ---- 저장소 ---------------------------------------------------------------

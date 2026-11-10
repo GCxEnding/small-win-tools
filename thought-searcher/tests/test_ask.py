@@ -243,3 +243,118 @@ def test_project_dir_name():
     assert ask.project_dir_name(r"C:\Users\me\AppData\Local\thought-searcher\ask") == \
         "C--Users-me-AppData-Local-thought-searcher-ask"
     assert ask.project_dir_name(r"D:\4.프로그램") == "D--4-----"
+
+
+# ---- 요약 AI 고르기 (SPEC-settings.md 3-J, 12번 test_ask.py 추가) -------------------------------
+FAKE_CODEX = textwrap.dedent("""
+    import json, os, sys
+    args = sys.argv[1:]
+    data = sys.stdin.buffer.read().decode("utf-8").replace("\\r\\n", "\\n")
+    with open(os.environ["FAKE_LOG"], "w", encoding="utf-8") as f:
+        json.dump({"argv": args, "stdin": data, "cwd": os.getcwd(),
+                   "codex_env": sorted(k for k in os.environ if k.upper().startswith("CODEX_"))}, f, ensure_ascii=False)
+    print("OpenAI Codex v0.163.0 (research preview)\\n--------\\nmcp: notion failed: 인증 필요\\ntokens used: 13000")
+    if os.environ.get("FAKE_MODE") == "fail":
+        sys.stderr.write("error: model not found: gpt-없음\\n")
+        sys.exit(1)
+    out = args[args.index("-o") + 1]
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("어디까지 했나\\n1. GPT 요약 확인\\n남은 일\\n1. 기록에 없음\\n다음 한 걸음\\n1. 커밋")
+""")
+
+
+@pytest.fixture
+def fake_codex(tmp_path, monkeypatch):
+    script = tmp_path / "fake_codex.py"
+    script.write_text(FAKE_CODEX, encoding="utf-8")
+    log = tmp_path / "fake_codex_log.json"
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    monkeypatch.setenv("CODEX_THREAD_ID", "이어받으면 안 됨")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex-home"))
+    return [sys.executable, str(script)], log
+
+
+def test_build_command_codex_order():
+    cmd = build_command(["codex"], "gpt-6-luna", "codex", "low", "C:/tmp/a.txt")
+    assert cmd == ["codex", "exec", "-m", "gpt-6-luna", "-c", 'model_reasoning_effort="low"', "--ephemeral",
+                   "--skip-git-repo-check", "-s", "read-only", "--ignore-user-config", "--color", "never",
+                   "-o", "C:/tmp/a.txt", "-"]
+    claude = build_command(["claude-없는-명령"], "haiku")
+    assert claude == build_command(["claude-없는-명령"], "haiku", "claude")     # Claude는 지금과 같음
+
+
+def test_codex_answer_read_from_output_file(fake_codex, tmp_path):
+    cmd, log = fake_codex
+    p = tmp_path / "c.md"
+    p.write_text(chat_md(4), encoding="utf-8")
+    work = tmp_path / "ask"
+    text = ask.summarize(item_for(p), ask_command=cmd, model="gpt-6-luna", limits=Limits(), cwd=work, timeout=30,
+                         today=TODAY, provider="codex", effort="medium")
+    assert text.splitlines() == ["어디까지 했나", "1. GPT 요약 확인", "남은 일", "1. 기록에 없음", "다음 한 걸음", "1. 커밋"]
+    got = json.loads(log.read_text(encoding="utf-8"))
+    assert got["argv"][:5] == ["exec", "-m", "gpt-6-luna", "-c", 'model_reasoning_effort="medium"']
+    assert got["argv"][-1] == "-" and got["stdin"].startswith(ask.PROMPT)
+    assert got["cwd"].lower() == str(work).lower()
+    assert got["codex_env"] == ["CODEX_HOME"]                    # 세션 변수는 빼고 인증 위치는 남김
+    assert list(work.glob("answer-*")) == []                     # 답 파일은 지움
+
+
+def test_codex_error_and_missing(fake_codex, tmp_path, monkeypatch):
+    cmd, _ = fake_codex
+    p = tmp_path / "c.md"
+    p.write_text(chat_md(2), encoding="utf-8")
+    monkeypatch.setenv("FAKE_MODE", "fail")
+    with pytest.raises(AskError, match="codex 오류 종료 \\(코드 1\\): error: model not found"):
+        ask.summarize(item_for(p), ask_command=cmd, model="gpt-없음", limits=Limits(), cwd=tmp_path / "ask",
+                      timeout=30, provider="codex")
+    with pytest.raises(AskError, match="codex 명령을 찾지 못했습니다 \\(설정 > 요약 AI"):
+        ask.summarize(item_for(p), ask_command=None, model="x", limits=Limits(), cwd=tmp_path / "ask",
+                      timeout=30, provider="codex")
+
+
+def test_provider_off_no_call(tmp_path):
+    with pytest.raises(AskError, match="요약 AI가 꺼져 있습니다"):
+        ask.summarize(item_for(tmp_path / "없음.md"), ask_command=["x"], model="x", limits=Limits(),
+                      cwd=tmp_path / "ask", timeout=5, provider="off")
+    assert not (tmp_path / "ask").exists()
+
+
+def test_model_label_old_and_new():
+    assert ask.model_label("haiku") == "claude:haiku"
+    assert ask.model_label("codex:gpt-6-luna") == "codex:gpt-6-luna"
+    assert ask.model_label("") == ""
+
+
+def test_core_codex_summary_saved_with_provider(core_env, fake_codex, tmp_path):
+    cmd, _ = fake_codex
+    core = core_env
+    core.config.update({"ask_provider": "codex", "ask_command_codex": cmd})
+    p = tmp_path / "c.md"
+    p.write_text(chat_md(4), encoding="utf-8")
+    core.summarize(item_for(p, trace=NOW))
+    rec = json.loads((core.store.local / "summaries.json").read_text(encoding="utf-8"))["claude-code:s1"]
+    assert rec["model"] == "codex:gpt-6-luna"
+    it = item_for(p, trace=NOW)
+    core.attach_summary(it)
+    assert it.summary_model == "codex:gpt-6-luna" and it.summary == "다음: 커밋"
+    # 예전 기록(model: haiku)은 Claude로 읽는다
+    core.summaries.put("claude-code:s1", NOW, "옛 요약", "haiku")
+    core.attach_summary(it)
+    assert it.summary_model == "claude:haiku"
+    core.config["ask_provider"] = "off"
+    with pytest.raises(AskError, match="꺼져 있습니다"):
+        core.summarize(item_for(p))
+    assert core.ask_model_label() == ""
+
+
+def gpt_md(source):
+    return chat_md(4).replace("source: claude-code", f"source: {source}").replace("claude-code:s1", f"{source}:s1")
+
+
+@pytest.mark.parametrize("source,label", [("chatgpt", "ChatGPT 대화"), ("codex", "Codex 대화")])
+def test_material_chatgpt_codex_last_messages(tmp_path, source, label):
+    p = tmp_path / "g.md"
+    p.write_text(gpt_md(source), encoding="utf-8")
+    m = build_material(item_for(p, source=source), Limits(tail_messages=2), TODAY)
+    assert f"출처: {label}" in m and "마지막 메시지들" in m
+    assert "메시지 3" in m and "메시지 4" in m and "메시지 2" not in m

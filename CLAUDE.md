@@ -115,7 +115,7 @@
 도구끼리 import하지 않으므로 공통 코드는 복사합니다. 원본을 고치면 복사본도 같이 고칩니다.
 | 원본 | 복사본 | 상태 |
 |---|---|---|
-| `emoji-searcher/app/hotkey.py` | `thought-searcher/app/hotkey.py` | 동일 |
+| `emoji-searcher/app/hotkey.py` | `thought-searcher/app/hotkey.py` | 동일 (설정 창의 '새 키 먼저 등록 후 교체'는 복사본을 고치지 않고 `thought-searcher/app/main.py`의 `swap_hotkey`에 둠) |
 | `emoji-searcher/app/hotkey.py` | `hangul-restore/app/hotkey.py` | 동일 |
 | `emoji-searcher/_deps.py` | `gohome-vlog/_deps.py`, `hangul-restore/_deps.py`, `thought-searcher/_deps.py` | 동일 (PySide6 없으면 첫 실행 때 설치 제안) |
 

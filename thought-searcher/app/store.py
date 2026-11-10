@@ -37,6 +37,14 @@ DEFAULT_CONFIG = {
     "ask_timeout_seconds": 120,
     "capture_dir": "",         # claude.ai 자동 수집 파일 폴더. 비면 <watch_dir>\claude-sync
     "capture_stale_hours": 3,  # 수집이 이만큼 멈추면 트레이 알림
+    # 설정 창 확장 (SPEC-settings.md 3-H). 기본값은 예전 동작 그대로
+    "sources": {"claude_ai": True, "chatgpt": True, "claude_code": True, "codex": True},   # 쓰는 서비스
+    "queue_sources": ["claude-ai", "claude-code", "note"],   # 큐에 올릴 출처
+    "ask_provider": "claude",       # F2 요약 AI: "claude" | "codex" | "off"
+    "ask_model_codex": "gpt-6-luna",
+    "ask_codex_effort": "low",
+    "ask_command_codex": [],        # 비면 PATH의 codex, 그다음 Codex 데스크톱 앱 번들
+    "setup_done": False,            # 시작 안내를 마쳤거나 건너뜀 (판정은 '시작 때 config.json이 없었음')
 }
 
 DEFAULT_STATE = {
@@ -114,6 +122,7 @@ class Store:
         self.config_path = self.root / "config.json"
         self.state_path = self.root / "state.json"
         self.config_broken = False
+        self.config_missing = False     # load_config 때 config.json이 없었음 (첫 실행: 시작 안내)
 
     @property
     def index_path(self) -> Path:
@@ -143,19 +152,38 @@ class Store:
                 pass
             return Loaded(copy.deepcopy(defaults), f"{what} 읽기 실패({e}). {bak.name}로 보관하고 기본값으로 시작합니다.")
 
-    def load_config(self) -> Loaded:
+    def load_config(self, create: bool = True) -> Loaded:
+        """create=False: 없어도 만들지 않는다(트레이 앱 첫 실행. 시작 안내를 마치거나 건너뛸 때 저장)."""
+        self.config_missing = not self.config_path.exists()
         res = self._load(self.config_path, DEFAULT_CONFIG, "config.json")
         self.config_broken = res.warning is not None
-        if not self.config_path.exists():
+        if create and not self.config_path.exists():
             try:
                 atomic_json(self.config_path, res.data)
             except OSError:
                 pass
         return res
 
+    def read_raw_config(self) -> dict | None:
+        """디스크의 config.json 그대로(기본값을 합치지 않음). 없거나 깨졌으면 None."""
+        try:
+            data = json.loads(self.config_path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def config_signature(self) -> tuple[int, int] | None:
+        """외부 변경 감지용 (수정 시각 ns, 크기). 파일이 없으면 None."""
+        try:
+            st = self.config_path.stat()
+        except OSError:
+            return None
+        return st.st_mtime_ns, st.st_size
+
     def save_config(self, data: dict) -> None:
         atomic_json(self.config_path, data)
         self.config_broken = False
+        self.config_missing = False
 
     def load_state(self) -> Loaded:
         return self._load(self.state_path, DEFAULT_STATE, "state.json")

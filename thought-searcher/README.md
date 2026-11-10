@@ -10,7 +10,8 @@ Claude(와 ChatGPT) 채팅 기록을 내 PC에 영구 보관하고, 흐릿한 �
   Claude Code 세션을 Codex로 옮겨 온 대화는 같은 세션의 Claude Code md가 이미 있으면 건너뛰고, 원본이 지워져 Codex에만 남은 것만 들어옵니다.
 - 가져오는 동안 트레이 아이콘에 ⏳가 붙고, 아이콘에 마우스를 올리면 진행 상황(`Claude Code 대화 가져오는 중 (3/14)`)이 보여요. `지금 가져오기`를 누르면 끝났을 때 `가져오기 완료: 새 대화 N개, 바뀐 대화 M개` 알림이 뜹니다.
 - `Ctrl+Alt+H`로 검색 창을 띄웁니다.
-- 마지막 가져오기 후 7일이 지나면 내보내기를 받으라고 알려 드려요.
+- 마지막 가져오기 후 7일이 지나면 내보내기를 받으라고 알려 드려요(claude.ai를 켰을 때만, 설정에서 끌 수 있음).
+- 쓰지 않는 서비스는 설정에서 꺼 두면 수집, 알림, 메뉴가 모두 빠집니다.
 
 ## 설치
 
@@ -29,9 +30,14 @@ pip install -r requirements.txt
 pythonw thought_searcher.pyw
 ```
 
-1. 묻는 것 없이 트레이에 🧠 아이콘이 생기고, 곧바로 Claude Code 세션을 모읍니다.
-   대화 md는 기본 위치 `%LOCALAPPDATA%\thought-searcher\archive`에 쌓여요. 트레이 메뉴 `대화 보관 폴더 열기`로 바로 열 수 있습니다.
-   다른 곳(동기화 폴더 등)에 두고 싶으면 `고급 > 대화 보관 폴더 바꾸기...`로 바꾸세요.
+1. 트레이에 🧠 아이콘이 생기고, 처음 한 번만 **시작 안내** 창이 뜹니다(`config.json`이 없을 때만).
+   1. 쓰는 서비스(claude.ai, ChatGPT, Claude Code, Codex)를 고릅니다. 끈 서비스는 수집도 알림도 하지 않아요.
+   2. 대화 보관 폴더: 기본 위치 `%LOCALAPPDATA%\thought-searcher\archive`를 그대로 쓰거나 바꿉니다.
+   3. F2 요약 AI: Claude, GPT(Codex), 끄기 중 하나. 가장 싼 모델(haiku, gpt-6-luna)로 정해 둡니다.
+   4. 노트 폴더(선택)와 claude.ai, ChatGPT 수집 스크립트 설치 안내.
+
+   `마치기`를 누르면 수집을 시작합니다. `건너뛰기`(또는 창 닫기)를 누르면 모든 서비스를 켠 기본값으로 동작해요. 다음 실행부터는 뜨지 않습니다.
+   설정은 언제든 트레이 메뉴 `설정...`이나 검색 창 오른쪽 아래 ⚙에서 바꿉니다.
 2. claude.ai 대화는 트레이 메뉴 `claude.ai 내보내기 받으러 가기`로 내보내기 페이지를 열어 zip을 받으면 됩니다(메일로 링크가 와요). 다운로드 폴더에 들어오면 자동으로 가져옵니다.
    내보내기는 `conversations-000.zip`, `projects-000.zip`, `memories-000.zip` 등 여러 개로 나뉘어 오는데, 필요한 것만 알아서 읽고 나머지는 무시합니다.
    처리한 zip은 지우거나 옮기지 않아요. 같은 zip을 다시 넣어도 중복되지 않습니다.
@@ -60,7 +66,7 @@ pythonw thought_searcher.pyw
 | `배` (1글자) | 제목에서만 찾음 |
 | (빈 입력) | 최근 대화 목록 |
 
-순위는 BM25 관련도에 제목 일치, 한 메시지 안 동시 등장, 최근 대화 가산을 더해 정합니다. 가중치는 `config.json`의 `weights`에서 바꿀 수 있어요.
+순위는 BM25 관련도에 제목 일치, 한 메시지 안 동시 등장, 최근 대화 가산을 더해 정합니다. 가중치는 `설정 > 고급 > 순위 가중치`에서 바꿀 수 있어요.
 
 ### 검색 창 키
 
@@ -79,15 +85,13 @@ pythonw thought_searcher.pyw
 
 | 메뉴 | 하는 일 |
 |---|---|
-| 검색 (Ctrl+Alt+H) | 검색 창 열기 |
-| 지금 가져오기 | 30분을 기다리지 않고 Claude Code, Codex 대화와 노트 폴더를 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
-| claude.ai 내보내기 받으러 가기 | claude.ai 데이터 내보내기 페이지를 브라우저로 열기 |
+| 검색 (Ctrl+Alt+H) | 검색 창 열기 (단축키를 바꾸면 글자도 바뀜) |
+| 설정... | 설정 창 열기 (아래 '설정 창') |
+| 지금 가져오기 | 30분을 기다리지 않고 켠 서비스의 대화와 노트 폴더를 바로 모으고, 다운로드 폴더의 새 zip도 확인 |
+| claude.ai 내보내기 받으러 가기 | claude.ai 데이터 내보내기 페이지를 브라우저로 열기 (claude.ai를 켰을 때만 보임) |
 | 대화 보관 폴더 열기 | 대화 md가 쌓인 폴더 열기 |
 | 상태 보기 | 마지막 가져오기 시각, 대화 수, 경고 |
 | 고급 > zip 파일 직접 고르기... | 다운로드 폴더 밖에 있는 zip 가져오기 |
-| 고급 > 대화 보관 폴더 바꾸기... | md를 쌓을 폴더 바꾸기 |
-| 고급 > 노트 폴더 추가... | 내 md 폴더(Obsidian 볼트 등)를 검색에 넣기 |
-| 고급 > 노트 폴더 빼기 | 등록한 노트 폴더를 검색에서 빼기 (파일은 그대로) |
 | 고급 > 검색 색인 다시 만들기 | 검색이 이상할 때. md에서 색인만 새로 만듦 |
 | 고급 > 대화 md 전부 다시 만들기 | 도구를 업데이트한 뒤 안내가 뜰 때. 받아 둔 zip과 Code 세션 복사본에서 md를 새로 만듦 |
 
@@ -98,6 +102,40 @@ python -m app.cli search 로그 배포
 ```
 
 (`import <zip>`, `collect`, `reindex`, `rebuild-index`, `rebuild`, `status`도 있습니다.)
+
+## 설정 창
+
+`config.json`을 몰라도 바꿀 수 있는 설정은 모두 여기서 바꿉니다. `저장`을 누르면 칸을 검사한 뒤 재시작 없이 바로 적용돼요. 잘못된 칸은 그 탭으로 가서 칸 아래 빨간 줄로 알려 줍니다.
+
+| 탭 | 항목 |
+|---|---|
+| 일반 | 검색 창 단축키(칸을 누르고 새 조합을 누름, 저장할 때 등록해 보고 실패하면 옛 키 유지), 대화 보관 폴더, 노트 폴더, 업무 일지 폴더, 열린 일 기간과 개수, 큐에 올릴 출처, 큐에서 뺄 노트 폴더 |
+| 수집 | 쓰는 서비스, 다운로드(감시) 폴더, 자동 수집 파일 폴더, Claude Code/Codex 폴더, 수집 주기, 내보내기 알림(끄기 가능), 수집 멈춤 알림, 수집 스크립트 설치 안내와 `스크립트 복사` |
+| 요약 AI | Claude / GPT (Codex) / 끄기, 모델, GPT 추론 정도, CLI 상태(버전과 로그인만 확인, 토큰 안 씀), CLI 경로 |
+| 고급 | md 여는 명령, 검색 결과 개수, 순위 가중치, 추가 가림 정규식, 요약 재료 크기와 제한 시간, 내보내기 페이지 주소, config.json/데이터 폴더 열기 |
+
+- 창에 없는 키(손으로 넣은 키)는 저장해도 그대로 남습니다. 바꾼 칸만 파일에 씁니다.
+- 창을 연 뒤 `config.json`을 메모장 등으로 고쳤다면 저장할 때 `덮어쓰기 / 다시 읽기`를 묻습니다.
+- 쓰는 서비스를 끄면 그 서비스의 수집, zip 가져오기, 알림, 메뉴가 멈추거나 숨겨집니다. 이미 보관된 md는 계속 검색돼요. 끈 동안 들어온 zip은 이력에 남기지 않으므로 나중에 켜면 가져옵니다.
+
+### 요약 AI 고르기 (F2)
+
+앱은 CLI를 설치하거나 로그인하지 않습니다. 상태만 보여 줘요.
+
+| 고르기 | 필요한 것 | 기본 모델 |
+|---|---|---|
+| Claude | Claude Code CLI(`claude`)가 PATH에 있고 `claude`로 로그인 | `haiku` |
+| GPT (Codex) | Codex CLI. PATH의 `codex`, 없으면 Codex 데스크톱 앱이 넣은 `%LOCALAPPDATA%\OpenAI\Codex\bin\*\codex.exe`를 찾음. `codex login`으로 ChatGPT 로그인 | `gpt-6-luna` |
+| 끄기 | 없음 | |
+
+- GPT 모델 목록은 이 PC의 Codex가 받아 둔 `%USERPROFILE%\.codex\models_cache.json`에서 읽습니다.
+- Codex 요약은 `codex exec --ephemeral -s read-only --ignore-user-config ...`로 실행해 세션 기록을 남기지 않습니다(Codex 수집에 요약 대화가 섞이지 않음).
+- 요약 줄 끝에 만든 모델이 `claude:haiku`, `codex:gpt-6-luna`처럼 보입니다.
+
+### ChatGPT만 쓰는 경우
+
+시작 안내 1단계에서 ChatGPT만 체크하면 claude.ai 내보내기 알림과 메뉴가 사라지고, 큐에는 ChatGPT 대화와 노트가 올라오며, 요약 AI는 GPT로 정해집니다.
+ChatGPT 대화는 내보내기 zip을 다운로드 폴더에 두거나, 설정 > 수집 탭 안내대로 `chatgpt-sync.user.js`를 설치해 모읍니다. 회사 크롬 정책으로 확장 설치가 막혀 있으면 zip 내보내기로 가져오세요.
 
 ## claude.ai, ChatGPT 자동 수집 (Tampermonkey)
 zip 내보내기를 기다리지 않고, claude.ai 탭이 열려 있는 동안 30분마다 바뀐 대화만 받아 둡니다. 주로 계속 켜 두는 PC용입니다.
@@ -110,7 +148,7 @@ zip 내보내기를 기다리지 않고, claude.ai 탭이 열려 있는 동안 3
    - 처음 저장할 때 크롬이 다운로드 권한을 물으면 허용합니다.
 3. 크롬 설정 > 다운로드 > "다운로드 전에 각 파일의 저장 위치 확인"을 끕니다.
 4. 크롬 설정 > 성능 > 메모리 절약 모드를 쓰면 `claude.ai`를 "항상 활성 상태로 유지할 사이트"에 넣습니다.
-5. Tampermonkey 대시보드 > 새 스크립트에 `userscript/claude-sync.user.js` 내용을 붙여 넣고 저장합니다. ChatGPT도 받으려면 `userscript/chatgpt-sync.user.js`를 같은 방법으로 하나 더 넣습니다.
+5. Tampermonkey 대시보드 > 새 스크립트에 `userscript/claude-sync.user.js` 내용을 붙여 넣고 저장합니다. ChatGPT도 받으려면 `userscript/chatgpt-sync.user.js`를 같은 방법으로 하나 더 넣습니다. 설정 > 수집 탭의 `스크립트 복사` 버튼으로 내용을 바로 복사할 수 있어요.
 6. claude.ai를 열면 15초 뒤 첫 수집이 돕니다. 확장 아이콘의 스크립트 메뉴에서 `지금 수집`, `상태 보기`를 쓸 수 있습니다.
 
 저장 위치는 둘 다 다운로드 폴더의 `claude-sync\`입니다. 대화 하나가 파일 하나(`claude-ai_<uuid>.json`, `chatgpt_<id>.json`)이고, 돌 때마다 `_status.json`(claude.ai), `_status_chatgpt.json`(ChatGPT)이 갱신됩니다. ChatGPT 대화는 프로젝트 이름 없이 들어옵니다.
@@ -136,6 +174,8 @@ zip 내보내기를 기다리지 않고, claude.ai 탭이 열려 있는 동안 3
 | `%LOCALAPPDATA%\thought-searcher\index.db` | 검색 색인 (지워도 md에서 다시 만듦) |
 | `%LOCALAPPDATA%\thought-searcher\raw\claude-code\` | Code 원본 jsonl 복사본 |
 | `%LOCALAPPDATA%\thought-searcher\logs\` | 로그 (1MB x 3) |
+| `%LOCALAPPDATA%\thought-searcher\ask\` | F2 요약 CLI 작업 폴더 (수집에서 뺌) |
+| `%LOCALAPPDATA%\thought-searcher\summaries.json` | F2 요약 저장본 (모델 표기 `claude:haiku` 등) |
 
 ## 테스트
 
@@ -153,7 +193,7 @@ pytest
 
 ## 내 노트 md 넣기 (노트 폴더)
 
-Obsidian 일지, 메모처럼 직접 쓴 md는 `고급 > 노트 폴더 추가...`로 폴더를 고르면 형식 변환 없이 그대로 검색됩니다.
+Obsidian 일지, 메모처럼 직접 쓴 md는 `설정 > 일반 > 노트 폴더`에서 `추가...`로 폴더를 고르면 형식 변환 없이 그대로 검색됩니다.
 
 - 파일은 **읽기만** 합니다. 복사하거나 고치지 않고, 보관 폴더에도 쓰지 않아요.
 - 하위 폴더까지 모두 읽고, 점으로 시작하는 폴더(`.obsidian`, `.git` 등)는 건너뜁니다.

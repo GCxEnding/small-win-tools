@@ -456,3 +456,42 @@ def test_window_empty_queue_and_search_mode(window):
     assert got == []
     w.set_results([], "결과 없음")
     assert w.mode == "search" and w.list.count() == 0
+
+
+# ---- 큐에 올릴 출처 (SPEC-settings.md 3-D, 12번 test_queue.py 추가) -------------------------------
+def test_queue_sources_setting_adds_and_removes():
+    docs = [doc("claude-code:1", H), doc("chatgpt:2", 2 * H, source="chatgpt"), doc("codex:3", 3 * H, source="codex"),
+            doc("note:c:/n/a.md", 4 * H, source="note", path="C:/n/a.md")]
+    assert ids(compute(docs, {}, NOW).focus) == ["claude-code:1", "note:c:/n/a.md"]        # 기본값은 지금과 같음
+    both = compute(docs, {}, NOW, sources=("claude-code", "chatgpt", "codex", "note"))
+    assert ids(both.focus) == ["claude-code:1", "chatgpt:2", "codex:3", "note:c:/n/a.md"]
+    only_gpt = compute(docs, {}, NOW, sources=("chatgpt", "note"))
+    assert ids(only_gpt.focus) == ["chatgpt:2", "note:c:/n/a.md"]
+
+
+def test_load_docs_respects_sources(db):
+    _fill(db, [("chatgpt:g", "chatgpt", NOW - H, 0, [(3, 0), (8, 0)]), ("codex:c", "codex", NOW - H, 0, [(5, 0)]),
+               ("claude-ai:a", "claude-ai", NOW - H, 0, [(2, 0)])])
+    assert {d.conv_id for d in queue.load_docs(db, NOW - DAY)} == {"claude-ai:a"}
+    got = {d.conv_id: d for d in queue.load_docs(db, NOW - DAY, sources=("chatgpt", "codex"))}
+    assert set(got) == {"chatgpt:g", "codex:c"} and got["chatgpt:g"].line == 8
+    assert queue.load_docs(db, NOW - DAY, sources=()) == []
+
+
+def test_core_queue_sources_and_journal_chatgpt_link(core_env, db, tmp_path):
+    core = core_env
+    _fill(db, [("chatgpt:g1", "chatgpt", NOW - 30 * DAY, 0, [(4, 0)]), ("claude-code:a", "claude-code", NOW - H, 0,
+                                                                         [(7, 0)])])
+    assert ids(core.compute_queue(db, NOW).focus) == ["claude-code:a"]          # 키가 없으면 지금 동작
+    core.config["queue_sources"] = ["chatgpt", "note"]
+    vault = tmp_path / "vault"
+    p = vault / "2026" / "11" / "2026-11-09.md"
+    p.parent.mkdir(parents=True)
+    p.write_text("## 업무\n- [/] GPT로 정리 [session:: chatgpt:g1]\n", encoding="utf-8")
+    core.config["journal_dir"] = str(vault)
+    res = core.compute_queue(db, NOW)
+    assert ids(res.focus) == ["chatgpt:g1"]                 # 30일 전 대화지만 일지 연결로 흔적이 생김
+    assert "GPT로 정리" in res.focus[0].subtitle
+    core.config["queue_focus"] = 0
+    res = core.compute_queue(db, NOW)
+    assert res.focus == [] and ids(res.rest) == ["chatgpt:g1"]

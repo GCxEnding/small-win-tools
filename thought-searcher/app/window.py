@@ -5,8 +5,8 @@ from datetime import datetime
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QStyle,
-                               QStyledItemDelegate, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QStyle,
+                               QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
 
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit
@@ -21,6 +21,7 @@ K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus",
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
 HINT_SEARCH = "Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기"
 HINT_QUEUE = "열린 일 · Enter 열기 · F2 요약 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
+HINT_QUEUE_NO_ASK = HINT_QUEUE.replace("F2 요약 · ", "")
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
          "journal": "일지"}
 BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
@@ -159,7 +160,8 @@ class HitDelegate(QStyledItemDelegate):
         if it.id in self.ask_state:
             return self.ask_state[it.id]
         if it.summary:
-            return f"💬 {it.summary}" + ("  (새 흔적 있음)" if it.summary_stale else "")
+            return (f"💬 {it.summary}" + ("  (새 흔적 있음)" if it.summary_stale else "")
+                    + (f"  · {it.summary_model}" if it.summary_model else ""))
         return ""
 
     def sizeHint(self, option, index):
@@ -314,6 +316,7 @@ class HitDelegate(QStyledItemDelegate):
 class SearchWindow(QWidget):
     searchRequested = Signal(str)
     action = Signal(str, object, int)    # (종류, Hit, 맞은 메시지 순번)
+    settingsRequested = Signal()         # 상태 줄 ⚙
 
     def __init__(self):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -334,7 +337,10 @@ class SearchWindow(QWidget):
             QLabel {{ color:{self.t.sub.name()}; padding:2px 4px; }}
             QLabel#detail {{ color:{self.t.text.name()}; background:{self.t.input_bg.name()};
                             border-radius:6px; padding:6px 10px; }}
+            QToolButton#gear {{ color:{self.t.sub.name()}; border:none; padding:0 4px; }}
+            QToolButton#gear:hover {{ color:{self.t.text.name()}; }}
         """)
+        self.ask_enabled = True
         root = QWidget(self)
         root.setObjectName("root")
         lay = QVBoxLayout(self)
@@ -364,7 +370,18 @@ class SearchWindow(QWidget):
         inner.addWidget(self.edit)
         inner.addWidget(self.list, 1)
         inner.addWidget(self.detail)
-        inner.addWidget(self.status)
+        status_row = QHBoxLayout()
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.addWidget(self.status, 1)
+        self.gear = QToolButton()
+        self.gear.setObjectName("gear")
+        self.gear.setText("⚙")
+        self.gear.setToolTip("설정")
+        self.gear.setFocusPolicy(Qt.NoFocus)
+        self.gear.setCursor(Qt.PointingHandCursor)
+        self.gear.clicked.connect(self.settingsRequested.emit)
+        status_row.addWidget(self.gear)
+        inner.addLayout(status_row)
         self.hint = QLabel(HINT_SEARCH)
         f = QFont(font)
         f.setPointSizeF(8.5)
@@ -447,7 +464,7 @@ class SearchWindow(QWidget):
         self.mode = "queue"
         self._queue = result
         self.delegate.now = now
-        self.hint.setText(HINT_QUEUE)
+        self.hint.setText(HINT_QUEUE if self.ask_enabled else HINT_QUEUE_NO_ASK)
         self.list.clear()
         if not result.open_count:
             self._add_row(K_EMPTY, text=f"최근 {result.days}일 동안 흔적이 있는 일이 없습니다")
@@ -493,11 +510,23 @@ class SearchWindow(QWidget):
         elif q.summary_text:
             text = q.summary_text
             if q.summary_stale:
-                text += "\n(요약 이후 새 흔적 있음, F2로 새로)"
-        else:
+                text += "\n(요약 이후 새 흔적 있음, F2로 새로)" if self.ask_enabled else "\n(요약 이후 새 흔적 있음)"
+            if q.summary_model:
+                text += f"\n({q.summary_model})"
+        elif self.ask_enabled:
             text = "F2: 어디까지 했지? (요약)"
+        else:
+            self.detail.hide()            # 요약 AI 끔: F2 안내를 보이지 않는다
+            return
         self.detail.setText(text)
         self.detail.show()
+
+    def set_ask_enabled(self, enabled: bool) -> None:
+        """요약 AI를 끄면 큐의 F2 안내 글자를 숨긴다."""
+        self.ask_enabled = bool(enabled)
+        if self.mode == "queue":
+            self.hint.setText(HINT_QUEUE if self.ask_enabled else HINT_QUEUE_NO_ASK)
+            self._update_detail()
 
     def set_ask_state(self, item_id: str, text: str | None) -> None:
         """요약 중, 실패 표시. None이면 지움."""
@@ -546,7 +575,8 @@ class SearchWindow(QWidget):
         self.list.setCurrentItem(it)
         q: QueueItem = it.data(ROLE_HIT)
         menu = QMenu(self)
-        acts = [("열기\tEnter", "open"), ("요약\tF2", "summary"), ("대화 복사\tShift+Enter", "copy_conv")]
+        acts = [("열기\tEnter", "open")] + ([("요약\tF2", "summary")] if self.ask_enabled else []) + \
+               [("대화 복사\tShift+Enter", "copy_conv")]
         acts += [("다시 열기\tF4", "reopen")] if q.closed_kind else [("완료\tF4", "done"), ("버림\tShift+F4", "drop")]
         for label, kind in acts:
             menu.addAction(label).triggered.connect(lambda _=False, k=kind: self.action.emit(k, q, 0))

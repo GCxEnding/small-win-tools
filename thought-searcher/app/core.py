@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from . import ask, codex, collector, queue
+from . import ask, cli_check, codex, collector, queue, settings
 from .journal import JournalReader
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
@@ -39,7 +39,7 @@ def setup_logging(store: Store) -> None:
 
 @dataclass
 class ZipOutcome:
-    result: str                  # "ok" | "skipped" | "ignored" | "failed" | "no_archive"
+    result: str                  # "ok" | "skipped" | "ignored" | "failed" | "no_archive" | "off"(끈 서비스)
     importer: str = ""
     counts: dict = field(default_factory=dict)
     reason: str = ""
@@ -69,13 +69,14 @@ def _now_iso() -> str:
 
 
 class Core:
-    def __init__(self, store: Store | None = None, tz=None):
+    def __init__(self, store: Store | None = None, tz=None, create_config: bool = True):
+        """create_config=False: config.json이 없어도 만들지 않는다(트레이 앱. 시작 안내 뒤에 저장)."""
         self.store = store or Store()
         setup_logging(self.store)
         self.tz = tz or local_tz()
         self.lock = threading.RLock()
         self.warnings: list[str] = []
-        cfg = self.store.load_config()
+        cfg = self.store.load_config(create=create_config)
         self.config = cfg.data
         self._warn(cfg.warning)
         st = self.store.load_state()
@@ -139,6 +140,45 @@ class Core:
         self.config["archive_dir"] = str(path)
         self.store.save_config(self.config)
         self._apply_note_dirs()
+
+    # ---- 설정 창 (SPEC-settings.md) ---------------------------------------------
+    @property
+    def sources(self) -> dict[str, bool]:
+        return settings.read_sources(self.config)
+
+    def service_on(self, service: str) -> bool:
+        return self.sources.get(service, True)
+
+    def update_config(self, new: dict) -> set[str]:
+        """설정 창 저장: 바뀐 키만 디스크 파일에 덮어 쓰고(손으로 넣은 키 보존) 본체 쪽 적용까지. 바뀐 키를 돌려준다.
+        self.config는 통째로 새 dict로 바꾼다(작업 스레드가 읽던 옛 dict는 그대로 남아 옛 값으로 끝남)."""
+        old = self.config
+        changed = settings.diff(old, new)
+        raw = None if (self.store.config_broken or self.store.config_missing) else self.store.read_raw_config()
+        self.store.save_config(settings.to_save(raw, new, changed))
+        self.config = new
+        if "extra_redact_patterns" in changed:
+            self.redactor = Redactor(new.get("extra_redact_patterns") or [])
+            for e in self.redactor.errors:
+                self._warn(e)
+        if changed & {"note_dirs", "archive_dir"}:
+            self._apply_note_dirs()
+        if "journal_dir" in changed:
+            self._journal_warned = False
+        return changed
+
+    def reload_config(self) -> set[str]:
+        """config.json을 다시 읽어 바꾼다(설정 창 '다시 읽기'). 저장하지 않는다. 바뀐 키를 돌려준다."""
+        res = self.store.load_config(create=False)
+        self._warn(res.warning)
+        new = res.data
+        changed = settings.diff(self.config, new)
+        self.config = new
+        if "extra_redact_patterns" in changed:
+            self.redactor = Redactor(new.get("extra_redact_patterns") or [])
+        if changed & {"note_dirs", "archive_dir"}:
+            self._apply_note_dirs()
+        return changed
 
     # ---- 노트 폴더 ----------------------------------------------------------
     @property
@@ -227,9 +267,15 @@ class Core:
                     log.info("이미 가져온 zip과 내용이 같음: %s", path)
             self.save_state()
             return ZipOutcome("skipped")
+        imp = detect(path)
+        svc = settings.IMPORTER_SERVICE.get(imp.name) if imp is not None else None
+        if svc and not self.service_on(svc):
+            # 끈 서비스의 zip: 가져오지 않고 이력에도 남기지 않는다(나중에 켜면 다음 확인 때 가져옴)
+            log.info("끈 서비스(%s)의 zip이라 건너뜀: %s", svc, path)
+            return ZipOutcome("off", importer=imp.name)
         rec = {"name": path.name, "path": str(path), "size": st.st_size, "mtime": st.st_mtime,
                "processed_at": _now_iso(), "export_time": "", "result": "", "counts": {}, "importer": ""}
-        out = self._import(path, rec)
+        out = self._import(path, rec, imp)
         rec["result"] = out.result
         rec["importer"] = out.importer
         rec["counts"] = out.counts
@@ -244,8 +290,7 @@ class Core:
             self._warn(f"{path.name}: {out.reason}")
         return out
 
-    def _import(self, path: Path, rec: dict) -> ZipOutcome:
-        imp = detect(path)
+    def _import(self, path: Path, rec: dict, imp=None) -> ZipOutcome:
         if imp is None:
             import zipfile
             if not zipfile.is_zipfile(path):
@@ -304,10 +349,17 @@ class Core:
     def capture_raw_dir(self) -> Path:
         return self.store.local / "raw" / "claude-ai-capture"
 
+    def site_on(self, site: str) -> bool:
+        return self.service_on(settings.CAPTURE_SITE_SERVICE.get(site, "claude_ai"))
+
+    def _capture_files(self, folder: Path) -> list[Path]:
+        """켠 서비스의 수집 파일만 (끈 서비스 파일은 이력에도 남기지 않아 나중에 켜면 가져온다)."""
+        return [p for p in claude_capture.capture_files(folder) if self.site_on(claude_capture.site_of(p.name))]
+
     def pending_captures(self) -> list[Path]:
         """처리 기록과 크기나 수정 시각이 다른 수집 파일."""
         try:
-            files = claude_capture.capture_files(self.capture_dir)
+            files = self._capture_files(self.capture_dir)
         except OSError:
             return []
         out = []
@@ -331,7 +383,7 @@ class Core:
             return res
         if force:
             try:
-                files = claude_capture.capture_files(self.capture_dir)
+                files = self._capture_files(self.capture_dir)
             except OSError:
                 files = []
         else:
@@ -386,7 +438,7 @@ class Core:
     def misplaced_captures(self) -> int:
         """Tampermonkey 다운로드 설정이 기본값이면 하위 폴더 대신 다운로드 폴더 바로 아래에 쌓인다."""
         try:
-            return len(claude_capture.capture_files(self.watch_dir))
+            return len(self._capture_files(self.watch_dir))
         except OSError:
             return 0
 
@@ -403,6 +455,8 @@ class Core:
                     "Tampermonkey 다운로드 설정(브라우저 API 모드)을 확인하세요.")
         hours = max(1, self._int_cfg("capture_stale_hours", 3))
         for site, label in claude_capture.SITE_LABEL.items():
+            if not self.site_on(site):
+                continue
             status = claude_capture.read_status(self.capture_dir, site)
             ok = claude_capture.last_ok(status)
             if status is None or ok is None:
@@ -422,10 +476,28 @@ class Core:
             return f"{label} 자동 수집이 {int(age)}시간째 멈춰 있습니다.\n{tail}"
         return None
 
+    def capture_site_status(self, site: str) -> str:
+        """설정 창 수집 탭의 사이트별 한 줄 (3-I-4)."""
+        status = claude_capture.read_status(self.capture_dir, site)
+        if status is None:
+            return "아직 수집 기록 없음"
+        fmt = (lambda dt: dt.astimezone(self.tz).strftime("%m-%d %H:%M"))
+        err = str(status.get("error") or "").strip()
+        if err:
+            run = parse_iso(status.get("last_run")) or claude_capture.last_ok(status)
+            return f"오류: {err[:120]}" + (f" ({fmt(run)})" if run else "")
+        ok = claude_capture.last_ok(status)
+        if ok is None:
+            return "아직 수집 기록 없음"
+        n = sum(1 for x in (self.state.get("capture_files") or {}) if claude_capture.site_of(x) == site)
+        return f"마지막 성공 {fmt(ok)}, 대화 {n}개"
+
     def capture_status_line(self) -> str:
         lines = []
         names = list(self.state.get("capture_files") or {})
         for site, label in claude_capture.SITE_LABEL.items():
+            if not self.site_on(site):
+                continue
             status = claude_capture.read_status(self.capture_dir, site)
             if status is None:
                 continue
@@ -440,15 +512,22 @@ class Core:
     def collect_code(self, force: bool = False, progress=None) -> collector.CollectResult | None:
         if not self.archive_ok():
             return None
+        src = self.sources
+        if not (src["claude_code"] or src["codex"]):
+            return collector.CollectResult()
         archive = self.archive()
         with self.lock:
-            res = collector.collect(self.projects_dir, self.store.raw_dir, archive, self.state, force,
-                                    progress, {ask.project_dir_name(self.ask_dir)})
+            if src["claude_code"]:
+                res = collector.collect(self.projects_dir, self.store.raw_dir, archive, self.state, force,
+                                        progress, {ask.project_dir_name(self.ask_dir)})
+            else:
+                res = collector.CollectResult()
             # Codex는 Claude Code 다음에: 옮겨 온 대화가 Claude Code md와 겹치는지 보려면 그쪽이 먼저 있어야 한다
-            cx = codex.collect(self.codex_dir, archive, self.state, force)
-            res.new += cx.new
-            res.changed += cx.changed
-            res.written += cx.written
+            if src["codex"]:
+                cx = codex.collect(self.codex_dir, archive, self.state, force)
+                res.new += cx.new
+                res.changed += cx.changed
+                res.written += cx.written
             self.state["last_code_collect"] = _now_iso()
         self.save_state()
         self.reindex_paths(res.written)
@@ -500,8 +579,16 @@ class Core:
     # ---- 알림 판단 ----------------------------------------------------------
     def reminder_due(self, now: datetime | None = None) -> str | None:
         """띄울 알림 문구, 아니면 None. 하루 1번."""
+        if not self.service_on("claude_ai"):
+            return None
         now = now or datetime.now(timezone.utc).astimezone()
-        days = float(self.config.get("reminder_days") or 7)
+        raw = self.config.get("reminder_days", 7)
+        try:
+            days = float(7 if raw is None or isinstance(raw, bool) else raw)
+        except (TypeError, ValueError):
+            days = 7.0
+        if days <= 0:
+            return None                    # reminder_days: 0 = 알림 끔
         last = parse_iso(self.state.get("last_zip_import"))
         base = last or parse_iso(self.state.get("first_run"))
         if base is None:
@@ -527,11 +614,15 @@ class Core:
 
     # ---- 상태 ----------------------------------------------------------
     # ---- 열린 일 큐 ---------------------------------------------------------
-    def _int_cfg(self, key: str, default: int) -> int:
+    def _int_cfg(self, key: str, default: int, lo: int = 1) -> int:
+        v = self.config.get(key)
+        if v is None or isinstance(v, bool) or v == "":
+            return default
         try:
-            return max(1, int(self.config.get(key) or default))
+            n = int(v)
         except (TypeError, ValueError):
             return default
+        return n if n >= lo else default
 
     def queue_filters(self) -> queue.Filters:
         jd = str(self.config.get("journal_dir") or "").strip()
@@ -559,11 +650,12 @@ class Core:
         days = self._int_cfg("queue_days", 14)
         entries = self.read_journal(now, days)
         extra = [i for e in entries for i in e.sessions]
-        docs = queue.load_docs(conn, now - days * queue.DAY, extra)
+        srcs = settings.read_queue_sources(self.config)
+        docs = queue.load_docs(conn, now - days * queue.DAY, extra, srcs)
         with self.lock:
             closed = dict(self.state.get("queue_closed") or {})
-        res = queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters(),
-                            entries)
+        res = queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5, lo=0), self.queue_filters(),
+                            entries, srcs)
         for it in (*res.focus, *res.rest, *res.closed):
             self.attach_summary(it)
         return res
@@ -581,19 +673,40 @@ class Core:
         it.summary_text = str(rec["text"])
         it.summary = ask.headline(it.summary_text)
         it.summary_stale = self.summaries.is_stale(it.id, it.trace_ts)
+        it.summary_model = ask.model_label(str(rec.get("model") or ""))
+
+    @property
+    def ask_provider(self) -> str:
+        return settings.read_provider(self.config)
+
+    def ask_model_label(self, cfg: dict | None = None) -> str:
+        """'claude:haiku', 'codex:gpt-6-luna', 끄기면 빈 문자열."""
+        cfg = cfg or self.config
+        p = settings.read_provider(cfg)
+        if p == "codex":
+            return f"codex:{str(cfg.get('ask_model_codex') or 'gpt-6-luna').strip()}"
+        if p == "claude":
+            return f"claude:{str(cfg.get('ask_model') or 'haiku').strip()}"
+        return ""
 
     def summarize(self, it: queue.QueueItem) -> str:
-        """claude -p로 요약하고 저장한다. 실패하면 ask.AskError. 작업 스레드에서 부른다."""
-        cfg = self.config
-        cmd = cfg.get("ask_command") or ["claude"]
-        if isinstance(cmd, str):
-            cmd = [cmd]
-        model = str(cfg.get("ask_model") or "haiku")
+        """설정한 요약 AI(claude -p 또는 codex exec)로 요약하고 저장한다. 실패하면 ask.AskError. 작업 스레드에서 부른다."""
+        cfg = self.config            # 도중에 설정이 바뀌어도 이 호출은 옛 값으로 끝낸다
+        provider = settings.read_provider(cfg)
         limits = ask.Limits(self._int_cfg("ask_tail_messages", 20), self._int_cfg("ask_max_chars", 12000))
-        text = ask.summarize(it, ask_command=cmd, model=model, limits=limits, cwd=self.ask_dir,
-                             timeout=self._int_cfg("ask_timeout_seconds", 120))
+        timeout = self._int_cfg("ask_timeout_seconds", 120)
+        if provider == "codex":
+            model = str(cfg.get("ask_model_codex") or "gpt-6-luna").strip()
+            cmd = cli_check.resolve("codex", cfg.get("ask_command_codex"))
+            text = ask.summarize(it, ask_command=cmd, model=model, limits=limits, cwd=self.ask_dir, timeout=timeout,
+                                 provider="codex", effort=str(cfg.get("ask_codex_effort") or "low").strip())
+        else:
+            cmd = settings.as_command(cfg.get("ask_command")) or ["claude"]
+            model = str(cfg.get("ask_model") or "haiku").strip()
+            text = ask.summarize(it, ask_command=cmd, model=model, limits=limits, cwd=self.ask_dir, timeout=timeout,
+                                 provider=provider)
         with self.lock:
-            self.summaries.put(it.id, it.trace_ts, text, model)
+            self.summaries.put(it.id, it.trace_ts, text, f"{provider}:{model}")
         return text
 
     def close_item(self, item_id: str, kind: str) -> None:
@@ -619,11 +732,19 @@ class Core:
             self._warn(f"색인 상태 읽기 실패: {e}")
         names = {"claude-ai": "claude.ai 대화", "claude-code": "Claude Code", "claude-ai-project": "프로젝트",
                  "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex"}
-        lines = [
-            f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}",
-            f"마지막 zip 가져오기: {fmt(self.state.get('last_zip_import'))}",
-            f"마지막 Code 수집: {fmt(self.state.get('last_code_collect'))}",
-            self.capture_status_line(),
+        src = self.sources
+        lines = [f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}"]
+        if src["claude_ai"]:
+            lines.append(f"마지막 claude.ai zip 가져오기: {fmt(self.state.get('last_zip_import'))}")
+        if src["claude_code"] or src["codex"]:
+            label = "Claude Code, Codex" if src["claude_code"] and src["codex"] else \
+                ("Claude Code" if src["claude_code"] else "Codex")
+            lines.append(f"마지막 {label} 수집: {fmt(self.state.get('last_code_collect'))}")
+        if src["claude_ai"] or src["chatgpt"]:
+            lines.append(self.capture_status_line())
+        if not any(src.values()):
+            lines.append("쓰는 서비스: 없음 (노트 폴더만 검색)")
+        lines += [
             "대화 수: " + (", ".join(f"{names.get(k, k)} {v}" for k, v in sorted(st['by_source'].items())) or "0"),
             "노트 폴더: " + (", ".join(str(p) for p in self.note_dirs) or "없음"),
             f"색인 크기: {st['size'] / 1_048_576:.1f} MB",
