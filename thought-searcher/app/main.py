@@ -202,11 +202,11 @@ class App:
 
     def _watch_folder(self):
         try:
-            d = str(self.core.watch_dir)
             if self.fs.directories():
                 self.fs.removePaths(self.fs.directories())
-            if os.path.isdir(d):
-                self.fs.addPath(d)
+            for d in (str(self.core.watch_dir), str(self.core.capture_dir)):
+                if os.path.isdir(d):
+                    self.fs.addPath(d)
         except Exception:  # noqa: BLE001
             log.exception("감시 폴더 등록 실패")
 
@@ -248,7 +248,8 @@ class App:
 
     # ---- 진행 표시 ---------------------------------------------------------
     JOB_LABELS = {"collect": "Claude Code, Codex 대화 가져오는 중", "sync": "검색 색인 확인 중", "notes": "노트 폴더 확인 중",
-                  "rebuild-index": "검색 색인 다시 만드는 중", "rebuild-all": "대화 md 다시 만드는 중"}
+                  "rebuild-index": "검색 색인 다시 만드는 중", "rebuild-all": "대화 md 다시 만드는 중",
+                  "capture": "claude.ai 수집 파일 가져오는 중"}
 
     def on_job_started(self, name: str):
         if name.startswith("zip:"):
@@ -276,9 +277,10 @@ class App:
         if self._batch is not None:
             self.notify("이미 가져오는 중입니다. 끝나면 알려 드릴게요.")
             return
-        self._batch = {"names": {"collect", "sync"}, "new": 0, "changed": 0, "zips": 0, "failed": []}
+        self._batch = {"names": {"collect", "sync", "capture"}, "new": 0, "changed": 0, "zips": 0, "failed": []}
         self.worker.submit("sync", lambda: self.core.sync_index(self._progress))   # 직접 넣은 md 반영
         self.worker.submit("collect", self._collect)
+        self.worker.submit("capture", self.core.import_captures)
         n = 0
         now = time.time()
         for p in sorted(self.core.watch_dir.glob("*.zip")):
@@ -332,6 +334,8 @@ class App:
             return
         if self._archive_was_ok is False:
             self.update_archive_state()
+        if "capture" not in self.worker.pending and self.core.pending_captures():
+            self.worker.submit("capture", self.core.import_captures)   # 폴더 감시가 없어도 2초 확인으로 잡힘
         for p in self.poller.poll(self.core.watch_dir):
             self.poller.mark_done(p)
             if self.core.known_zip(p):
@@ -379,9 +383,10 @@ class App:
         b["names"].discard(name)
         if isinstance(result, Exception):
             b["failed"].append(str(result))
-        elif name == "collect" and result is not None:
+        elif name in ("collect", "capture") and result is not None:
             b["new"] += result.new
             b["changed"] += result.changed
+            b["failed"] += list(getattr(result, "failed", []))[:3]
         elif name.startswith("zip:"):
             if result.result == "ok":
                 b["zips"] += 1
@@ -426,6 +431,11 @@ class App:
             self.notify(msg)
         elif name == "sync":
             self.core.index.progress = None
+        elif name == "capture" and result.failed:
+            for f in result.failed[:3]:
+                self.core._warn(f"claude.ai 수집 파일: {f}")
+            self.notify("claude.ai 수집 파일을 읽지 못했습니다: " + "; ".join(result.failed)[:200],
+                        QSystemTrayIcon.Warning)
         if self.window.isVisible():
             self.on_query(self._last_query)
 
@@ -435,6 +445,10 @@ class App:
         if msg:
             self.core.mark_reminded()
             self.notify(msg, kind="reminder")
+            return
+        msg = self.core.capture_notice()
+        if msg:
+            self.notify(msg, QSystemTrayIcon.Warning)
 
     def on_message_clicked(self):
         if self._notice_kind == "reminder":

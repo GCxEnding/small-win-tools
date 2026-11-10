@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from . import ask, codex, collector, queue
 from .journal import JournalReader
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
+from .importers import claude_capture
 from .index import Index
 from .redact import Redactor
 from .store import Store, expand
@@ -51,6 +53,15 @@ class ZipOutcome:
         if c.get("skipped"):
             s += f", 건너뜀 {c['skipped']}"
         return s
+
+
+@dataclass
+class CaptureResult:
+    new: int = 0
+    changed: int = 0
+    not_ready: int = 0
+    failed: list[str] = field(default_factory=list)
+    written: list[Path] = field(default_factory=list)
 
 
 def _now_iso() -> str:
@@ -283,6 +294,141 @@ class Core:
         self.reindex_paths(out.written)
         return out
 
+    # ---- claude.ai 자동 수집 (SPEC-queue.md 3-D, 3-E) ------------------------------
+    @property
+    def capture_dir(self) -> Path:
+        p = expand(str(self.config.get("capture_dir") or ""))
+        return Path(p) if p else self.watch_dir / "claude-sync"
+
+    @property
+    def capture_raw_dir(self) -> Path:
+        return self.store.local / "raw" / "claude-ai-capture"
+
+    def pending_captures(self) -> list[Path]:
+        """처리 기록과 크기나 수정 시각이 다른 수집 파일."""
+        try:
+            files = sorted(self.capture_dir.glob(claude_capture.PATTERN))
+        except OSError:
+            return []
+        out = []
+        with self.lock:
+            seen = self.state.setdefault("capture_files", {})
+            for p in files:
+                try:
+                    st = p.stat()
+                except OSError:
+                    continue
+                rec = seen.get(p.name)
+                if not rec or rec.get("size") != st.st_size or rec.get("mtime") != st.st_mtime:
+                    out.append(p)
+        return out
+
+    def import_captures(self, force: bool = False) -> CaptureResult:
+        """바뀐 수집 파일만 읽어 보관본에 넣는다. 덜 써진 파일은 다음 확인 때 다시 본다. 파일은 지우지 않는다."""
+        res = CaptureResult()
+        if not self.archive_ok():
+            res.failed.append("보관 폴더 없음")
+            return res
+        if force:
+            try:
+                files = sorted(self.capture_dir.glob(claude_capture.PATTERN))
+            except OSError:
+                files = []
+        else:
+            files = self.pending_captures()
+        if not files:
+            return res
+        archive = self.archive()
+        raw = self.capture_raw_dir
+        for p in files:
+            try:
+                st = p.stat()
+                conv = claude_capture.read_capture(p)
+            except claude_capture.NotReady as e:
+                res.not_ready += 1
+                log.info("수집 파일 다음에 다시: %s (%s)", p.name, e)
+                continue
+            except (ImportFailed, OSError) as e:
+                res.failed.append(str(e))
+                log.warning("수집 파일 실패: %s", e)
+                with self.lock:   # 같은 내용으로 계속 실패하지 않게 기록 (파일이 바뀌면 다시 읽음)
+                    self.state["capture_files"][p.name] = {"mtime": st.st_mtime, "size": st.st_size,
+                                                           "updated": "", "error": str(e)[:200]}
+                continue
+            try:
+                raw.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, raw / p.name)
+            except OSError as e:
+                log.warning("수집 원본 복사 실패: %s", e)
+            updated = ""
+            if conv is not None:
+                try:
+                    r = archive.write(conv, status="present", skip_if_older=True)
+                except ArchiveMissing as e:
+                    res.failed.append(str(e))
+                    break
+                updated = conv.updated.isoformat()
+                if r.status == "new":
+                    res.new += 1
+                elif r.status == "changed":
+                    res.changed += 1
+                if r.status in ("new", "changed"):
+                    res.written.append(r.path)
+                    if r.old_path:
+                        res.written.append(r.old_path)
+            with self.lock:
+                self.state["capture_files"][p.name] = {"mtime": st.st_mtime, "size": st.st_size, "updated": updated}
+                self.state["last_capture_import"] = _now_iso()
+        self.save_state()
+        self.reindex_paths(res.written)
+        return res
+
+    def misplaced_captures(self) -> int:
+        """Tampermonkey 다운로드 설정이 기본값이면 하위 폴더 대신 다운로드 폴더 바로 아래에 쌓인다."""
+        try:
+            return sum(1 for _ in self.watch_dir.glob("claude-ai_*.json"))
+        except OSError:
+            return 0
+
+    def capture_notice(self, now: datetime | None = None) -> str | None:
+        """띄울 수집 알림 하나 (멈춤: 하루 한 번, 저장 위치 잘못: 한 번). 띄우면 기록한다."""
+        now = now or datetime.now(timezone.utc)
+        with self.lock:
+            sent = self.state.setdefault("capture_notices", {})
+        if self.misplaced_captures() and not sent.get("misplaced"):
+            with self.lock:
+                sent["misplaced"] = now.isoformat()
+            self.save_state()
+            return ("claude.ai 수집 파일이 다운로드 폴더 바로 아래에 저장되고 있습니다.\n"
+                    "Tampermonkey 다운로드 설정(브라우저 API 모드)을 확인하세요.")
+        status = claude_capture.read_status(self.capture_dir)
+        ok = claude_capture.last_ok(status)
+        if status is None or ok is None:
+            return None     # 한 번도 수집하지 않은 PC에서는 알리지 않음
+        hours = max(1, self._int_cfg("capture_stale_hours", 3))
+        age = (now - ok).total_seconds() / 3600
+        if age < hours:
+            return None
+        last = parse_iso(sent.get("stale"))
+        if last and (now - last).total_seconds() < 24 * 3600:
+            return None
+        with self.lock:
+            sent["stale"] = now.isoformat()
+        self.save_state()
+        err = str(status.get("error") or "")
+        tail = f"마지막 오류: {err[:120]}" if err else "claude.ai 탭이 열려 있는지 확인하세요."
+        return f"claude.ai 자동 수집이 {int(age)}시간째 멈춰 있습니다.\n{tail}"
+
+    def capture_status_line(self) -> str:
+        status = claude_capture.read_status(self.capture_dir)
+        if status is None:
+            return "claude.ai 자동 수집: 없음"
+        ok = claude_capture.last_ok(status)
+        when = ok.astimezone(self.tz).strftime("%m-%d %H:%M") if ok else "없음"
+        n = len(self.state.get("capture_files") or {})
+        err = f", 오류: {status['error']}" if status.get("error") else ""
+        return f"claude.ai 자동 수집: 마지막 성공 {when}, 대화 {n}개{err}"
+
     # ---- Code ---------------------------------------------------------------
     def collect_code(self, force: bool = False, progress=None) -> collector.CollectResult | None:
         if not self.archive_ok():
@@ -330,6 +476,7 @@ class Core:
             else:
                 out["zip_missing"] += 1
         out["code"] = self.collect_code(force=True)
+        out["captures"] = self.import_captures(force=True).new
         self.sync_index()
         return out
 
@@ -469,6 +616,7 @@ class Core:
             f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}",
             f"마지막 zip 가져오기: {fmt(self.state.get('last_zip_import'))}",
             f"마지막 Code 수집: {fmt(self.state.get('last_code_collect'))}",
+            self.capture_status_line(),
             "대화 수: " + (", ".join(f"{names.get(k, k)} {v}" for k, v in sorted(st['by_source'].items())) or "0"),
             "노트 폴더: " + (", ".join(str(p) for p in self.note_dirs) or "없음"),
             f"색인 크기: {st['size'] / 1_048_576:.1f} MB",

@@ -199,8 +199,13 @@
 ## 10. 미결 사항 (구현 전 확인)
 - ~~세션 id를 일지 스킬이 얻는 방법~~ (2026-11-09 확정, Claude Code 2.1.317): Bash 도구 환경 변수 `CLAUDE_CODE_SESSION_ID`가 현재 세션 id(원본 jsonl 파일 이름)와 같고, 서브에이전트의 Bash에서도 메인 세션 id가 나온다. 스킬 본문 치환 `${CLAUDE_SESSION_ID}`도 있다. 스킬이 이 값으로 `[session:: <id>]`를 남기는 방식으로 확정. jsonl에서 일지 Edit/Write를 찾는 대안은 버림(obsidian-log 서브에이전트가 Bash로만 쓰는 경우가 많아 놓침).
 - ~~`claude -p` 옵션~~ (2026-11-09 확정): `claude -p --model haiku --no-session-persistence --tools "" --disable-slash-commands --strict-mcp-config`. `--no-session-persistence`는 세션을 디스크에 저장하지 않고, `--tools ""`는 내장 도구를 모두 끈다. 그래도 전용 작업 폴더 실행과 수집 제외(3-C-4)는 보험으로 둔다. (3단계 구현 때 실제 실행으로 확인: Haiku 응답 약 27초, 세션 jsonl은 남지 않고 작업 폴더 이름의 빈 `memory/` 폴더만 생김) 개인 PC에는 PATH에 `claude`가 없어(npm 전역 설치는 네이티브 바이너리 누락, 데스크톱 번들은 앱 밖에서 로그인 안 됨) 3단계 전에 CLI 설치와 로그인이 필요하다.
-- **claude.ai API 응답 구조**: 대화 목록과 본문 API의 실제 필드가 공식 내보내기 `conversations.json`과 얼마나 같은지. 실제 수집 파일 1~2개로 확인 후 `claude_capture.py`의 맞춤 범위를 정한다.
-- 회사 PC에서 Tampermonkey 설치와 `GM_download` 하위 폴더 저장이 허용되는지(사내 보안 프로그램, 크롬 정책).
+- ~~claude.ai API 응답 구조~~ (2026-11-10 확인, 실제 수집 파일 87개): 대화 본문 API(`tree=True&rendering_mode=messages`)는 내보내기와 필드가 거의 같아 `convert_conversation`을 그대로 쓴다. 다른 점과 맞춤:
+  - `current_leaf_message_uuid`가 있어 지금 보는 가지를 본선으로 삼는다(내보내기 변환도 있으면 쓰게 바꿈).
+  - AI가 만들어 건넨 파일이 메시지 `files`가 아니라 도구 블록 안에만 있다(`present_files` 입력의 `filepaths`, 도구 결과의 `file_deliveries`). 이름을 모아 첨부 줄로 넣는다.
+  - 본문에 내보내기의 `<cite index=...>` 꼬리표가 없다(인용은 `citations`에 따로). 그대로 둔다.
+  - 내보내기가 붙이는 `image-0-0.jpg` 같은 생성 이미지 이름은 API에 없다. 버린다.
+  - 같은 대화 83개 중 65개 본문이 zip 변환과 같았고, 나머지는 위 차이와 zip 이후 이어진 대화였다.
+- 회사 PC에서 Tampermonkey 설치와 `GM_download` 하위 폴더 저장이 허용되는지(사내 보안 프로그램, 크롬 정책). 개인 PC에서는 2026-11-10 Browser API 모드로 `claude-sync/` 하위 폴더 저장 확인.
 - 회사 PC에서 `claude` CLI가 PATH에 있는지.
 
 ## 11. 구현 단계

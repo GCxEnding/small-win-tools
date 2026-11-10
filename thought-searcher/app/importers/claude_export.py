@@ -277,7 +277,8 @@ def convert_conversation(raw: dict) -> Conversation | None:
     has_tree = all("parent_message_uuid" in e[4] for e in entries)
 
     if has_tree:
-        latest = max(entries, key=lambda e: (e[2], e[3]))
+        # 사이트 API 응답(자동 수집)에는 지금 보고 있는 가지의 끝이 있다. 없으면 가장 늦은 메시지
+        latest = by_id.get(str(raw.get("current_leaf_message_uuid") or "")) or max(entries, key=lambda e: (e[2], e[3]))
         path_ids = []
         seen = set()
         cur = latest

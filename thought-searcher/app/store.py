@@ -35,6 +35,8 @@ DEFAULT_CONFIG = {
     "ask_tail_messages": 20,    # 요약 재료: 마지막 메시지 수
     "ask_max_chars": 12000,     # 요약 재료 상한 (넘치면 오래된 쪽부터 자름)
     "ask_timeout_seconds": 120,
+    "capture_dir": "",         # claude.ai 자동 수집 파일 폴더. 비면 <watch_dir>\claude-sync
+    "capture_stale_hours": 3,  # 수집이 이만큼 멈추면 트레이 알림
 }
 
 DEFAULT_STATE = {
@@ -47,6 +49,8 @@ DEFAULT_STATE = {
     "code_files": {},         # 원본 복사 기록: 상대 경로 -> [크기, 수정 시각 ns]
     "code_sessions": {},      # md 변환 기록: 상대 경로 -> [크기, 수정 시각 ns, 원본 있음]
     "queue_closed": {},       # 큐에서 직접 닫은 일: id -> {"kind": "done"|"drop", "at": 시각}
+    "capture_files": {},      # claude.ai 수집 파일: 파일 이름 -> {"mtime", "size", "updated"}
+    "capture_notices": {},    # 수집 관련 알림을 마지막으로 띄운 시각: 종류 -> ISO
 }
 
 
