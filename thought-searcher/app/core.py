@@ -307,7 +307,7 @@ class Core:
     def pending_captures(self) -> list[Path]:
         """처리 기록과 크기나 수정 시각이 다른 수집 파일."""
         try:
-            files = sorted(self.capture_dir.glob(claude_capture.PATTERN))
+            files = claude_capture.capture_files(self.capture_dir)
         except OSError:
             return []
         out = []
@@ -331,7 +331,7 @@ class Core:
             return res
         if force:
             try:
-                files = sorted(self.capture_dir.glob(claude_capture.PATTERN))
+                files = claude_capture.capture_files(self.capture_dir)
             except OSError:
                 files = []
         else:
@@ -386,12 +386,12 @@ class Core:
     def misplaced_captures(self) -> int:
         """Tampermonkey 다운로드 설정이 기본값이면 하위 폴더 대신 다운로드 폴더 바로 아래에 쌓인다."""
         try:
-            return sum(1 for _ in self.watch_dir.glob("claude-ai_*.json"))
+            return len(claude_capture.capture_files(self.watch_dir))
         except OSError:
             return 0
 
     def capture_notice(self, now: datetime | None = None) -> str | None:
-        """띄울 수집 알림 하나 (멈춤: 하루 한 번, 저장 위치 잘못: 한 번). 띄우면 기록한다."""
+        """띄울 수집 알림 하나 (멈춤: 사이트마다 하루 한 번, 저장 위치 잘못: 한 번). 띄우면 기록한다."""
         now = now or datetime.now(timezone.utc)
         with self.lock:
             sent = self.state.setdefault("capture_notices", {})
@@ -399,35 +399,42 @@ class Core:
             with self.lock:
                 sent["misplaced"] = now.isoformat()
             self.save_state()
-            return ("claude.ai 수집 파일이 다운로드 폴더 바로 아래에 저장되고 있습니다.\n"
+            return ("자동 수집 파일이 다운로드 폴더 바로 아래에 저장되고 있습니다.\n"
                     "Tampermonkey 다운로드 설정(브라우저 API 모드)을 확인하세요.")
-        status = claude_capture.read_status(self.capture_dir)
-        ok = claude_capture.last_ok(status)
-        if status is None or ok is None:
-            return None     # 한 번도 수집하지 않은 PC에서는 알리지 않음
         hours = max(1, self._int_cfg("capture_stale_hours", 3))
-        age = (now - ok).total_seconds() / 3600
-        if age < hours:
-            return None
-        last = parse_iso(sent.get("stale"))
-        if last and (now - last).total_seconds() < 24 * 3600:
-            return None
-        with self.lock:
-            sent["stale"] = now.isoformat()
-        self.save_state()
-        err = str(status.get("error") or "")
-        tail = f"마지막 오류: {err[:120]}" if err else "claude.ai 탭이 열려 있는지 확인하세요."
-        return f"claude.ai 자동 수집이 {int(age)}시간째 멈춰 있습니다.\n{tail}"
+        for site, label in claude_capture.SITE_LABEL.items():
+            status = claude_capture.read_status(self.capture_dir, site)
+            ok = claude_capture.last_ok(status)
+            if status is None or ok is None:
+                continue     # 이 사이트를 한 번도 수집하지 않은 PC에서는 알리지 않음
+            age = (now - ok).total_seconds() / 3600
+            if age < hours:
+                continue
+            key = "stale" if site == "claude-ai" else f"stale:{site}"
+            last = parse_iso(sent.get(key))
+            if last and (now - last).total_seconds() < 24 * 3600:
+                continue
+            with self.lock:
+                sent[key] = now.isoformat()
+            self.save_state()
+            err = str(status.get("error") or "")
+            tail = f"마지막 오류: {err[:120]}" if err else f"{label} 탭이 열려 있는지 확인하세요."
+            return f"{label} 자동 수집이 {int(age)}시간째 멈춰 있습니다.\n{tail}"
+        return None
 
     def capture_status_line(self) -> str:
-        status = claude_capture.read_status(self.capture_dir)
-        if status is None:
-            return "claude.ai 자동 수집: 없음"
-        ok = claude_capture.last_ok(status)
-        when = ok.astimezone(self.tz).strftime("%m-%d %H:%M") if ok else "없음"
-        n = len(self.state.get("capture_files") or {})
-        err = f", 오류: {status['error']}" if status.get("error") else ""
-        return f"claude.ai 자동 수집: 마지막 성공 {when}, 대화 {n}개{err}"
+        lines = []
+        names = list(self.state.get("capture_files") or {})
+        for site, label in claude_capture.SITE_LABEL.items():
+            status = claude_capture.read_status(self.capture_dir, site)
+            if status is None:
+                continue
+            ok = claude_capture.last_ok(status)
+            when = ok.astimezone(self.tz).strftime("%m-%d %H:%M") if ok else "없음"
+            n = sum(1 for x in names if claude_capture.site_of(x) == site)
+            err = f", 오류: {status['error']}" if status.get("error") else ""
+            lines.append(f"{label} 자동 수집: 마지막 성공 {when}, 대화 {n}개{err}")
+        return "\n".join(lines) or "자동 수집: 없음"
 
     # ---- Code ---------------------------------------------------------------
     def collect_code(self, force: bool = False, progress=None) -> collector.CollectResult | None:

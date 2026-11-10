@@ -1,4 +1,4 @@
-"""claude.ai 자동 수집 파일 가져오기 (SPEC-queue.md 3-D).
+"""claude.ai, ChatGPT 자동 수집 파일 가져오기 (SPEC-queue.md 3-D).
 
 Tampermonkey 스크립트(userscript/claude-sync.user.js)가 다운로드 폴더의 claude-sync/ 에
 대화 하나당 claude-ai_<uuid>.json 하나를 덮어쓴다. 형식:
@@ -6,6 +6,10 @@ Tampermonkey 스크립트(userscript/claude-sync.user.js)가 다운로드 폴더
    "project": 이름 또는 null, "data": 대화 본문 API 응답 그대로}
 data는 내보내기 conversations.json의 대화 하나와 거의 같아서 claude_export.convert_conversation을 그대로 쓴다
 (2026-11-10 실제 수집 파일로 확인: chat_messages, parent_message_uuid, content 블록이 같음).
+
+ChatGPT는 userscript/chatgpt-sync.user.js가 같은 폴더에 chatgpt_<id>.json (site "chatgpt")으로 저장한다.
+data는 대화 본문 API(/backend-api/conversation/<id>) 응답이고, 내보내기 conversations.json의 대화 하나와
+같은 mapping 트리라 chatgpt.convert_conversation을 쓴다. 시각이 ISO 문자열로 오면 숫자로 바꿔 넘긴다.
 """
 from __future__ import annotations
 
@@ -16,12 +20,26 @@ from pathlib import Path
 from ..model import Conversation
 from ..timeutil import parse_iso
 from .base import ImportFailed
+from . import chatgpt
 from .claude_export import convert_conversation
 
 FORMAT = "thought-searcher.capture/1"
 STATUS_FORMAT = "thought-searcher.capture-status/1"
-PATTERN = "claude-ai_*.json"
-STATUS_NAME = "_status.json"
+PATTERNS = ("claude-ai_*.json", "chatgpt_*.json")
+STATUS_NAMES = {"claude-ai": "_status.json", "chatgpt": "_status_chatgpt.json"}
+SITE_LABEL = {"claude-ai": "claude.ai", "chatgpt": "ChatGPT"}
+STATUS_NAME = STATUS_NAMES["claude-ai"]
+
+
+def capture_files(folder: Path) -> list[Path]:
+    out: list[Path] = []
+    for pat in PATTERNS:
+        out += Path(folder).glob(pat)
+    return sorted(out)
+
+
+def site_of(name: str) -> str:
+    return "chatgpt" if name.startswith("chatgpt_") else "claude-ai"
 
 
 class NotReady(Exception):
@@ -71,16 +89,41 @@ def _fill_files(data: dict) -> dict:
     return {**data, "chat_messages": msgs}
 
 
+def _epoch(v):
+    if isinstance(v, str):
+        dt = parse_iso(v)
+        return dt.timestamp() if dt else None
+    return v
+
+
+def _chatgpt_data(data: dict) -> dict:
+    """API 응답의 시각이 ISO 문자열이면 내보내기처럼 숫자(초)로."""
+    out = {**data, "create_time": _epoch(data.get("create_time")), "update_time": _epoch(data.get("update_time"))}
+    mapping = {}
+    for nid, node in (data.get("mapping") or {}).items():
+        msg = (node or {}).get("message")
+        if isinstance(msg, dict) and isinstance(msg.get("create_time"), str):
+            node = {**node, "message": {**msg, "create_time": _epoch(msg["create_time"])}}
+        mapping[nid] = node
+    out["mapping"] = mapping
+    return out
+
+
 def read_capture(path: Path) -> Conversation | None:
     """수집 파일 하나를 대화로. 메시지가 없으면 None. 형식이 다르면 ImportFailed, 덜 써졌으면 NotReady."""
     d = _load(path)
-    if not isinstance(d, dict) or d.get("format") != FORMAT or d.get("site") != "claude-ai":
+    site = d.get("site") if isinstance(d, dict) else None
+    if not isinstance(d, dict) or d.get("format") != FORMAT or site not in STATUS_NAMES:
         raise ImportFailed(f"수집 파일 형식이 아님: {Path(path).name}")
     data = d.get("data")
-    if not isinstance(data, dict) or not data.get("uuid"):
+    ok = isinstance(data, dict) and (data.get("uuid") if site == "claude-ai" else isinstance(data.get("mapping"), dict))
+    if not ok:
         raise ImportFailed(f"대화 본문이 없음: {Path(path).name}")
     try:
-        conv = convert_conversation(_fill_files(data))
+        if site == "chatgpt":
+            conv = chatgpt.convert_conversation(_chatgpt_data(data))
+        else:
+            conv = convert_conversation(_fill_files(data))
     except (KeyError, ValueError, TypeError) as e:
         raise ImportFailed(f"{Path(path).name}: {e}") from e
     if conv is not None:
@@ -90,10 +133,10 @@ def read_capture(path: Path) -> Conversation | None:
     return conv
 
 
-def read_status(folder: Path) -> dict | None:
-    """스크립트가 남긴 _status.json. 없거나 깨졌거나 형식이 다르면 None."""
+def read_status(folder: Path, site: str = "claude-ai") -> dict | None:
+    """스크립트가 남긴 상태 파일. 없거나 깨졌거나 형식이 다르면 None."""
     try:
-        d = _load(Path(folder) / STATUS_NAME)
+        d = _load(Path(folder) / STATUS_NAMES[site])
     except NotReady:
         return None
     if not isinstance(d, dict) or d.get("format") != STATUS_FORMAT:

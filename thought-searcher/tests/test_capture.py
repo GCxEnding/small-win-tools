@@ -140,7 +140,7 @@ def test_status_line_and_stale_notice(cap):
     core, d = cap
     now = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
     assert core.capture_notice(now) is None                 # 수집한 적 없는 PC
-    assert core.capture_status_line() == "claude.ai 자동 수집: 없음"
+    assert core.capture_status_line() == "자동 수집: 없음"
     write_status(d, (now - timedelta(hours=1)).isoformat())
     assert core.capture_notice(now) is None
     assert "마지막 성공" in core.capture_status_line()
@@ -176,3 +176,72 @@ def test_files_made_by_ai_become_attachments(tmp_path):
     assert text.splitlines()[0] == "파일 드립니다"
     assert [ln for ln in text.splitlines() if ln.startswith("📎")] == [
         "📎 첨부: 이미있음.png", "📎 첨부: a.md", "📎 첨부: 독후감.md"]
+
+
+# ---- ChatGPT ----------------------------------------------------------------
+def gpt_data(cid="g1", title="GPT 대화", update_time=1794283200.0, iso=False):
+    def node(nid, parent, role, text, t, children):
+        return {"id": nid, "parent": parent, "children": children,
+                "message": None if role is None else {
+                    "id": nid, "author": {"role": role}, "create_time": t, "recipient": "all",
+                    "content": {"content_type": "text", "parts": [text]}, "metadata": {}}}
+    t0 = 1794280000.0
+    mapping = {
+        "root": node("root", None, None, "", None, ["u1"]),
+        "u1": node("u1", "root", "user", "GPT 질문", t0, ["a1", "a2"]),
+        "a1": node("a1", "u1", "assistant", "옛 답", t0 + 10, []),
+        "a2": node("a2", "u1", "assistant", "새 답", t0 + 20, []),
+    }
+    d = {"conversation_id": cid, "title": title, "create_time": t0, "update_time": update_time,
+         "current_node": "a2", "mapping": mapping}
+    if iso:   # 응답 시각이 문자열로 와도 받는다
+        d["create_time"] = "2026-11-10T00:00:00.000000Z"
+        d["update_time"] = "2026-11-10T01:00:00.000000Z"
+        for n in mapping.values():
+            if n["message"]:
+                n["message"]["create_time"] = "2026-11-10T00:00:10Z"
+    return d
+
+
+def write_gpt(folder, data):
+    folder.mkdir(parents=True, exist_ok=True)
+    p = folder / f"chatgpt_{data['conversation_id']}.json"
+    p.write_text(json.dumps({"format": cc.FORMAT, "site": "chatgpt", "captured_at": "2026-11-10T01:00:00Z",
+                             "project": None, "data": data}, ensure_ascii=False), encoding="utf-8")
+    return p
+
+
+@pytest.mark.parametrize("iso", [False, True])
+def test_read_chatgpt_capture(tmp_path, iso):
+    conv = cc.read_capture(write_gpt(tmp_path, gpt_data(iso=iso)))
+    assert conv.conv_id == "chatgpt:g1" and conv.source == "chatgpt" and conv.title == "GPT 대화"
+    assert [m.text for m in conv.messages if m.on_main_branch] == ["GPT 질문", "새 답"]
+    assert [m.text for m in conv.messages if not m.on_main_branch] == ["옛 답"]
+    if iso:
+        assert conv.updated == datetime(2026, 11, 10, 1, 0, tzinfo=timezone.utc)
+
+
+def test_chatgpt_capture_without_mapping_fails(tmp_path):
+    d = gpt_data()
+    del d["mapping"]
+    with pytest.raises(ImportFailed):
+        cc.read_capture(write_gpt(tmp_path, d))
+
+
+def test_core_imports_both_sites_and_reports_each(cap):
+    core, d = cap
+    write_capture(d, conv_data())
+    write_gpt(d, gpt_data())
+    r = core.import_captures()
+    assert r.new == 2 and core.archive().find("chatgpt:g1") is not None
+    now = datetime(2026, 11, 10, 12, 0, tzinfo=timezone.utc)
+    write_status(d, (now - timedelta(minutes=10)).isoformat())
+    (d / "_status_chatgpt.json").write_text(json.dumps({
+        "format": cc.STATUS_FORMAT, "site": "chatgpt", "last_ok": (now - timedelta(hours=4)).isoformat(),
+        "error": None}), encoding="utf-8")
+    lines = core.capture_status_line().splitlines()
+    assert lines[0].startswith("claude.ai 자동 수집") and "대화 1개" in lines[0]
+    assert lines[1].startswith("ChatGPT 자동 수집") and "대화 1개" in lines[1]
+    msg_ = core.capture_notice(now)
+    assert msg_.startswith("ChatGPT 자동 수집이 4시간째") and "ChatGPT 탭" in msg_
+    assert core.capture_notice(now) is None

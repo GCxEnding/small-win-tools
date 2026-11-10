@@ -99,7 +99,7 @@ python -m app.cli search 로그 배포
 
 (`import <zip>`, `collect`, `reindex`, `rebuild-index`, `rebuild`, `status`도 있습니다.)
 
-## claude.ai 자동 수집 (Tampermonkey)
+## claude.ai, ChatGPT 자동 수집 (Tampermonkey)
 zip 내보내기를 기다리지 않고, claude.ai 탭이 열려 있는 동안 30분마다 바뀐 대화만 받아 둡니다. 주로 계속 켜 두는 PC용입니다.
 앱은 받은 파일을 2초마다 확인해 바뀐 것만 보관 폴더에 넣습니다(파일은 지우지 않음). 프로젝트 문서와 메모리는 여전히 zip으로만 들어오므로 주간 내보내기 알림은 그대로 뜹니다.
 
@@ -110,10 +110,10 @@ zip 내보내기를 기다리지 않고, claude.ai 탭이 열려 있는 동안 3
    - 처음 저장할 때 크롬이 다운로드 권한을 물으면 허용합니다.
 3. 크롬 설정 > 다운로드 > "다운로드 전에 각 파일의 저장 위치 확인"을 끕니다.
 4. 크롬 설정 > 성능 > 메모리 절약 모드를 쓰면 `claude.ai`를 "항상 활성 상태로 유지할 사이트"에 넣습니다.
-5. Tampermonkey 대시보드 > 새 스크립트에 `userscript/claude-sync.user.js` 내용을 붙여 넣고 저장합니다.
+5. Tampermonkey 대시보드 > 새 스크립트에 `userscript/claude-sync.user.js` 내용을 붙여 넣고 저장합니다. ChatGPT도 받으려면 `userscript/chatgpt-sync.user.js`를 같은 방법으로 하나 더 넣습니다.
 6. claude.ai를 열면 15초 뒤 첫 수집이 돕니다. 확장 아이콘의 스크립트 메뉴에서 `지금 수집`, `상태 보기`를 쓸 수 있습니다.
 
-저장 위치는 다운로드 폴더의 `claude-sync\`입니다. 대화 하나가 `claude-ai_<uuid>.json` 파일 하나이고, 돌 때마다 `_status.json`이 갱신됩니다.
+저장 위치는 둘 다 다운로드 폴더의 `claude-sync\`입니다. 대화 하나가 파일 하나(`claude-ai_<uuid>.json`, `chatgpt_<id>.json`)이고, 돌 때마다 `_status.json`(claude.ai), `_status_chatgpt.json`(ChatGPT)이 갱신됩니다. ChatGPT 대화는 프로젝트 이름 없이 들어옵니다.
 첫 실행에서는 전체 대화를 50개씩 나눠 받습니다(3분 간격으로 이어 받음).
 파일이 `claude-sync\` 대신 다운로드 폴더 바로 아래 `claude-ai_... (1).json`처럼 쌓이면 2번 설정(브라우저 API 모드)을 다시 확인하세요. 앱도 한 번 알려 줍니다.
 수집이 3시간 넘게 멈추면(탭을 닫았거나 로그아웃) 하루 한 번 트레이 알림이 뜹니다. 상태 보기에 마지막 성공 시각이 나옵니다.

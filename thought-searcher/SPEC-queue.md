@@ -93,6 +93,7 @@
 6. 실패(`claude` 없음, 로그인 안 됨, 시간 초과, 오류 종료): 항목 아래에 사유 한 줄 + 트레이 알림. 재료는 그대로 버린다.
 
 ### D. claude.ai 자동 수집
+> 2026-11-10 추가: ChatGPT도 같은 방식(`userscript/chatgpt-sync.user.js`, `chatgpt_<id>.json`, `_status_chatgpt.json`). 로그인 토큰은 `/api/auth/session`, 목록은 `/backend-api/conversations?order=updated`, 본문은 `/backend-api/conversation/<id>`(내보내기와 같은 mapping 트리). 멈춤 알림과 상태 줄은 사이트마다 따로. 실제 ChatGPT 응답으로는 아직 확인하지 않음.
 1. **스크립트**: `thought-searcher/userscript/claude-sync.user.js`. 사용자가 Tampermonkey에 붙여 넣어 설치한다. `@match https://claude.ai/*`, `@grant GM_download GM_getValue GM_setValue GM_notification`.
 2. **주기**: 페이지가 열려 있는 동안 `sync_minutes`(기본 30)분마다, 그리고 페이지를 연 직후 한 번. 여러 탭이 열려 있으면 하나만 돈다(`GM_setValue`의 잠금 + 시각).
 3. **바뀐 대화 찾기**: 조직 id를 얻고, 대화 목록 API를 최근 수정 순으로 훑으며 `updated_at`을 `GM_getValue("seen")`의 `{uuid: updated_at}`과 비교한다. 이미 본 값보다 오래된 대화가 연속으로 나오면 훑기를 멈춘다.
