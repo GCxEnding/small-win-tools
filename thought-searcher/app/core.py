@@ -60,6 +60,7 @@ class CaptureResult:
     new: int = 0
     changed: int = 0
     not_ready: int = 0
+    removed: int = 0              # 수집 제외로 지운 md
     failed: list[str] = field(default_factory=list)
     written: list[Path] = field(default_factory=list)
 
@@ -309,8 +310,14 @@ class Core:
                 counts["skipped"] += 1
                 log.warning(msg)
 
+            ex = self.capture_exclude if imp.name == "claude-ai" else None
             for conv in imp.iter_conversations(path, on_skip):
                 seen.add(conv.conv_id)
+                if ex:
+                    conv = self._drop_excluded(conv, ex)
+                    if conv is None:
+                        counts["excluded"] = counts.get("excluded", 0) + 1
+                        continue
                 r = archive.write(conv, status="present", skip_if_older=True)
                 counts[r.status] += 1
                 if r.status in ("new", "changed"):
@@ -381,6 +388,8 @@ class Core:
         if not self.archive_ok():
             res.failed.append("보관 폴더 없음")
             return res
+        if self.site_on("claude-ai") and (force or self.exclusions_pending()):
+            res.removed = len(self.apply_exclusions())
         if force:
             try:
                 files = self._capture_files(self.capture_dir)
@@ -392,7 +401,14 @@ class Core:
             return res
         archive = self.archive()
         raw = self.capture_raw_dir
+        ex = self.capture_exclude
         for p in files:
+            if claude_capture.capture_uuid(p.name) in ex.conversations:
+                try:
+                    p.unlink()                 # 뺀 대화: 가져오지 않고 다운로드 폴더에서도 지운다
+                except OSError as e:
+                    log.warning("뺀 대화 수집 파일을 지우지 못함 %s: %s", p.name, e)
+                continue
             try:
                 st = p.stat()
                 conv = claude_capture.read_capture(p)
@@ -507,6 +523,85 @@ class Core:
             err = f", 오류: {status['error']}" if status.get("error") else ""
             lines.append(f"{label} 자동 수집: 마지막 성공 {when}, 대화 {n}개{err}")
         return "\n".join(lines) or "자동 수집: 없음"
+
+    # ---- 수집 제외 (claude.ai, Tampermonkey 메뉴에서 뺀 대화와 프로젝트) -------------------------
+    def _status_sig(self) -> list | None:
+        try:
+            st = (self.capture_dir / claude_capture.STATUS_NAME).stat()
+        except OSError:
+            return None
+        return [st.st_mtime, st.st_size]
+
+    def exclusions_pending(self) -> bool:
+        """상태 파일이 바뀌어 제외 목록을 다시 볼 때가 됐는지 (2초 확인용, 파일 stat만)."""
+        if not self.site_on("claude-ai"):
+            return False
+        sig = self._status_sig()
+        with self.lock:
+            return sig is not None and sig != self.state.get("capture_exclude_sig")
+
+    @property
+    def capture_exclude(self) -> claude_capture.Exclude:
+        """지금 제외 목록. 상태 파일이 없거나 예전 형식이면 마지막으로 읽은 목록을 쓴다(state.json에 보관)."""
+        ex = claude_capture.read_exclude(claude_capture.read_status(self.capture_dir, "claude-ai"))
+        if ex is not None:
+            return ex
+        with self.lock:
+            return claude_capture.Exclude.from_json(self.state.get("capture_exclude"))
+
+    def apply_exclusions(self) -> list[Path]:
+        """제외 목록에 든 대화의 기존 흔적을 지운다: 보관 md(대화, 프로젝트 문서), 다운로드 폴더의 수집 파일과
+        앱의 원본 사본, 요약, 큐 닫기 기록. 지운 md 경로(색인 갱신용)를 돌려준다."""
+        sig = self._status_sig()
+        ex = self.capture_exclude
+        with self.lock:
+            self.state["capture_exclude"] = ex.to_json()
+            self.state["capture_exclude_sig"] = sig
+        removed: list[Path] = []
+        if ex and self.archive_ok():
+            archive = self.archive()
+            ids = [f"claude-ai:{u}" for u in ex.conversations] + [f"claude-ai-project:{u}" for u in ex.projects]
+            for cid in ids:
+                p = archive.find(cid)
+                if p is None:
+                    continue
+                try:
+                    p.unlink()
+                    removed.append(p)
+                except OSError as e:
+                    log.warning("뺀 대화 md를 지우지 못함 %s: %s", p, e)
+            for u in ex.conversations:
+                for folder in (self.capture_dir, self.watch_dir, self.capture_raw_dir):
+                    try:
+                        (folder / f"claude-ai_{u}.json").unlink(missing_ok=True)
+                    except OSError as e:
+                        log.warning("뺀 대화 수집 파일을 지우지 못함 %s: %s", u, e)
+            with self.lock:
+                closed = self.state.setdefault("queue_closed", {})
+                for cid in ids:
+                    closed.pop(cid, None)
+                for u in ex.conversations:
+                    self.state.setdefault("capture_files", {}).pop(f"claude-ai_{u}.json", None)
+                self.summaries.drop(ids)
+        self.save_state()
+        if removed:
+            log.info("수집 제외로 md %d개를 지움", len(removed))
+            self.reindex_paths(removed)
+        return removed
+
+    @staticmethod
+    def _drop_excluded(conv, ex: claude_capture.Exclude):
+        """zip에서 읽은 claude.ai 항목 하나를 제외 목록으로 거른다. 빼면 None, 메모리는 뺀 프로젝트 메모리만 지운다."""
+        source, _, native = conv.conv_id.partition(":")
+        if source == "claude-ai" and native in ex.conversations:
+            return None
+        if source == "claude-ai-project" and native in ex.projects:
+            return None
+        if source == "claude-ai-memory" and ex.projects:
+            # 프로젝트 메모리 항목은 native_id가 'project:<uuid>' (claude_export.convert_memory)
+            conv.messages = [m for m in conv.messages
+                             if not (m.native_id.startswith("project:") and m.native_id[8:] in ex.projects)]
+        return conv
 
     # ---- Code ---------------------------------------------------------------
     def collect_code(self, force: bool = False, progress=None) -> collector.CollectResult | None:

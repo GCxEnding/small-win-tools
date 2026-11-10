@@ -38,12 +38,14 @@ DEFAULT_CONFIG = {
     "capture_dir": "",         # claude.ai 자동 수집 파일 폴더. 비면 <watch_dir>\claude-sync
     "capture_stale_hours": 3,  # 수집이 이만큼 멈추면 트레이 알림
     # 설정 창 확장 (SPEC-settings.md 3-H). 기본값은 예전 동작 그대로
-    "sources": {"claude_ai": True, "chatgpt": True, "claude_code": True, "codex": True},   # 쓰는 서비스
+    "sources": {"claude_ai": True, "claude_code": True, "chatgpt": True, "codex": True},   # 쓰는 서비스
     "queue_sources": ["claude-ai", "claude-code", "note"],   # 큐에 올릴 출처
     "ask_provider": "claude",       # F2 요약 AI: "claude" | "codex" | "off"
     "ask_model_codex": "gpt-6-luna",
     "ask_codex_effort": "low",
     "ask_command_codex": [],        # 비면 PATH의 codex, 그다음 Codex 데스크톱 앱 번들
+    "theme_mode": "system",         # 화면 모드: "light" | "dark" | "system"
+    "theme_accent": "ink_blue",     # 강조색: ink_blue | deep_teal | sage_green | rust (색 값은 theme.py)
     "setup_done": False,            # 시작 안내를 마쳤거나 건너뜀 (판정은 '시작 때 config.json이 없었음')
 }
 

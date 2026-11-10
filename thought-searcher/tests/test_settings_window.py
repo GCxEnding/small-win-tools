@@ -18,8 +18,9 @@ def qt(monkeypatch):
     from app import settings_window as sw
     monkeypatch.setattr(sw.cli_check, "check", lambda p, c=None, **k: cli_check.CliStatus("ready", f"준비됨: {p}"))
     asked = []
-    monkeypatch.setattr(sw.QMessageBox, "question", lambda *a, **k: (asked.append(a[2]), sw.QMessageBox.StandardButton.Yes)[1])
-    monkeypatch.setattr(sw.QMessageBox, "warning", lambda *a, **k: (asked.append(a[2]), sw.QMessageBox.StandardButton.Yes)[1])
+    # 확인 창은 실제로 띄우지 않고 강조 단추(보통 '예' 쪽)를 고른 것으로 한다
+    monkeypatch.setattr(sw, "ask", lambda parent, title, text, buttons, primary=None:
+                        (asked.append(text), primary or buttons[-1][0])[1])
     yield app, sw, asked
     app.processEvents()
 
@@ -39,7 +40,10 @@ def test_open_shows_current_values_and_is_clean(qt, core_env):
     assert not w.dirty() and w.windowTitle() == sw.TITLE and not w.btn_save.isEnabled()
     assert w.build_new() == core_env.config
     assert w.collect()["archive_dir"] == core_env.config["archive_dir"]
-    assert w.tabs.count() == 4 and [w.tabs.tabText(i) for i in range(4)] == ["일반", "수집", "요약 AI", "고급"]
+    assert [b.text() for b in w.nav_buttons] == ["일반", "수집", "요약 AI", "고급"] and w.stack.count() == 4
+    assert w.current_tab() == "general" and w.nav_buttons[0].isChecked()
+    w.select_tab("advanced")
+    assert w.stack.currentIndex() == 3 and w.nav_buttons[3].isChecked() and not w.nav_buttons[0].isChecked()
     w.close()
 
 
@@ -60,9 +64,9 @@ def test_errors_block_save_and_jump_to_tab(qt, core_env, tmp_path):
     _app, sw, _ = qt
     w, calls = make(sw, core_env)
     w._io["watch_dir"][0](str(tmp_path / "없는 폴더"))
-    w.tabs.setCurrentIndex(0)
+    w.select_tab("general")
     assert not w.save()
-    assert S.TABS[w.tabs.currentIndex()] == "collect"
+    assert w.current_tab() == "collect" and w.nav_buttons[1].isChecked()
     assert "폴더가 없습니다" in w._notes["watch_dir"].text() and calls["applied"] == []
     w._done = True
     w.close()
@@ -116,14 +120,11 @@ def test_external_change_reload(qt, core_env, monkeypatch):
     core.store.config_path.write_text(json.dumps(data), encoding="utf-8")
     os.utime(core.store.config_path, ns=(1, 1))
     w._io["queue_days"][0](8)
-    clicked = {}
-
-    def fake_exec(box):
-        clicked["b"] = next(b for b in box.buttons() if b.text() == "다시 읽기")
-        return 0
-    monkeypatch.setattr(sw.QMessageBox, "exec", fake_exec)
-    monkeypatch.setattr(sw.QMessageBox, "clickedButton", lambda box: clicked["b"])
+    choices = []
+    monkeypatch.setattr(sw, "ask", lambda parent, title, text, buttons, primary=None:
+                        (choices.append([k for k, _ in buttons]), "reload")[1])
     assert not w.save()
+    assert choices == [["cancel", "reload", "over"]]
     assert core.config["max_results"] == 99 and w.collect()["max_results"] == 99
     assert calls["applied"] and "max_results" in calls["applied"][0]
     assert w.collect()["queue_days"] == core.config["queue_days"]     # 다시 읽으면 화면 값도 파일 값으로
@@ -190,3 +191,72 @@ def test_wheel_without_focus_does_not_change_numbers(qt, core_env):
         assert sp.value() != before
     w._done = True
     w.close()
+
+
+def test_regex_box_and_number_units(qt, core_env):
+    _app, sw, _ = qt
+    w, _ = make(sw, core_env)
+    w.redact.setPlainText("  foo\\d+ \n\n bar \n")
+    assert w._io["extra_redact_patterns"][1]() == ["foo\\d+", "bar"]
+    w._io["extra_redact_patterns"][0](["a", "b"])
+    assert w.redact.toPlainText() == "a\nb"
+    from PySide6.QtWidgets import QAbstractSpinBox
+    sp = w.weight_spins["recency_half_life_days"]
+    assert sp.buttonSymbols() == QAbstractSpinBox.NoButtons and sp.parentWidget().unit.text() == "일"
+    w._done = True
+    w.close()
+
+
+def test_theme_preview_and_save(qt, core_env):
+    _app, sw, _ = qt
+    core = core_env
+    w, calls = make(sw, core)
+    assert w._io["theme_mode"][1]() == "system" and w._io["theme_accent"][1]() == "ink_blue"
+    w._io["theme_mode"][0]("dark")
+    w._io["theme_accent"][0]("rust")
+    w._preview_theme()
+    assert w.t.dark and w.t.accent.name() == "#e0a487"                # 저장 전에 창에 먼저 칠함
+    assert core.config["theme_mode"] == "system"
+    w._on_changed()
+    assert w.save()
+    saved = json.loads(core.store.config_path.read_text(encoding="utf-8"))
+    assert saved["theme_mode"] == "dark" and saved["theme_accent"] == "rust"
+    assert calls["applied"] == [{"theme_mode", "theme_accent"}]
+
+
+def test_setup_window_uses_theme(qt, tmp_path, monkeypatch):
+    _app, sw, _ = qt
+    from app.core import Core
+    from app.store import Store
+    core = Core(Store(tmp_path / "roam", tmp_path / "local"), create_config=False)
+    w, _ = make(sw, core, setup=True)
+    assert "QPushButton#primary" in w.styleSheet() and w.btn_next.objectName() == "primary"
+    w._done = True
+    w.close()
+
+
+def test_confirm_dialog_is_themed_korean_and_silent(qt, core_env):
+    _app, sw, _ = qt
+    w, _ = make(sw, core_env)
+    d = sw.Confirm(w, sw.TITLE, "저장할까요?", [("back", "돌아가기"), ("save", "저장")], "save")
+    from PySide6.QtWidgets import QMessageBox, QPushButton
+    assert not isinstance(d, QMessageBox)                         # QMessageBox는 Windows 알림 소리를 낸다
+    texts = {b.text(): b.objectName() for b in d.findChildren(QPushButton)}
+    assert texts == {"돌아가기": "secondary", "저장": "primary"}
+    assert d.t is w.t and "QPushButton#primary" in d.styleSheet()
+    d.close()
+    w._done = True
+    w.close()
+
+
+def test_missing_cli_does_not_block_save(qt, core_env):
+    _app, sw, asked = qt
+    w, _ = make(sw, core_env)
+    w._cli_status["claude"] = cli_check.CliStatus("missing", "찾지 못함")
+    w._io["queue_days"][0](9)
+    assert w.save() and not any("CLI" in a for a in asked)
+
+
+def test_services_listed_by_company():
+    assert list(S.SERVICE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex"]
+    assert list(S.QUEUE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex", "노트"]

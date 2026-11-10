@@ -20,11 +20,12 @@ TABS = ("general", "collect", "ask", "advanced")
 TAB_LABEL = {"general": "일반", "collect": "수집", "ask": "요약 AI", "advanced": "고급"}
 
 # ---- 쓰는 서비스와 큐 출처 ------------------------------------------------------
-SERVICES = ("claude_ai", "chatgpt", "claude_code", "codex")
-SERVICE_LABEL = {"claude_ai": "claude.ai", "chatgpt": "ChatGPT", "claude_code": "Claude Code", "codex": "Codex"}
-SERVICE_SOURCE = {"claude_ai": "claude-ai", "chatgpt": "chatgpt", "claude_code": "claude-code", "codex": "codex"}
-QUEUE_CHOICES = ("claude-ai", "chatgpt", "claude-code", "codex", "note")
-QUEUE_LABEL = {"claude-ai": "claude.ai", "chatgpt": "ChatGPT", "claude-code": "Claude Code", "codex": "Codex",
+# 화면에 보이는 순서: 회사별로 묶어 claude.ai, Claude Code, ChatGPT, Codex
+SERVICES = ("claude_ai", "claude_code", "chatgpt", "codex")
+SERVICE_LABEL = {"claude_ai": "claude.ai", "claude_code": "Claude Code", "chatgpt": "ChatGPT", "codex": "Codex"}
+SERVICE_SOURCE = {"claude_ai": "claude-ai", "claude_code": "claude-code", "chatgpt": "chatgpt", "codex": "codex"}
+QUEUE_CHOICES = ("claude-ai", "claude-code", "chatgpt", "codex", "note")
+QUEUE_LABEL = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "chatgpt": "ChatGPT", "codex": "Codex",
                "note": "노트"}
 LEGACY_QUEUE_SOURCES = ("claude-ai", "claude-code", "note")
 # zip 가져오기 모듈 이름 -> 서비스 (claude.ai 메모리 md 묶음도 claude.ai)
@@ -32,6 +33,19 @@ IMPORTER_SERVICE = {"claude-ai": "claude_ai", "claude-ai-memory-md": "claude_ai"
                     "claude-code": "claude_code"}
 CAPTURE_SITE_SERVICE = {"claude-ai": "claude_ai", "chatgpt": "chatgpt"}
 PROVIDERS = ("claude", "codex", "off")
+# 화면 모드와 강조색 이름 (색 값은 theme.py 한 곳)
+THEME_MODES = ("light", "dark", "system")
+THEME_MODE_LABEL = {"light": "라이트", "dark": "다크", "system": "시스템"}
+THEME_ACCENTS = ("ink_blue", "deep_teal", "sage_green", "rust")
+THEME_ACCENT_LABEL = {"ink_blue": "잉크 블루", "deep_teal": "딥 틸", "sage_green": "세이지 그린", "rust": "러스트"}
+
+
+def read_theme(cfg: dict) -> tuple[str, str]:
+    """(모드, 강조색). 모르는 값이면 기본값."""
+    mode = str(cfg.get("theme_mode") or "").strip().lower()
+    accent = str(cfg.get("theme_accent") or "").strip().lower()
+    return (mode if mode in THEME_MODES else DEFAULT_CONFIG["theme_mode"],
+            accent if accent in THEME_ACCENTS else DEFAULT_CONFIG["theme_accent"])
 
 
 def read_sources(cfg: dict) -> dict[str, bool]:
@@ -73,7 +87,7 @@ def setup_provider(sources: dict) -> str:
 
 
 def setup_queue_sources(sources: dict) -> list[str]:
-    return [SERVICE_SOURCE[s] for s in ("claude_ai", "chatgpt", "claude_code", "codex") if sources.get(s)] + ["note"]
+    return [SERVICE_SOURCE[s] for s in SERVICES if sources.get(s)] + ["note"]
 
 
 def skip_config() -> dict:
@@ -186,12 +200,15 @@ class Field:
     key: str
     tab: str
     kind: str     # hotkey path paths relpaths int sources queue_sources choice text cli command weights regexes url
+    #               theme_mode theme_accent
     lo: float | None = None
     hi: float | None = None
 
 
 FIELDS: tuple[Field, ...] = (
     Field("hotkey", "general", "hotkey"),
+    Field("theme_mode", "general", "theme_mode"),
+    Field("theme_accent", "general", "theme_accent"),
     Field("archive_dir", "general", "path"),
     Field("note_dirs", "general", "paths"),
     Field("journal_dir", "general", "path"),
@@ -226,7 +243,7 @@ FIELD = {f.key: f for f in FIELDS}
 NOT_IN_WINDOW = frozenset({"setup_done"})     # 창에 칸이 없는 DEFAULT_CONFIG 키
 # 가중치 5개: (키, 이름, 최소, 최대)
 WEIGHTS = (("title", "제목", 0.0, 100.0), ("body", "본문", 0.0, 100.0), ("same_message_bonus", "같은 메시지 가산", 0.0, 10.0),
-           ("recency", "최근 가산", 0.0, 10.0), ("recency_half_life_days", "반감기(일)", 1.0, 3650.0))
+           ("recency", "최근 가산", 0.0, 10.0), ("recency_half_life_days", "반감기", 1.0, 3650.0))
 # 서비스를 끄면 검사하지 않는(비활성) 칸
 FIELD_SERVICE = {"code_projects_dir": "claude_code", "codex_dir": "codex", "reminder_days": "claude_ai"}
 ARCHIVE_KEY = "archive_dir"
@@ -317,6 +334,10 @@ def field_error(key: str, value) -> str:
         return f"알 수 없는 출처: {', '.join(bad)}" if bad else ""
     if k == "choice":
         return "" if value in PROVIDERS else "claude, codex, off 중 하나여야 합니다"
+    if k == "theme_mode":
+        return "" if value in THEME_MODES else f"{', '.join(THEME_MODES)} 중 하나여야 합니다"
+    if k == "theme_accent":
+        return "" if value in THEME_ACCENTS else f"{', '.join(THEME_ACCENTS)} 중 하나여야 합니다"
     if k == "text":
         if not isinstance(value, str) or not value.strip():
             return "비어 있습니다"
@@ -401,7 +422,9 @@ def validate(new: dict, old: dict | None = None) -> dict[str, str]:
         if e:
             errs[f.key] = e
             continue
+        # 기본값(예: %USERPROFILE%\.codex)은 없어도 통과: 그 도구를 안 쓰는 PC일 수 있다
         if f.kind == "path" and f.key != ARCHIVE_KEY and isinstance(v, str) and v.strip() \
+                and v.strip() != str(DEFAULT_CONFIG.get(f.key, "")) \
                 and _changed(f.key, new, old) and not Path(expand(v.strip())).is_dir():
             errs[f.key] = f"폴더가 없습니다: {v.strip()}"
         elif f.kind == "paths":

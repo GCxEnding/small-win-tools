@@ -1,7 +1,11 @@
 """설정 창과 시작 안내 (SPEC-settings.md 3-A, 3-B, 3-E, 3-I, 3-J, 3-K).
 
-검사, 바뀐 키 계산, 기본값 규칙은 settings.py, CLI 확인은 cli_check.py에 있고 여기는 화면만 다룬다.
-저장 뒤 트레이 앱 쪽 적용(단축키, 타이머, 감시 폴더, 검색 가중치)은 Hooks로 main.py에 맡긴다.
+검사, 바뀐 키 계산, 기본값 규칙은 settings.py, CLI 확인은 cli_check.py, 색과 스타일은 theme.py에 있고
+여기는 화면 구성만 다룬다. 저장 뒤 트레이 앱 쪽 적용(단축키, 타이머, 감시 폴더, 검색 가중치, 테마)은
+Hooks로 main.py에 맡긴다.
+
+화면 구성: 왼쪽 사이드바(208px) + 오른쪽 페이지. 페이지는 섹션(_section) 단위, 섹션 안은 줄(_row) 단위.
+줄은 "왼쪽 이름+설명 / 오른쪽 입력칸"이고, 넓은 칸(목록, 여러 줄 입력)만 stacked로 이름 아래에 둔다.
 """
 from __future__ import annotations
 
@@ -12,18 +16,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QFont, QGuiApplication
-from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog, QDoubleSpinBox,
-                               QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPushButton, QRadioButton, QScrollArea, QSpinBox,
-                               QStackedWidget, QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
+                               QDoubleSpinBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
+                               QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton, QRadioButton,
+                               QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 from . import cli_check
 from . import settings as S
+from . import theme as T
 from .store import expand
 from .watcher import downloads_dir
-from .window import TEXT_FONTS, Theme
+from .window import TEXT_FONTS
 
 TITLE = "생각 검색기 설정"
 SETUP_TITLE = "생각 검색기 시작하기"
@@ -36,6 +41,10 @@ CHROME_PERFORMANCE = "chrome://settings/performance"
 CLOUD_WARNING = "회사 PC 보관본을 개인 클라우드에 두지 마세요"
 CHANGED_OUTSIDE = "config.json이 창을 연 뒤 바뀌었습니다. 덮어쓸까요?"
 INVALID_NOTE = "config.json 값이 잘못돼 기본값을 보여 줍니다"
+SIDEBAR_W = 208
+SECTION_GAP = 36
+PATH_W = 380          # 경로 칸(입력 + 찾아보기 + 열기) 폭
+NUM_W = 118           # 숫자 칸 폭
 
 
 @dataclass
@@ -48,14 +57,105 @@ class Hooks:
     setup_finished: Callable[[bool, set, dict], None] = lambda finished, changed, old: None
 
 
+def set_tone(w: QWidget, tone: str) -> None:
+    """글자 톤 바꾸기. "error"면 빨강(theme.py의 error), 빈 값이면 원래 색."""
+    if w.property("tone") == tone:
+        return
+    w.setProperty("tone", tone)
+    w.style().unpolish(w)
+    w.style().polish(w)
+
+
+def _label(text: str, name: str, wrap: bool = True) -> QLabel:
+    lb = QLabel(text)
+    lb.setObjectName(name)
+    lb.setWordWrap(wrap)
+    lb.setTextFormat(Qt.PlainText)
+    return lb
+
+
+def _wrap(layout: QLayout) -> QWidget:
+    w = QWidget()
+    layout.setContentsMargins(0, 0, 0, 0)
+    w.setLayout(layout)
+    return w
+
+
+def _button(text: str, kind: str = "") -> QPushButton:
+    """kind: "" 보조 버튼, primary(저장), secondary(취소 등 아래 버튼), link(강조색 글자 링크), chip(고르기)."""
+    b = QPushButton(text)
+    if kind:
+        b.setObjectName(kind)
+    if kind in ("link", "chip", "nav"):
+        b.setCursor(Qt.PointingHandCursor)
+    b.setAutoDefault(False)
+    return b
+
+
+# ---- 확인 창 -----------------------------------------------------------------
+class Confirm(QDialog):
+    """QMessageBox 대신 쓰는 확인 창. 테마를 따르고 단추는 한국어, 아이콘이 없어 Windows 알림 소리가 나지 않는다."""
+
+    def __init__(self, parent, title: str, text: str, buttons: list[tuple[str, str]], primary: str):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.choice = ""                       # Esc, X로 닫으면 빈 값
+        win = parent.window() if parent is not None else None
+        self.t = getattr(win, "t", None) or T.make()
+        if win is not None:
+            self.setFont(win.font())
+        self.setPalette(T.palette(self.t))
+        self.setStyleSheet(T.dialog_qss(self.t))
+        v = QVBoxLayout(self)
+        v.setContentsMargins(24, 22, 24, 18)
+        v.setSpacing(20)
+        lb = _label(text, "name")
+        lb.setMinimumWidth(340)
+        lb.setMaximumWidth(560)
+        lb.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        v.addWidget(lb)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addStretch(1)
+        for key, label in buttons:
+            b = _button(label, "primary" if key == primary else "secondary")
+            b.clicked.connect(lambda _=False, k=key: self._pick(k))
+            row.addWidget(b)
+            if key == primary:
+                b.setDefault(True)
+                b.setFocus()
+        v.addLayout(row)
+
+    def _pick(self, key: str) -> None:
+        self.choice = key
+        self.accept()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        T.style_titlebar(self, self.t)
+
+
+def ask(parent, title: str, text: str, buttons: list[tuple[str, str]], primary: str | None = None) -> str:
+    """단추 (키, 글자) 목록을 보여 주고 고른 키를 돌려준다. 닫으면 "". primary를 안 주면 마지막 단추."""
+    d = Confirm(parent, title, text, buttons, primary or buttons[-1][0])
+    d.exec()
+    return d.choice
+
+
+def tell(parent, title: str, text: str) -> None:
+    ask(parent, title, text, [("ok", "확인")])
+
+
 # ---- 작은 위젯 ---------------------------------------------------------------
 class Note(QLabel):
-    """칸 아래 한 줄. 오류(빨강) > 경고 > 안내 순으로 하나만 보여 준다."""
+    """칸 아래 한 줄. 오류 > 경고 > 안내 순으로 하나만 보여 준다. 오류와 경고는 빨강, 안내는 보조색."""
 
-    def __init__(self, theme: Theme):
+    def __init__(self):
         super().__init__("")
-        self.t = theme
+        self.setObjectName("desc")
         self.setWordWrap(True)
+        self.setTextFormat(Qt.PlainText)
         self._error = self._warn = self._note = ""
         self.hide()
 
@@ -73,10 +173,41 @@ class Note(QLabel):
 
     def _render(self) -> None:
         text = self._error or self._warn or self._note
-        color = self.t.warn.name() if (self._error or self._warn) else self.t.sub.name()
-        self.setStyleSheet(f"color:{color};")
-        self.setText(("⚠ " if self._warn and not self._error else "") + text)
+        set_tone(self, "error" if (self._error or self._warn) else "")
+        self.setText(text)
         self.setVisible(bool(text))
+
+
+class NumEdit(QFrame):
+    """화살표 없는 숫자 칸. 숫자는 오른쪽 정렬, 단위는 칸 안 오른쪽. 테두리는 이 틀이 그린다."""
+
+    def __init__(self, spin: QAbstractSpinBox, unit: str = "", width: int = NUM_W):
+        super().__init__()
+        self.setObjectName("numBox")
+        self.spin = spin
+        spin.setButtonSymbols(QAbstractSpinBox.NoButtons)
+        spin.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        spin.setFrame(False)
+        h = QHBoxLayout(self)
+        h.setContentsMargins(8, 6, 10, 6)
+        h.setSpacing(5)
+        h.addWidget(spin, 1)
+        if unit:
+            self.unit = _label(unit, "unit", wrap=False)
+            h.addWidget(self.unit)
+        self.setFixedWidth(width)
+        spin.installEventFilter(self)
+
+    def eventFilter(self, obj, e):
+        if e.type() in (QEvent.FocusIn, QEvent.FocusOut):
+            self.setProperty("focus", e.type() == QEvent.FocusIn)
+            self.style().unpolish(self)
+            self.style().polish(self)
+        return False
+
+    def mousePressEvent(self, e):
+        self.spin.setFocus()
+        self.spin.selectAll()
 
 
 class PathEdit(QWidget):
@@ -87,15 +218,16 @@ class PathEdit(QWidget):
         self.title, self.file = title, file
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
         self.edit = QLineEdit()
         self.edit.setPlaceholderText(placeholder)
         self.edit.textChanged.connect(lambda _t: self.changed.emit())
         lay.addWidget(self.edit, 1)
-        b = QPushButton("찾아보기...")
+        b = _button("찾아보기...")
         b.clicked.connect(self._browse)
         lay.addWidget(b)
         if open_button:
-            o = QPushButton("열기")
+            o = _button("열기")
             o.clicked.connect(self._open)
             lay.addWidget(o)
 
@@ -104,6 +236,7 @@ class PathEdit(QWidget):
 
     def set_value(self, v: str) -> None:
         self.edit.setText(str(v or ""))
+        self.edit.setCursorPosition(0)        # 긴 경로는 앞부분(드라이브)부터 보이게
 
     def set_placeholder(self, p: str) -> None:
         self.edit.setPlaceholderText(p)
@@ -129,26 +262,28 @@ class PathEdit(QWidget):
         if p and os.path.isdir(p):
             os.startfile(p)
         else:
-            QMessageBox.information(self, TITLE, f"폴더가 없습니다: {p or '(비어 있음)'}")
+            tell(self, TITLE, f"폴더가 없습니다: {p or '(비어 있음)'}")
 
 
 class ListEdit(QWidget):
-    """목록 + 추가 / 빼기. mode: dir(폴더 고르기), text(한 줄씩 직접 입력). pick: 추가 때 부를 함수."""
+    """폴더 목록 + 추가 / 빼기. pick: 추가 때 부를 함수 (없으면 폴더 고르기)."""
     changed = Signal()
 
-    def __init__(self, mode: str, title: str = "", pick: Callable[[], str | None] | None = None):
+    def __init__(self, title: str = "", pick: Callable[[], str | None] | None = None):
         super().__init__()
-        self.mode, self.title, self.pick = mode, title, pick
+        self.title, self.pick = title, pick
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
         self.list = QListWidget()
-        self.list.setMaximumHeight(96)
+        self.list.setMaximumHeight(104)
         self.list.itemChanged.connect(lambda _i: self.changed.emit())
         lay.addWidget(self.list, 1)
         col = QVBoxLayout()
-        add = QPushButton("추가..." if mode == "dir" or pick else "추가")
+        col.setSpacing(6)
+        add = _button("추가...")
         add.clicked.connect(self._add)
-        rm = QPushButton("빼기")
+        rm = _button("빼기")
         rm.clicked.connect(self._remove)
         col.addWidget(add)
         col.addWidget(rm)
@@ -167,29 +302,17 @@ class ListEdit(QWidget):
         self.list.blockSignals(True)
         self.list.clear()
         for v in vs or []:
-            self._append(str(v))
+            self.list.addItem(QListWidgetItem(str(v)))
         self.list.blockSignals(False)
 
-    def _append(self, text: str) -> QListWidgetItem:
-        it = QListWidgetItem(text)
-        if self.mode == "text":
-            it.setFlags(it.flags() | Qt.ItemIsEditable)
-        self.list.addItem(it)
-        return it
-
     def _add(self) -> None:
-        if self.mode == "text":
-            it = self._append("")
-            self.list.setCurrentItem(it)
-            self.list.editItem(it)
-            return
         if self.pick:
             v = self.pick()
         else:
             d = QFileDialog.getExistingDirectory(self, self.title, str(Path.home()))
             v = str(Path(d)) if d else None
         if v and v not in self.values():
-            self._append(v)
+            self.list.addItem(QListWidgetItem(v))
             self.changed.emit()
 
     def _remove(self) -> None:
@@ -197,6 +320,27 @@ class ListEdit(QWidget):
         if row >= 0:
             self.list.takeItem(row)
             self.changed.emit()
+
+
+class LinesEdit(QPlainTextEdit):
+    """한 줄에 하나씩 쓰는 여러 줄 입력칸 (추가 가림 정규식). 빈 줄과 앞뒤 공백은 뺀다."""
+    changed = Signal()
+
+    def __init__(self, placeholder: str = ""):
+        super().__init__()
+        self.setPlaceholderText(placeholder)
+        self.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.setTabChangesFocus(True)
+        self.setFixedHeight(104)
+        self.textChanged.connect(self.changed.emit)
+
+    def values(self) -> list[str]:
+        return [s.strip() for s in self.toPlainText().splitlines() if s.strip()]
+
+    def set_values(self, vs) -> None:
+        self.blockSignals(True)
+        self.setPlainText("\n".join(str(v) for v in vs or []))
+        self.blockSignals(False)
 
 
 class HotkeyEdit(QLineEdit):
@@ -266,6 +410,37 @@ class HotkeyEdit(QLineEdit):
         self.recorded.emit("+".join(names + [name]))
 
 
+class Section(QWidget):
+    """섹션: 제목(+ 옆 설명, 오른쪽 링크) 아래에 줄이 쌓인다. 줄마다 위에 얇은 구분선."""
+
+    def __init__(self, title: str, caption: str = "", link: tuple[str, Callable] | None = None, intro: str = "",
+                 first: bool = False):
+        super().__init__()
+        v = QVBoxLayout(self)
+        v.setContentsMargins(0, 0 if first else SECTION_GAP, 0, 0)
+        v.setSpacing(0)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 12)
+        head.setSpacing(12)
+        head.addWidget(_label(title, "sectionTitle", wrap=False), 0, Qt.AlignBottom)
+        if caption:
+            head.addWidget(_label(caption, "caption", wrap=False), 0, Qt.AlignBottom)
+        head.addStretch(1)
+        if link:
+            self.link = _button(link[0], "link")
+            self.link.clicked.connect(link[1])
+            head.addWidget(self.link, 0, Qt.AlignBottom)
+        v.addLayout(head)
+        if intro:
+            lb = _label(intro, "desc")
+            lb.setContentsMargins(0, 0, 0, 12)
+            v.addWidget(lb)
+        self.rows = QVBoxLayout()
+        self.rows.setContentsMargins(0, 0, 0, 0)
+        self.rows.setSpacing(0)
+        v.addLayout(self.rows)
+
+
 class _CheckBridge(QObject):
     done = Signal(str, object)    # (provider, CliStatus)
 
@@ -297,44 +472,53 @@ class SettingsWindow(QDialog):
         self.core = core
         self.hooks = hooks or Hooks()
         self.setup_mode = setup
-        self.t = Theme()
+        self.t = T.from_config(core.config)
         font = QFont()
         font.setFamilies(TEXT_FONTS)
-        font.setPointSize(10)
+        font.setPointSizeF(10.5)
         self.setFont(font)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self.setMinimumSize(560, 480)
-        self.resize(680, 660)
         self._io: dict[str, tuple[Callable, Callable]] = {}
         self._notes: dict[str, Note] = {}
         self._boxes: dict[str, QWidget] = {}
         self._scrolls: dict[str, QScrollArea] = {}
+        self._sections: list[QVBoxLayout] = []   # 섹션이 하나라도 들어간 페이지 (첫 섹션은 위 간격 없음)
         self._loading = False
         self._done = False
+        self._tab = "general"
         self.forced: set[str] = set()
         self.initial: dict = {}
         self._cli_status: dict[str, cli_check.CliStatus] = {}
         self._checking: set[str] = set()
         self._status_labels: dict[str, list[QLabel]] = {"claude": [], "codex": []}
+        self._status_rows: dict[str, list[QWidget]] = {"claude": [], "codex": []}
         self._guides: list[tuple[str, QWidget]] = []
+        self._nav_icons: list[tuple[QPushButton, str]] = []
+        self._swatches: dict[str, QPushButton] = {}
         self._bridge = _CheckBridge()
         self._bridge.done.connect(self._on_check_done)
         self._sig = core.store.config_signature()
 
         root = QVBoxLayout(self)
-        self.broken = QLabel("config.json을 읽지 못해 기본값으로 동작 중입니다. 저장하면 지금 화면 내용으로 새로 씁니다 "
-                             "(깨진 파일은 config.json.bak에 있음)")
-        self.broken.setWordWrap(True)
-        self.broken.setStyleSheet(f"color:{self.t.warn.name()}; font-weight:bold;")
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self.broken = _label("config.json을 읽지 못해 기본값으로 동작 중입니다. 저장하면 지금 화면 내용으로 새로 씁니다 "
+                             "(깨진 파일은 config.json.bak에 있음)", "banner")
         self.broken.setVisible(bool(core.store.config_broken) and not setup)
         root.addWidget(self.broken)
-        buttons = QHBoxLayout()
+        footer = QFrame()
+        footer.setObjectName("footer")
+        buttons = QHBoxLayout(footer)
+        buttons.setContentsMargins(24, 12, 24, 12)
+        buttons.setSpacing(8)
         if setup:
             self.setWindowTitle(SETUP_TITLE)
+            self.setMinimumSize(640, 480)
+            self.resize(760, 640)
             self._build_setup(root)
-            self.btn_prev = QPushButton("이전")
-            self.btn_next = QPushButton("다음")
-            self.btn_skip = QPushButton("건너뛰기")
+            self.btn_prev = _button("이전", "secondary")
+            self.btn_next = _button("다음", "primary")
+            self.btn_skip = _button("건너뛰기", "secondary")
             self.btn_prev.clicked.connect(lambda: self._go(-1))
             self.btn_next.clicked.connect(lambda: self._go(1))
             self.btn_skip.clicked.connect(self.reject)
@@ -342,30 +526,69 @@ class SettingsWindow(QDialog):
             buttons.addStretch(1)
             buttons.addWidget(self.btn_prev)
             buttons.addWidget(self.btn_next)
-            self.btn_next.setDefault(True)
             self._go(0)
         else:
-            self.tabs = QTabWidget()
+            self.setMinimumSize(760, 520)
+            self.resize(920, 740)
+            body = QHBoxLayout()
+            body.setContentsMargins(0, 0, 0, 0)
+            body.setSpacing(0)
+            body.addWidget(self._build_sidebar())
+            self.stack = QStackedWidget()
+            body.addWidget(self.stack, 1)
+            root.addLayout(body, 1)
             for key in S.TABS:
                 getattr(self, f"_build_{key}")()
-            root.addWidget(self.tabs, 1)
-            self.btn_save = QPushButton("저장")
-            self.btn_cancel = QPushButton("취소")
+            for lay in self._sections:
+                lay.addStretch(1)                 # 내용이 창보다 짧으면 남는 높이는 맨 아래로
+            self.btn_cancel = _button("취소", "secondary")
+            self.btn_save = _button("저장", "primary")
             self.btn_save.clicked.connect(self.save)
             self.btn_cancel.clicked.connect(self.reject)
             buttons.addStretch(1)
-            buttons.addWidget(self.btn_save)
             buttons.addWidget(self.btn_cancel)
-            self.btn_save.setDefault(False)
-            self.btn_save.setAutoDefault(False)
-            self.btn_cancel.setAutoDefault(False)
-            self.populate(core.config)
-            self.tabs.currentChanged.connect(self._on_tab)
+            buttons.addWidget(self.btn_save)
+        root.addWidget(footer)
+        for b in self.findChildren(QPushButton):
+            b.setAutoDefault(False)           # Enter로 엉뚱한 버튼이 눌리지 않게
+        if setup:
+            self.btn_next.setDefault(True)
+            self._apply_theme(self.t)
+        else:
+            self.populate(core.config)        # 테마도 여기서 칠한다 (_preview_theme)
             self.select_tab(tab)
-        root.addLayout(buttons)
         self._wheel_guard = _WheelGuard(self)
         guard_wheel(self, self._wheel_guard)
         self._center()
+
+    # ---- 테마 ---------------------------------------------------------------
+    def _apply_theme(self, t: T.Theme) -> None:
+        self.t = t
+        self.setPalette(T.palette(t))
+        self.setStyleSheet(T.dialog_qss(t))
+        for b, name in self._nav_icons:
+            b.setIcon(T.icon(name, t.text, 16))
+        for acc, b in self._swatches.items():
+            b.setIcon(T.swatch(T.accent_color(acc, t.dark)))
+        if self.isVisible():
+            T.style_titlebar(self, t)
+
+    def _preview_theme(self, *_a) -> None:
+        """모드, 강조색을 고르면 저장 전에 이 창에 먼저 칠해 본다 (취소하면 저장 안 됨)."""
+        if "theme_mode" not in self._io:
+            return
+        self._apply_theme(T.make(self._io["theme_mode"][1](), self._io["theme_accent"][1]()))
+
+    def system_theme_changed(self) -> None:
+        """Windows 앱 모드가 바뀜 (main.py가 부름). 시스템 모드를 고른 상태면 다시 칠한다."""
+        if self.setup_mode:
+            self._apply_theme(T.from_config(self.core.config))
+        else:
+            self._preview_theme()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        T.style_titlebar(self, self.t)
 
     # ---- 공통 도우미 --------------------------------------------------------
     def _center(self) -> None:
@@ -374,16 +597,46 @@ class SettingsWindow(QDialog):
         self.move(g.left() + (g.width() - self.width()) // 2, g.top() + (g.height() - self.height()) // 2)
 
     def _help(self, text: str, warn: bool = False) -> QLabel:
-        lb = QLabel(text)
-        lb.setWordWrap(True)
-        lb.setTextFormat(Qt.PlainText)
-        lb.setStyleSheet(f"color:{(self.t.warn if warn else self.t.sub).name()};")
+        lb = _label(text, "desc")
+        if warn:
+            set_tone(lb, "error")
         return lb
 
-    def _page(self, tab: str | None = None, title: str = "") -> QVBoxLayout:
+    def _build_sidebar(self) -> QFrame:
+        side = QFrame()
+        side.setObjectName("sidebar")
+        side.setFixedWidth(SIDEBAR_W)
+        v = QVBoxLayout(side)
+        v.setContentsMargins(12, 22, 12, 12)
+        v.setSpacing(2)
+        v.addWidget(_label("설정", "sideCaption", wrap=False))
+        self.nav = QButtonGroup(self)
+        self.nav.setExclusive(True)
+        self.nav_buttons: list[QPushButton] = []
+        for i, key in enumerate(S.TABS):
+            b = _button(S.TAB_LABEL[key], "nav")
+            b.setCheckable(True)
+            b.setIconSize(QSize(16, 16))
+            b.clicked.connect(lambda _=False, k=key: self.select_tab(k))
+            self.nav.addButton(b, i)
+            self.nav_buttons.append(b)
+            self._nav_icons.append((b, key))
+            v.addWidget(b)
+        v.addStretch(1)
+        return side
+
+    def _page(self, tab: str | None = None, title: str = "", desc: str = "") -> QVBoxLayout:
         w = QWidget()
+        w.setObjectName("content")
         lay = QVBoxLayout(w)
+        lay.setContentsMargins(42, 34, 42, 40)
+        lay.setSpacing(0)
         lay.setAlignment(Qt.AlignTop)
+        lay.addWidget(_label(title, "pageTitle", wrap=False))
+        if desc:
+            lay.addSpacing(6)
+            lay.addWidget(_label(desc, "pageDesc"))
+        lay.addSpacing(30)
         sc = QScrollArea()
         sc.setWidgetResizable(True)
         sc.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)    # 긴 안내 줄은 옆으로 넘치지 않고 줄바꿈
@@ -391,68 +644,97 @@ class SettingsWindow(QDialog):
         sc.setWidget(w)
         if tab:
             self._scrolls[tab] = sc
-            self.tabs.addTab(sc, S.TAB_LABEL[tab])
+            self.stack.addWidget(sc)
         else:
             self.pages.addWidget(sc)
-            if title:
-                h = QLabel(title)
-                f = QFont(self.font())
-                f.setPointSizeF(f.pointSizeF() * 1.25)
-                f.setBold(True)
-                h.setFont(f)
-                lay.addWidget(h)
         return lay
 
-    def _item(self, lay: QVBoxLayout, title: str, body, help: str = "", key: str | None = None,
-              warn: str = "") -> QWidget:
+    def _section(self, lay: QVBoxLayout, title: str, caption: str = "", link=None, intro: str = "") -> Section:
+        first = not any(x is lay for x in self._sections)
+        if first:
+            self._sections.append(lay)        # 붙잡아 둔다 (id 재사용 방지)
+        sec = Section(title, caption, link, intro, first=first)
+        lay.addWidget(sec)
+        return sec
+
+    def _row(self, sec: Section, title: str, control=None, desc: str = "", key: str | None = None,
+             stacked: bool = False, after: str = "", warn: str = "", extras: tuple = ()) -> QWidget:
+        """줄 하나. 보통은 왼쪽 이름(+설명, 경고, 알림) / 오른쪽 칸.
+        stacked: 이름, 설명, 칸, after(칸 아래 설명) 순으로 위아래로 쌓는다 (목록, 여러 줄 입력)."""
+        if isinstance(control, QLayout):
+            control = _wrap(control)
         box = QWidget()
         v = QVBoxLayout(box)
-        v.setContentsMargins(0, 4, 0, 8)
-        v.setSpacing(3)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(0)
+        line = QFrame()
+        line.setObjectName("hline")
+        line.setFixedHeight(1)
+        v.addWidget(line)
+        text = QVBoxLayout()
+        text.setSpacing(4)
         if title:
-            t = QLabel(title)
-            f = QFont(self.font())
-            f.setBold(True)
-            t.setFont(f)
-            v.addWidget(t)
-        if isinstance(body, QWidget):
-            v.addWidget(body)
-        elif body is not None:
-            v.addLayout(body)
-        if help:
-            v.addWidget(self._help(help))
+            text.addWidget(_label(title, "name"))
+        if desc:
+            text.addWidget(_label(desc, "desc"))
+        tail: list[QWidget] = []
+        if after:
+            tail.append(_label(after, "desc"))
         if warn:
-            v.addWidget(self._help(warn, warn=True))
+            tail.append(self._help(warn, warn=True))
+        tail.extend(extras)
         if key:
-            n = Note(self.t)
+            n = Note()
             self._notes[key] = n
-            v.addWidget(n)
             self._boxes[key] = box
-        lay.addWidget(box)
+            tail.append(n)
+        if stacked:
+            col = QVBoxLayout()
+            col.setContentsMargins(0, 14, 0, 14)
+            col.setSpacing(8)
+            col.addLayout(text)
+            if control is not None:
+                col.addWidget(control)
+            for w in tail:
+                col.addWidget(w)
+            v.addLayout(col)
+        else:
+            for w in tail:
+                text.addWidget(w)
+            h = QHBoxLayout()
+            h.setContentsMargins(0, 14, 0, 14)
+            h.setSpacing(24)
+            h.addLayout(text, 1)
+            if control is not None:
+                h.addWidget(control, 0, Qt.AlignRight | Qt.AlignVCenter)
+            v.addLayout(h)
+        sec.rows.addWidget(box)
         return box
 
     def _bind(self, key: str, setter: Callable, getter: Callable) -> None:
         self._io[key] = (setter, getter)
 
-    def _spin(self, key: str) -> QSpinBox:
+    def _spin(self, key: str, unit: str = "", width: int = NUM_W) -> NumEdit:
         f = S.FIELD[key]
         sp = QSpinBox()
         sp.setRange(int(f.lo), int(f.hi))
         if key == "ask_max_chars":
             sp.setSingleStep(1000)
-        sp.setMaximumWidth(120)
+            sp.setGroupSeparatorShown(True)
         sp.valueChanged.connect(self._on_changed)
         self._bind(key, lambda v, sp=sp: sp.setValue(int(v)), sp.value)
-        return sp
+        return NumEdit(sp, unit, width)
 
     def _path(self, key: str, title: str, placeholder: str = "") -> PathEdit:
         pe = PathEdit(title, placeholder)
+        pe.setFixedWidth(PATH_W)
         pe.changed.connect(self._on_changed)
         self._bind(key, pe.set_value, pe.value)
         return pe
 
-    def _checks(self, names: dict[str, str]) -> tuple[QHBoxLayout, dict[str, QCheckBox]]:
+    def _checks(self, names: dict[str, str]) -> tuple[QWidget, dict[str, QCheckBox]]:
         row = QHBoxLayout()
+        row.setSpacing(16)
         boxes = {}
         for k, label in names.items():
             cb = QCheckBox(label)
@@ -460,58 +742,81 @@ class SettingsWindow(QDialog):
             row.addWidget(cb)
             boxes[k] = cb
         row.addStretch(1)
-        return row, boxes
+        return _wrap(row), boxes
+
+    def _chips(self, key: str, labels: dict[str, str], default: str, swatch: bool = False) -> QWidget:
+        """하나만 고르는 단추 묶음 (모드, 강조색). 고르면 바로 이 창에 미리 칠한다."""
+        row = QHBoxLayout()
+        row.setSpacing(6)
+        grp = QButtonGroup(self)
+        btns: dict[str, QPushButton] = {}
+        for k, label in labels.items():
+            b = _button(label, "chip")
+            b.setCheckable(True)
+            if swatch:
+                b.setIconSize(QSize(12, 12))
+                self._swatches[k] = b
+            b.clicked.connect(self._on_changed)
+            b.clicked.connect(self._preview_theme)
+            grp.addButton(b)
+            btns[k] = b
+            row.addWidget(b)
+        self._bind(key, lambda v: btns.get(v, btns[default]).setChecked(True),
+                   lambda: next((k for k, b in btns.items() if b.isChecked()), default))
+        return _wrap(row)
 
     # ---- 일반 탭 -------------------------------------------------------------
     def _build_general(self) -> None:
-        lay = self._page("general")
+        lay = self._page("general", "일반")
+        sec = self._section(lay, "검색 창")
         self.hotkey = HotkeyEdit()
-        self.hotkey.setMaximumWidth(260)
+        self.hotkey.setFixedWidth(240)
         self.hotkey.recorded.connect(self._on_hotkey_recorded)
         self.hotkey.recording.connect(self.hooks.recording)
         self._bind("hotkey", self.hotkey.set_value, self.hotkey.value)
-        self._item(lay, "검색 창 단축키", self.hotkey,
-                   f"칸을 누르고 새 조합을 누릅니다. 저장할 때 바로 등록해 봅니다. Backspace는 기본값({S.display_hotkey(S.DEFAULT_HOTKEY)}).",
-                   "hotkey")
+        self._row(sec, "검색 창 단축키", self.hotkey,
+                  f"칸을 누르고 새 조합을 누릅니다. 저장할 때 바로 등록해 봅니다. Backspace는 기본값"
+                  f"({S.display_hotkey(S.DEFAULT_HOTKEY)}).", "hotkey")
+
+        sec = self._section(lay, "모양", "검색 창, 설정 창, 시작 안내에 같이 씁니다")
+        self._row(sec, "모드", self._chips("theme_mode", S.THEME_MODE_LABEL, "system"),
+                  "시스템은 Windows 앱 모드(라이트/다크)를 따라갑니다.", "theme_mode")
+        self._row(sec, "강조색", self._chips("theme_accent", S.THEME_ACCENT_LABEL, "ink_blue", swatch=True),
+                  "저장 버튼, 링크, 입력 중인 칸 테두리에 씁니다.", "theme_accent", stacked=True)
+
+        sec = self._section(lay, "폴더")
         self.archive = self._path("archive_dir", "보관 폴더 선택 (대화 md를 저장할 곳)", str(self.core.default_archive))
-        self._item(lay, "대화 보관 폴더", self.archive,
-                   "비면 기본 위치를 씁니다. 기존 md는 옮기지 않습니다. 필요하면 직접 옮긴 뒤 트레이 '고급 > 검색 색인 다시 만들기'.",
-                   "archive_dir", warn=CLOUD_WARNING)
-        self.notes = ListEdit("dir", "노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)")
+        self._row(sec, "대화 보관 폴더", self.archive,
+                  "비면 기본 위치를 씁니다. 기존 md는 옮기지 않습니다. 필요하면 직접 옮긴 뒤 트레이 '고급 > 검색 색인 다시 만들기'.",
+                  "archive_dir", warn=CLOUD_WARNING)
+        self.notes = ListEdit("노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)")
         self.notes.changed.connect(self._on_changed)
         self._bind("note_dirs", self.notes.set_values, self.notes.values)
-        self._item(lay, "노트 폴더", self.notes, "내 md 폴더(Obsidian 볼트 등)를 그대로 검색에 넣습니다. 파일은 읽기만 합니다.",
-                   "note_dirs")
+        self._row(sec, "노트 폴더", self.notes, "내 md 폴더(Obsidian 볼트 등)를 그대로 검색에 넣습니다. 파일은 읽기만 합니다.",
+                  "note_dirs", stacked=True)
         self.journal = self._path("journal_dir", "업무 일지 보관함 루트 선택")
-        off = QPushButton("끄기")
+        off = _button("끄기")
         off.clicked.connect(lambda: self.journal.set_value(""))
         self.journal.layout().addWidget(off)
-        self._item(lay, "업무 일지 폴더", self.journal,
-                   "YYYY/MM/YYYY-MM-DD.md 형식의 '## 업무' 구역을 읽습니다. 형식이 다르면 비워 두고 노트 폴더로만 넣으세요.",
-                   "journal_dir")
-        row = QHBoxLayout()
-        row.addWidget(QLabel("열린 일 기간(일)"))
-        row.addWidget(self._spin("queue_days"))
-        row.addSpacing(20)
-        row.addWidget(QLabel("크게 보여 줄 개수"))
-        row.addWidget(self._spin("queue_focus"))
-        row.addStretch(1)
-        box = self._item(lay, "열린 일 큐 (검색어가 비었을 때 보이는 최근 일 목록)", row,
-                         "이 기간 안에 흔적이 있는 일만 올라옵니다. 위쪽에 크게 보여 줄 개수를 넘는 일은 '나머지 N개' 줄에 접혀 있습니다.",
-                         "queue_days")
-        self._notes["queue_focus"] = self._notes["queue_days"]
-        self._boxes["queue_focus"] = box
+        self._row(sec, "업무 일지 폴더", self.journal,
+                  "YYYY/MM/YYYY-MM-DD.md 형식의 '## 업무' 구역을 읽습니다. 형식이 다르면 비워 두고 노트 폴더로만 넣으세요.",
+                  "journal_dir")
+
+        sec = self._section(lay, "열린 일 큐", "검색어가 비었을 때 보이는 최근 일 목록")
+        self._row(sec, "열린 일 기간", self._spin("queue_days", "일"), "이 기간 안에 흔적이 있는 일만 올라옵니다.", "queue_days")
+        self._row(sec, "크게 보여 줄 개수", self._spin("queue_focus", "개"),
+                  "위쪽에 크게 보여 줍니다. 넘는 일은 '나머지 N개' 줄에 접혀 있습니다.", "queue_focus")
         qrow, self.queue_checks = self._checks(S.QUEUE_LABEL)
         self._bind("queue_sources", self._set_queue_sources,
                    lambda: [s for s in S.QUEUE_CHOICES if self.queue_checks[s].isChecked()])
-        self._item(lay, "큐에 올릴 출처", qrow,
-                   "프로젝트 문서, 메모리, imported 폴더는 올리지 않습니다. 업무 일지 항목은 일지 폴더가 있으면 늘 올라옵니다.",
-                   "queue_sources")
-        self.queue_ex = ListEdit("dir", pick=self._pick_note_subdir)
+        self._row(sec, "큐에 올릴 출처", qrow,
+                  "프로젝트 문서, 메모리, imported 폴더는 올리지 않습니다. 업무 일지 항목은 일지 폴더가 있으면 늘 올라옵니다.",
+                  "queue_sources", stacked=True)
+        self.queue_ex = ListEdit(pick=self._pick_note_subdir)
         self.queue_ex.changed.connect(self._on_changed)
         self._bind("queue_note_exclude", self.queue_ex.set_values, self.queue_ex.values)
-        self._item(lay, "큐에서 뺄 노트 폴더", self.queue_ex, "노트 폴더 안의 폴더만 고를 수 있습니다(노트 폴더 기준 상대 경로로 저장).",
-                   "queue_note_exclude")
+        self._row(sec, "큐에서 뺄 노트 폴더", self.queue_ex, "노트 폴더 안의 폴더만 고를 수 있습니다(노트 폴더 기준 상대 경로로 저장).",
+                  "queue_note_exclude", stacked=True)
 
     def _set_queue_sources(self, v) -> None:
         for s, cb in self.queue_checks.items():
@@ -520,7 +825,7 @@ class SettingsWindow(QDialog):
     def _pick_note_subdir(self) -> str | None:
         roots = [Path(expand(p)) for p in self.notes.values()]
         if not roots:
-            QMessageBox.information(self, TITLE, "먼저 노트 폴더를 추가하세요.")
+            tell(self, TITLE, "먼저 노트 폴더를 추가하세요.")
             return None
         d = QFileDialog.getExistingDirectory(self, "큐에서 뺄 폴더 (노트 폴더 안)", str(roots[0]))
         if not d:
@@ -532,10 +837,10 @@ class SettingsWindow(QDialog):
             except (ValueError, OSError):
                 continue
             if rel.as_posix() in ("", "."):
-                QMessageBox.information(self, TITLE, "노트 폴더 자체는 뺄 수 없습니다. 노트 폴더 목록에서 빼세요.")
+                tell(self, TITLE, "노트 폴더 자체는 뺄 수 없습니다. 노트 폴더 목록에서 빼세요.")
                 return None
             return rel.as_posix()
-        QMessageBox.warning(self, TITLE, "노트 폴더 밖의 폴더는 고를 수 없습니다.")
+        tell(self, TITLE, "노트 폴더 밖의 폴더는 고를 수 없습니다.")
         return None
 
     def _on_hotkey_recorded(self, raw: str) -> None:
@@ -553,42 +858,46 @@ class SettingsWindow(QDialog):
 
     # ---- 수집 탭 -------------------------------------------------------------
     def _build_collect(self) -> None:
-        lay = self._page("collect")
+        lay = self._page("collect", "수집")
+        sec = self._section(lay, "서비스")
         row, self.source_checks = self._checks(S.SERVICE_LABEL)
         self._bind("sources", self._set_sources, self._get_sources)
-        self._item(lay, "쓰는 서비스", row, "끈 서비스는 수집도 알림도 하지 않습니다. 이미 보관된 md는 그대로 검색됩니다.", "sources")
+        self._row(sec, "쓰는 서비스", row, "끈 서비스는 수집도 알림도 하지 않습니다. 이미 보관된 md는 그대로 검색됩니다.",
+                  "sources", stacked=True)
+
+        sec = self._section(lay, "폴더")
         self.watch = self._path("watch_dir", "다운로드(감시) 폴더 선택", str(downloads_dir()))
         self.watch.changed.connect(self._update_capture_placeholder)
-        self._item(lay, "다운로드(감시) 폴더", self.watch, "내보내기 zip이 들어오는 곳입니다. 비면 시스템 다운로드 폴더.", "watch_dir")
+        self._row(sec, "다운로드(감시) 폴더", self.watch, "내보내기 zip이 들어오는 곳입니다. 비면 시스템 다운로드 폴더.", "watch_dir")
         self.capture = self._path("capture_dir", "자동 수집 파일 폴더 선택")
-        self._item(lay, "자동 수집 파일 폴더", self.capture, "수집 스크립트가 대화 파일을 저장하는 곳입니다. 비면 <감시 폴더>\\claude-sync.",
-                   "capture_dir")
+        self._row(sec, "자동 수집 파일 폴더", self.capture, "수집 스크립트가 대화 파일을 저장하는 곳입니다. 비면 <감시 폴더>\\claude-sync.",
+                  "capture_dir")
         self.projects = self._path("code_projects_dir", "Claude Code 세션 폴더 선택",
                                    expand(str(S.default_of("code_projects_dir"))))
-        self._item(lay, "Claude Code 세션 폴더", self.projects, "Claude Code를 켰을 때만 씁니다.", "code_projects_dir")
+        self._row(sec, "Claude Code 세션 폴더", self.projects, "Claude Code를 켰을 때만 씁니다.", "code_projects_dir")
         self.codex_home = self._path("codex_dir", "Codex 폴더 선택", expand(str(S.default_of("codex_dir"))))
-        self._item(lay, "Codex 폴더", self.codex_home, "Codex를 켰을 때만 씁니다.", "codex_dir")
-        self._item(lay, "수집 주기(분)", self._spin("code_collect_minutes"),
-                   "Claude Code, Codex 대화와 노트 폴더를 이 간격으로 모읍니다.", "code_collect_minutes")
-        rrow = QHBoxLayout()
+        self._row(sec, "Codex 폴더", self.codex_home, "Codex를 켰을 때만 씁니다.", "codex_dir")
+
+        sec = self._section(lay, "주기와 알림")
+        self._row(sec, "수집 주기", self._spin("code_collect_minutes", "분"),
+                  "Claude Code, Codex 대화와 노트 폴더를 이 간격으로 모읍니다.", "code_collect_minutes")
         self.reminder = QSpinBox()
         self.reminder.setRange(1, 60)
-        self.reminder.setMaximumWidth(120)
         self.reminder.valueChanged.connect(self._on_changed)
         self.reminder_off = QCheckBox("끄기")
-        self.reminder_off.toggled.connect(lambda on: (self.reminder.setEnabled(not on), self._on_changed()))
-        rrow.addWidget(self.reminder)
+        self.reminder_off.toggled.connect(lambda on: (self.reminder_box.setEnabled(not on), self._on_changed()))
+        self.reminder_box = NumEdit(self.reminder, "일")
+        rrow = QHBoxLayout()
+        rrow.setSpacing(12)
         rrow.addWidget(self.reminder_off)
-        rrow.addStretch(1)
+        rrow.addWidget(self.reminder_box)
         self._bind("reminder_days", self._set_reminder, lambda: 0 if self.reminder_off.isChecked() else self.reminder.value())
-        self._item(lay, "claude.ai 내보내기 알림(일)", rrow, "마지막 zip 가져오기 뒤 이만큼 지나면 하루 한 번 알려 드립니다.",
-                   "reminder_days")
-        self._item(lay, "자동 수집 멈춤 알림(시간)", self._spin("capture_stale_hours"),
-                   "수집 스크립트가 이만큼 멈추면 하루 한 번 알려 드립니다.", "capture_stale_hours")
+        self._row(sec, "claude.ai 내보내기 알림", rrow, "마지막 zip 가져오기 뒤 이만큼 지나면 하루 한 번 알려 드립니다.",
+                  "reminder_days")
+        self._row(sec, "자동 수집 멈춤 알림", self._spin("capture_stale_hours", "시간"),
+                  "수집 스크립트가 이만큼 멈추면 하루 한 번 알려 드립니다.", "capture_stale_hours")
         for site in SCRIPTS:
-            g = self._script_guide(site)
-            lay.addWidget(g)
-            self._guides.append((site, g))
+            self._guides.append((site, self._script_guide(lay, site)))
 
     def _set_sources(self, v) -> None:
         for s, cb in self.source_checks.items():
@@ -601,25 +910,18 @@ class SettingsWindow(QDialog):
         v = int(v)
         self.reminder_off.setChecked(v == 0)
         self.reminder.setValue(v if v > 0 else 7)
-        self.reminder.setEnabled(v > 0)
+        self.reminder_box.setEnabled(v > 0)
 
     def _update_capture_placeholder(self) -> None:
         if hasattr(self, "capture"):
             base = self.watch.value() or str(downloads_dir())
             self.capture.set_placeholder(str(Path(expand(base)) / "claude-sync"))
 
-    def _script_guide(self, site: str) -> QWidget:
-        """수집 스크립트 설치 단계, 스크립트 복사, 상태 한 줄 (3-I)."""
+    def _script_guide(self, lay: QVBoxLayout, site: str) -> Section:
+        """수집 스크립트 설치 단계, 스크립트 복사, 상태 한 줄 (3-I). 섹션 하나."""
         label, _svc, host = SITES[site]
-        box = QFrame()
-        box.setFrameShape(QFrame.StyledPanel)
-        v = QVBoxLayout(box)
-        t = QLabel(f"{label} 수집 스크립트 설치 (Tampermonkey)")
-        f = QFont(self.font())
-        f.setBold(True)
-        t.setFont(f)
-        v.addWidget(t)
-        v.addWidget(self._help(f"{label} 탭이 열려 있는 동안 바뀐 대화만 받아 둡니다. 순서대로 한 번만 하면 됩니다."))
+        sec = self._section(lay, f"{label} 수집 스크립트", "Tampermonkey",
+                            intro=f"{label} 탭이 열려 있는 동안 바뀐 대화만 받아 둡니다. 순서대로 한 번만 하면 됩니다.")
         copied = self._help("")
         copied.hide()
 
@@ -633,7 +935,7 @@ class SettingsWindow(QDialog):
             try:
                 text = p.read_text(encoding="utf-8")
             except OSError as e:
-                QMessageBox.warning(self, TITLE, f"스크립트를 읽지 못했습니다: {e}")
+                tell(self, TITLE, f"스크립트를 읽지 못했습니다: {e}")
                 return
             copy_text(text, f"{SCRIPTS[site]} 내용")
 
@@ -647,28 +949,23 @@ class SettingsWindow(QDialog):
              lambda: copy_text(CHROME_PERFORMANCE, f"{CHROME_PERFORMANCE} (크롬 주소창에 붙여 넣으세요)")),
             ("6. Tampermonkey 대시보드 > 새 스크립트에 붙여 넣고 저장", "스크립트 복사", copy_script),
         ]
-        grid = QGridLayout()
-        for i, (text, btn, fn) in enumerate(steps):
-            lb = QLabel(text)
-            lb.setWordWrap(True)
-            grid.addWidget(lb, i, 0)
+        for text, btn, fn in steps:
+            b = None
             if btn:
-                b = QPushButton(btn)
+                b = _button(btn)
+                b.setAutoDefault(False)
                 b.clicked.connect(fn)
-                grid.addWidget(b, i, 1)
-        grid.setColumnStretch(0, 1)
-        v.addLayout(grid)
-        v.addWidget(copied)
-        status = QLabel(f"상태: {self.core.capture_site_status(site)}")
-        status.setWordWrap(True)
-        v.addWidget(status)
-        v.addWidget(self._help("회사 크롬 정책으로 확장 설치가 막혀 있으면 zip 내보내기로 가져오세요."))
-        return box
+            self._row(sec, text, b)
+        self._row(sec, "상태", None, self.core.capture_site_status(site),
+                  after="회사 크롬 정책으로 확장 설치가 막혀 있으면 zip 내보내기로 가져오세요.", extras=(copied,))
+        return sec
 
     # ---- 요약 AI 탭 -----------------------------------------------------------
     def _build_ask(self) -> None:
-        lay = self._page("ask")
+        lay = self._page("ask", "요약 AI")
+        sec = self._section(lay, "요약 AI", "큐에서 F2를 눌렀을 때")
         row = QHBoxLayout()
+        row.setSpacing(16)
         self.provider_group = QButtonGroup(self)
         self.provider_radios = {}
         for p, label in (("claude", "Claude"), ("codex", "GPT (Codex)"), ("off", "끄기")):
@@ -677,54 +974,48 @@ class SettingsWindow(QDialog):
             self.provider_group.addButton(rb)
             self.provider_radios[p] = rb
             row.addWidget(rb)
-        row.addStretch(1)
         self._bind("ask_provider", lambda v: self.provider_radios.get(v, self.provider_radios["claude"]).setChecked(True),
                    lambda: next((p for p, rb in self.provider_radios.items() if rb.isChecked()), "claude"))
-        self._item(lay, "요약 AI", row, "큐에서 F2를 눌렀을 때만 이 PC의 CLI를 실행합니다. CLI 설치와 로그인은 직접 합니다.",
-                   "ask_provider")
+        self.off_note = self._help("F2를 누르면 '요약 AI가 꺼져 있습니다' 한 줄만 보여 줍니다. 큐의 F2 안내도 숨깁니다.")
+        self._row(sec, "쓰는 AI", row, "F2를 눌렀을 때만 이 PC의 CLI를 실행합니다. CLI 설치와 로그인은 직접 합니다.",
+                  "ask_provider", extras=(self.off_note,))
         # Claude
-        self.claude_box = QWidget()
-        cl = QVBoxLayout(self.claude_box)
-        cl.setContentsMargins(0, 0, 0, 0)
+        self.claude_box = self._section(lay, "Claude", "Claude Code CLI")
         self.claude_model = self._model_combo("ask_model", cli_check.CLAUDE_MODELS, "claude")
-        self._item(cl, "모델 (Claude)", self.claude_model, "목록에 없는 이름(전체 모델 이름)도 직접 넣을 수 있습니다.", "ask_model")
-        cl.addWidget(self._status_row("claude"))
+        self._row(self.claude_box, "모델", self.claude_model, "목록에 없는 이름(전체 모델 이름)도 직접 넣을 수 있습니다.",
+                  "ask_model")
+        self._status_row(self.claude_box, "claude")
         self.claude_cmd = PathEdit("claude 실행 파일 선택", self._found("claude", ["claude"]), file=True, open_button=False)
+        self.claude_cmd.setFixedWidth(PATH_W)
         self.claude_cmd.changed.connect(self._on_changed)
         self._bind("ask_command",
                    lambda v: self.claude_cmd.set_value("" if S.as_command(v) in ([], ["claude"]) else S.join_command(v)),
                    lambda: S.split_command(self.claude_cmd.value()) or ["claude"])
-        self._item(cl, "CLI 경로 (Claude Code)", self.claude_cmd, "비면 PATH에서 claude를 찾습니다.", "ask_command")
-        lay.addWidget(self.claude_box)
+        self._row(self.claude_box, "CLI 경로", self.claude_cmd, "비면 PATH에서 claude를 찾습니다.", "ask_command")
         # GPT (Codex)
-        self.codex_box = QWidget()
-        cx = QVBoxLayout(self.codex_box)
-        cx.setContentsMargins(0, 0, 0, 0)
+        self.codex_box = self._section(lay, "GPT", "Codex CLI")
         self.codex_model = self._model_combo("ask_model_codex", cli_check.codex_models(self.core.codex_dir), "codex")
         self.codex_desc = self._help("")
         self.codex_model.currentTextChanged.connect(self._update_codex_desc)
-        mbox = QVBoxLayout()
-        mbox.addWidget(self.codex_model)
-        mbox.addWidget(self.codex_desc)
-        self._item(cx, "모델 (GPT)", mbox, "목록은 이 PC의 Codex가 받아 둔 models_cache.json에서 읽습니다(앱이 네트워크로 받지 않음).",
-                   "ask_model_codex")
+        self._row(self.codex_box, "모델", self.codex_model,
+                  "목록은 이 PC의 Codex가 받아 둔 models_cache.json에서 읽습니다(앱이 네트워크로 받지 않음).",
+                  "ask_model_codex", extras=(self.codex_desc,))
         self.effort = QComboBox()
         self.effort.addItems(list(cli_check.CODEX_EFFORTS))
-        self.effort.setMaximumWidth(160)
+        self.effort.setFixedWidth(160)
         self.effort.currentTextChanged.connect(self._on_changed)
         self._bind("ask_codex_effort", self._set_effort, lambda: self.effort.currentText())
-        self._item(cx, "추론 정도 (GPT)", self.effort, "low가 가장 빠르고 적게 씁니다. 요약에는 low로 충분합니다.", "ask_codex_effort")
-        cx.addWidget(self._status_row("codex"))
+        self._row(self.codex_box, "추론 정도", self.effort, "low가 가장 빠르고 적게 씁니다. 요약에는 low로 충분합니다.",
+                  "ask_codex_effort")
+        self._status_row(self.codex_box, "codex")
         self.codex_cmd = PathEdit("codex 실행 파일 선택", self._found("codex", []), file=True, open_button=False)
+        self.codex_cmd.setFixedWidth(PATH_W)
         self.codex_cmd.changed.connect(self._on_changed)
         self._bind("ask_command_codex", lambda v: self.codex_cmd.set_value(S.join_command(v)),
                    lambda: S.split_command(self.codex_cmd.value()))
-        self._item(cx, "CLI 경로 (Codex)", self.codex_cmd,
-                   "비면 PATH의 codex, 그다음 Codex 데스크톱 앱 폴더(%LOCALAPPDATA%\\OpenAI\\Codex\\bin)에서 찾습니다.",
-                   "ask_command_codex")
-        lay.addWidget(self.codex_box)
-        self.off_note = self._help("F2를 누르면 '요약 AI가 꺼져 있습니다' 한 줄만 보여 줍니다. 큐의 F2 안내도 숨깁니다.")
-        lay.addWidget(self.off_note)
+        self._row(self.codex_box, "CLI 경로", self.codex_cmd,
+                  "비면 PATH의 codex, 그다음 Codex 데스크톱 앱 폴더(%LOCALAPPDATA%\\OpenAI\\Codex\\bin)에서 찾습니다.",
+                  "ask_command_codex")
 
     def _found(self, provider: str, configured) -> str:
         cmd = cli_check.resolve(provider, configured)
@@ -733,7 +1024,7 @@ class SettingsWindow(QDialog):
     def _model_combo(self, key: str, models: list, provider: str) -> QComboBox:
         cb = QComboBox()
         cb.setEditable(True)
-        cb.setMaximumWidth(360)
+        cb.setFixedWidth(PATH_W - 60)
         cheap = cli_check.CHEAPEST[provider]
         for m in models:
             cb.addItem(f"{m.slug} (가장 저렴)" if m.slug == cheap else m.slug, m.slug)
@@ -768,19 +1059,15 @@ class SettingsWindow(QDialog):
             self.effort.addItem(v)          # config.json에 손으로 넣은 high 등은 지운다고 보지 않고 목록에 더함
         self.effort.setCurrentText(v)
 
-    def _status_row(self, provider: str) -> QWidget:
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 0, 0, 6)
-        h.addWidget(QLabel("CLI 상태:"))
-        lb = QLabel("확인 전")
-        lb.setWordWrap(True)
+    def _status_row(self, sec: Section, provider: str) -> QWidget:
+        lb = self._help("확인 전")
         self._status_labels[provider].append(lb)
-        h.addWidget(lb, 1)
-        b = QPushButton("다시 확인")
+        b = _button("다시 확인")
         b.clicked.connect(lambda: self._start_check(provider, force=True))
-        h.addWidget(b)
-        return w
+        name = "CLI 상태" if not self.setup_mode else f"{cli_check.NAME[provider]} CLI 상태"
+        box = self._row(sec, name, b, extras=(lb,))
+        self._status_rows[provider].append(box)
+        return box
 
     def _configured_cmd(self, provider: str):
         key = "ask_command" if provider == "claude" else "ask_command_codex"
@@ -798,7 +1085,7 @@ class SettingsWindow(QDialog):
         self._checking.add(provider)
         for lb in self._status_labels[provider]:
             lb.setText("확인 중...")
-            lb.setStyleSheet("")
+            set_tone(lb, "")
         configured = self._configured_cmd(provider)
         bridge = self._bridge
 
@@ -820,78 +1107,81 @@ class SettingsWindow(QDialog):
         st = self._cli_status.get(provider)
         if not st:
             return
-        color = "" if st.state == "ready" else f"color:{self.t.warn.name()};"
         for lb in self._status_labels[provider]:
             lb.setText(st.line)
-            lb.setStyleSheet(color)
+            set_tone(lb, "" if st.state == "ready" else "error")
 
     # ---- 고급 탭 --------------------------------------------------------------
     def _build_advanced(self) -> None:
-        lay = self._page("advanced")
-        lay.addWidget(self._help("보통은 바꿀 필요가 없습니다."))
+        lay = self._page("advanced", "고급", "보통은 바꿀 필요가 없습니다.")
+        sec = self._section(lay, "검색")
         row = QHBoxLayout()
+        row.setSpacing(8)
         self.open_cmd = QLineEdit()
+        self.open_cmd.setObjectName("mono")
+        self.open_cmd.setFixedWidth(250)
         self.open_cmd.textChanged.connect(self._on_changed)
-        row.addWidget(self.open_cmd, 1)
-        d = QPushButton("기본값")
+        row.addWidget(self.open_cmd)
+        d = _button("기본값", "link")
         d.clicked.connect(lambda: self.open_cmd.setText(S.join_command(S.default_of("open_command"))))
         row.addWidget(d)
         self._bind("open_command", lambda v: self.open_cmd.setText(S.join_command(v)),
                    lambda: S.split_command(self.open_cmd.text()))
-        self._item(lay, "md 여는 명령", row,
-                   "{path}는 md 경로, {line}은 줄 번호로 바뀝니다. 공백이 든 경로는 큰따옴표로 묶습니다. "
-                   "실행에 실패하면 기본 연결 프로그램으로 엽니다.", "open_command")
-        self._item(lay, "검색 결과 최대 개수", self._spin("max_results"), "", "max_results")
-        grid = QGridLayout()
+        self._row(sec, "md 여는 명령", row,
+                  "{path}는 md 경로, {line}은 줄 번호로 바뀝니다. 공백이 든 경로는 큰따옴표로 묶습니다. "
+                  "실행에 실패하면 기본 연결 프로그램으로 엽니다.", "open_command")
+        self._row(sec, "검색 결과 최대 개수", self._spin("max_results", "개"), "", "max_results")
+
+        sec = self._section(lay, "순위 가중치", "BM25 관련도에 더하는 값",
+                            link=("기본값으로", lambda: self._set_weights(S.default_of("weights"))))
         self.weight_spins = {}
-        for i, (wk, name, lo, hi) in enumerate(S.WEIGHTS):
+        for wk, name, lo, hi in S.WEIGHTS:
             sp = QDoubleSpinBox()
             sp.setRange(lo, hi)
-            sp.setDecimals(2)
-            sp.setSingleStep(0.1 if hi <= 10 else 1.0)
-            sp.setMaximumWidth(120)
+            half_life = wk == "recency_half_life_days"
+            sp.setDecimals(0 if half_life else 2)
+            sp.setSingleStep(1.0 if hi > 10 else 0.1)
             sp.valueChanged.connect(self._on_changed)
             self.weight_spins[wk] = sp
-            grid.addWidget(QLabel(name), i // 2, (i % 2) * 2)
-            grid.addWidget(sp, i // 2, (i % 2) * 2 + 1)
-        wd = QPushButton("기본값")
-        wd.clicked.connect(lambda: self._set_weights(S.default_of("weights")))
-        grid.addWidget(wd, 2, 3)
-        grid.setColumnStretch(4, 1)
+            self._row(sec, name, NumEdit(sp, "일" if half_life else ""),
+                      "최근 가산이 절반이 되는 날 수" if half_life else "")
         self._bind("weights", self._set_weights, lambda: {wk: float(sp.value()) for wk, sp in self.weight_spins.items()})
-        self._item(lay, "순위 가중치", grid, "BM25 관련도에 더하는 값입니다. 반감기는 최근 가산이 절반이 되는 날 수.", "weights")
-        self.redact = ListEdit("text")
+        n = Note()
+        self._notes["weights"] = n
+        self._boxes["weights"] = sec
+        sec.rows.addWidget(n)
+
+        sec = self._section(lay, "가림 규칙")
+        self.redact = LinesEdit("한 줄에 정규식 하나")
         self.redact.changed.connect(self._on_changed)
         self._bind("extra_redact_patterns", self.redact.set_values, self.redact.values)
-        self._item(lay, "추가 가림 정규식", self.redact,
-                   "한 줄에 정규식 하나. 다음에 쓰는 md부터 가립니다. 이미 쓴 md는 다시 만들지 않습니다 "
-                   "(필요하면 트레이 '고급 > 대화 md 전부 다시 만들기').", "extra_redact_patterns")
-        row = QHBoxLayout()
-        for key, label in (("ask_tail_messages", "메시지 수"), ("ask_max_chars", "상한(자)"),
-                           ("ask_timeout_seconds", "제한 시간(초)")):
-            row.addWidget(QLabel(label))
-            row.addWidget(self._spin(key))
-            row.addSpacing(12)
-        row.addStretch(1)
-        box = self._item(lay, "요약 재료와 제한 시간", row, "F2 요약에 넘기는 마지막 메시지 수, 글자 수 상한, CLI 제한 시간.",
-                         "ask_tail_messages")
-        for k in ("ask_max_chars", "ask_timeout_seconds"):
-            self._notes[k] = self._notes["ask_tail_messages"]
-            self._boxes[k] = box
+        self._row(sec, "추가 가림 정규식", self.redact, key="extra_redact_patterns", stacked=True,
+                  after="다음에 쓰는 md부터 가립니다. 이미 만든 md를 다시 만들려면 트레이 메뉴의 "
+                        "고급 › 대화 md 전부 다시 만들기를 쓰세요.")
+
+        sec = self._section(lay, "F2 요약", "요약에 넘기는 재료와 시간")
+        self._row(sec, "마지막 메시지 수", self._spin("ask_tail_messages", "개"), "", "ask_tail_messages")
+        self._row(sec, "글자 수 상한", self._spin("ask_max_chars", "자", NUM_W + 16), "", "ask_max_chars")
+        self._row(sec, "제한 시간", self._spin("ask_timeout_seconds", "초"), "CLI가 이 시간 안에 답하지 않으면 멈춥니다.",
+                  "ask_timeout_seconds")
+
+        sec = self._section(lay, "파일과 주소")
         self.export_url = QLineEdit()
+        self.export_url.setFixedWidth(320)
         self.export_url.textChanged.connect(self._on_changed)
         self._bind("export_page_url", self.export_url.setText, lambda: self.export_url.text().strip())
-        self._item(lay, "내보내기 페이지 주소", self.export_url, "트레이 'claude.ai 내보내기 받으러 가기'가 여는 주소.",
-                   "export_page_url")
+        self._row(sec, "내보내기 페이지 주소", self.export_url, "트레이의 'claude.ai 내보내기 받으러 가기'가 여는 주소",
+                  "export_page_url")
         row = QHBoxLayout()
+        row.setSpacing(8)
         for text, fn in (("config.json 열기", self._open_config),
                          ("데이터 폴더 열기 (APPDATA)", lambda: self._open_dir(self.core.store.root)),
                          ("데이터 폴더 열기 (LOCALAPPDATA)", lambda: self._open_dir(self.core.store.local))):
-            b = QPushButton(text)
+            b = _button(text)
             b.clicked.connect(fn)
             row.addWidget(b)
         row.addStretch(1)
-        self._item(lay, "설정 파일", row, "config.json을 직접 고쳤다면 이 창을 닫고 다시 여세요.")
+        self._row(sec, "설정 파일과 데이터 폴더", row, "config.json을 직접 고쳤다면 이 창을 닫고 다시 여세요.", stacked=True)
 
     def _set_weights(self, v) -> None:
         for wk, sp in self.weight_spins.items():
@@ -902,13 +1192,13 @@ class SettingsWindow(QDialog):
         if p.exists():
             os.startfile(str(p))
         else:
-            QMessageBox.information(self, TITLE, "config.json이 아직 없습니다. 저장하면 만들어집니다.")
+            tell(self, TITLE, "config.json이 아직 없습니다. 저장하면 만들어집니다.")
 
     def _open_dir(self, p: Path) -> None:
         if Path(p).is_dir():
             os.startfile(str(p))
         else:
-            QMessageBox.information(self, TITLE, f"폴더가 없습니다: {p}")
+            tell(self, TITLE, f"폴더가 없습니다: {p}")
 
     # ---- 값 채우기, 모으기 -------------------------------------------------------
     def populate(self, cfg: dict) -> None:
@@ -930,7 +1220,8 @@ class SettingsWindow(QDialog):
         self._update_codex_desc()
         self.initial = self.collect()
         self._on_changed()
-        self._on_tab(self.tabs.currentIndex())
+        self._on_tab(self._tab)
+        self._preview_theme()
 
     def collect(self) -> dict:
         return {k: get() for k, (_set, get) in self._io.items()}
@@ -964,19 +1255,26 @@ class SettingsWindow(QDialog):
         self.claude_box.setVisible(prov == "claude")
         self.codex_box.setVisible(prov == "codex")
         self.off_note.setVisible(prov == "off")
-        if prov in ("claude", "codex") and self.tabs.currentIndex() == S.TABS.index("ask"):
+        if prov in ("claude", "codex") and self._tab == "ask":
             self._start_check(prov)
         d = self.dirty()
         self.setWindowTitle(TITLE + (" *" if d else ""))
         self.btn_save.setEnabled(d or bool(self.forced) or bool(self.core.store.config_broken))
 
-    def select_tab(self, tab: str | None) -> None:
-        if not self.setup_mode and tab in S.TABS:
-            self.tabs.setCurrentIndex(S.TABS.index(tab))
-            self._on_tab(self.tabs.currentIndex())
+    def current_tab(self) -> str:
+        return self._tab
 
-    def _on_tab(self, idx: int) -> None:
-        if S.TABS[idx] == "ask":
+    def select_tab(self, tab: str | None) -> None:
+        if self.setup_mode or tab not in S.TABS:
+            return
+        self._tab = tab
+        i = S.TABS.index(tab)
+        self.stack.setCurrentIndex(i)
+        self.nav_buttons[i].setChecked(True)
+        self._on_tab(tab)
+
+    def _on_tab(self, tab: str) -> None:
+        if tab == "ask":
             prov = self._io["ask_provider"][1]()
             if prov in ("claude", "codex"):
                 self._start_check(prov)
@@ -993,7 +1291,7 @@ class SettingsWindow(QDialog):
                     first = first or f.key
         if first:
             tab = S.tab_of(first)
-            self.tabs.setCurrentIndex(S.TABS.index(tab))
+            self.select_tab(tab)
             box = self._boxes.get(first)
             if box:
                 self._scrolls[tab].ensureWidgetVisible(box)
@@ -1008,8 +1306,8 @@ class SettingsWindow(QDialog):
             return False
         miss = S.archive_missing(new)
         if miss and new.get("archive_dir") != old.get("archive_dir"):
-            ans = QMessageBox.question(self, TITLE, f"보관 폴더가 없습니다: {miss}\n폴더를 만들까요?")
-            if ans != QMessageBox.StandardButton.Yes:
+            ans = ask(self, TITLE, f"보관 폴더가 없습니다: {miss}\n폴더를 만들까요?", [("no", "취소"), ("yes", "만들기")])
+            if ans != "yes":
                 self._show_errors({"archive_dir": f"폴더가 없습니다: {miss}"})
                 return False
             try:
@@ -1019,25 +1317,14 @@ class SettingsWindow(QDialog):
                 return False
         ws = list(S.warnings(new).values())
         ws = [w for w in ws if "쓰는 키" not in w]        # 단축키 경고는 칸 아래에 이미 보임
-        prov = S.read_provider(new)
-        st = self._cli_status.get(prov)
-        if prov in ("claude", "codex") and st and st.state == "missing":
-            ws.append(f"{cli_check.NAME[prov]} CLI를 찾지 못했습니다. F2를 누르면 실패 사유로 다시 알려 드립니다")
+        # CLI를 못 찾은 것은 묻지 않는다: 한쪽 CLI만 쓰는 PC가 보통이고, CLI 상태 줄과 F2 실패 사유로 이미 보인다
         if ws:
-            ans = QMessageBox.warning(self, TITLE, "\n".join(ws) + "\n\n이대로 저장할까요?",
-                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            if ans != QMessageBox.StandardButton.Yes:
+            ans = ask(self, TITLE, "\n".join(ws) + "\n\n이대로 저장할까요?", [("back", "돌아가기"), ("save", "저장")])
+            if ans != "save":
                 return False
         if self.core.store.config_signature() != self._sig:
-            box = QMessageBox(self)
-            box.setWindowTitle(TITLE)
-            box.setIcon(QMessageBox.Icon.Question)
-            box.setText(CHANGED_OUTSIDE)
-            over = box.addButton("덮어쓰기", QMessageBox.ButtonRole.AcceptRole)
-            reload_ = box.addButton("다시 읽기", QMessageBox.ButtonRole.ActionRole)
-            box.addButton("취소", QMessageBox.ButtonRole.RejectRole)
-            box.exec()
-            if box.clickedButton() is reload_:
+            ans = ask(self, TITLE, CHANGED_OUTSIDE, [("cancel", "취소"), ("reload", "다시 읽기"), ("over", "덮어쓰기")])
+            if ans == "reload":
                 before = self.core.config
                 changed = self.core.reload_config()
                 self.hooks.applied(changed, before)
@@ -1045,7 +1332,7 @@ class SettingsWindow(QDialog):
                 self.broken.setVisible(bool(self.core.store.config_broken))
                 self.populate(self.core.config)
                 return False
-            if box.clickedButton() is not over:
+            if ans != "over":
                 return False
         if not S.same_hotkey(str(new.get("hotkey") or ""), str(old.get("hotkey") or "")):
             ok, why = self.hooks.try_hotkey(str(new["hotkey"]))
@@ -1058,7 +1345,7 @@ class SettingsWindow(QDialog):
         except OSError as e:
             if "hotkey" in new and not S.same_hotkey(str(new["hotkey"]), str(old.get("hotkey") or "")):
                 self.hooks.try_hotkey(str(old.get("hotkey") or S.DEFAULT_HOTKEY))   # 되돌림
-            QMessageBox.warning(self, TITLE, f"config.json을 저장하지 못했습니다: {e}")
+            tell(self, TITLE, f"config.json을 저장하지 못했습니다: {e}")
             return False
         self._done = True
         self.hooks.applied(changed, old)
@@ -1074,8 +1361,8 @@ class SettingsWindow(QDialog):
             self._skip()
             return
         if self.dirty():
-            ans = QMessageBox.question(self, TITLE, "저장하지 않고 닫을까요?")
-            if ans != QMessageBox.StandardButton.Yes:
+            ans = ask(self, TITLE, "바꾼 내용을 저장하지 않고 닫을까요?", [("no", "계속 고치기"), ("yes", "닫기")])
+            if ans != "yes":
                 return
         self._done = True
         super().reject()
@@ -1086,60 +1373,69 @@ class SettingsWindow(QDialog):
         root.addWidget(self.pages, 1)
         guess = S.guess_sources()
         # 1. 쓰는 서비스
-        lay = self._page(title="1. 쓰는 서비스")
-        lay.addWidget(self._help("쓰는 것만 고르세요. 끈 서비스는 수집도 알림도 하지 않습니다. 나중에 설정에서 바꿀 수 있습니다."))
+        lay = self._page(title="1. 쓰는 서비스",
+                         desc="쓰는 것만 고르세요. 끈 서비스는 수집도 알림도 하지 않습니다. 나중에 설정에서 바꿀 수 있습니다.")
+        sec = self._section(lay, "쓰는 서비스")
+        col = QVBoxLayout()
+        col.setSpacing(10)
         self.setup_sources = {}
         for s in S.SERVICES:
             cb = QCheckBox(S.SERVICE_LABEL[s])
             cb.setChecked(guess[s])
             self.setup_sources[s] = cb
-            lay.addWidget(cb)
-        lay.addWidget(self._help("Claude Code, Codex는 이 PC에 쓴 흔적이 있으면 미리 체크해 두었습니다. "
-                                 "claude.ai, ChatGPT는 브라우저에서 쓰므로 직접 고르세요."))
+            col.addWidget(cb)
+        self._row(sec, "", col, stacked=True,
+                  after="Claude Code, Codex는 이 PC에 쓴 흔적이 있으면 미리 체크해 두었습니다. "
+                        "claude.ai, ChatGPT는 브라우저에서 쓰므로 직접 고르세요.")
         # 2. 보관 폴더
-        lay = self._page(title="2. 대화 보관 폴더")
-        lay.addWidget(self._help("모은 대화를 md 파일로 쌓을 곳입니다."))
+        lay = self._page(title="2. 대화 보관 폴더", desc="모은 대화를 md 파일로 쌓을 곳입니다.")
+        sec = self._section(lay, "보관 폴더")
         self.setup_archive = ""
-        self.setup_archive_label = QLabel(str(self.core.default_archive))
-        self.setup_archive_label.setWordWrap(True)
+        self.setup_archive_label = _label(str(self.core.default_archive), "name")
         self.setup_archive_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        lay.addWidget(self.setup_archive_label)
         row = QHBoxLayout()
-        keep = QPushButton("그대로 쓰기")
+        row.setSpacing(8)
+        keep = _button("그대로 쓰기")
         keep.clicked.connect(lambda: self._set_setup_archive(""))
-        change = QPushButton("바꾸기...")
+        change = _button("바꾸기...")
         change.clicked.connect(self._choose_setup_archive)
         row.addWidget(keep)
         row.addWidget(change)
         row.addStretch(1)
-        lay.addLayout(row)
-        lay.addWidget(self._help(CLOUD_WARNING, warn=True))
+        col = QVBoxLayout()
+        col.setSpacing(10)
+        col.addWidget(self.setup_archive_label)
+        col.addLayout(row)
+        self._row(sec, "", col, stacked=True, warn=CLOUD_WARNING)
         # 3. 요약 AI
-        lay = self._page(title="3. 요약 AI (F2)")
-        lay.addWidget(self._help("큐에서 F2를 누르면 '어디까지 했지?'를 요약합니다. 이 PC에 설치된 CLI를 씁니다."))
+        lay = self._page(title="3. 요약 AI (F2)",
+                         desc="큐에서 F2를 누르면 '어디까지 했지?'를 요약합니다. 이 PC에 설치된 CLI를 씁니다.")
+        sec = self._section(lay, "쓰는 AI")
         self.setup_provider = {}
         self.setup_provider_touched = False
         grp = QButtonGroup(self)
+        col = QVBoxLayout()
+        col.setSpacing(10)
         for p, label in (("claude", "Claude (Claude Code CLI)"), ("codex", "GPT (Codex CLI)"), ("off", "끄기")):
             rb = QRadioButton(label)
             rb.clicked.connect(self._on_setup_provider)
             grp.addButton(rb)
             self.setup_provider[p] = rb
-            lay.addWidget(rb)
+            col.addWidget(rb)
         self.setup_model = self._help("")
-        lay.addWidget(self.setup_model)
+        self._row(sec, "", col, stacked=True, extras=(self.setup_model,))
         for p in ("claude", "codex"):
-            lay.addWidget(self._status_row(p))
-        lay.addWidget(self._help("설치와 로그인은 직접 합니다(터미널에서 claude 또는 codex login). 모델을 바꾸려면 설정 > 요약 AI."))
+            self._status_row(sec, p)
+        self._row(sec, "", None, "설치와 로그인은 직접 합니다(터미널에서 claude 또는 codex login). 모델을 바꾸려면 설정 > 요약 AI.")
         # 4. 노트 폴더와 수집 스크립트
         lay = self._page(title="4. 노트 폴더와 수집 스크립트")
-        self.setup_notes = ListEdit("dir", "노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)")
-        self._item(lay, "노트 폴더 (선택)", self.setup_notes, "내 md 폴더(Obsidian 볼트 등)를 넣으면 같이 검색됩니다. 파일은 읽기만 합니다.")
-        self.setup_guides = []
-        for site in SCRIPTS:
-            g = self._script_guide(site)
-            lay.addWidget(g)
-            self.setup_guides.append((site, g))
+        sec = self._section(lay, "노트 폴더", "선택")
+        self.setup_notes = ListEdit("노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)")
+        self._row(sec, "", self.setup_notes, "내 md 폴더(Obsidian 볼트 등)를 넣으면 같이 검색됩니다. 파일은 읽기만 합니다.",
+                  stacked=True)
+        self.setup_guides = [(site, self._script_guide(lay, site)) for site in SCRIPTS]
+        for page in self._sections:
+            page.addStretch(1)
         self._page_idx = 0
 
     def _set_setup_archive(self, path: str) -> None:
@@ -1163,9 +1459,9 @@ class SettingsWindow(QDialog):
 
     def _refresh_setup_ask(self) -> None:
         p = self._setup_provider_value()
-        for prov, labels in self._status_labels.items():
-            for lb in labels:
-                lb.parentWidget().setVisible(prov == p)
+        for prov, rows in self._status_rows.items():
+            for box in rows:
+                box.setVisible(prov == p)
         if p in ("claude", "codex"):
             self.setup_model.setText(f"모델: {cli_check.CHEAPEST[p]} (가장 저렴)")
             self._start_check(p)
@@ -1195,7 +1491,7 @@ class SettingsWindow(QDialog):
                              self._setup_provider_value())
         errs = S.validate(cfg)
         if errs:
-            QMessageBox.warning(self, SETUP_TITLE, "\n".join(errs.values()))
+            tell(self, SETUP_TITLE, "\n".join(errs.values()))
             return
         self._save_setup(cfg, True)
 
@@ -1207,7 +1503,7 @@ class SettingsWindow(QDialog):
         try:
             changed = self.core.update_config(cfg)
         except OSError as e:
-            QMessageBox.warning(self, SETUP_TITLE, f"config.json을 저장하지 못했습니다: {e}\n다음 실행 때 다시 묻습니다.")
+            tell(self, SETUP_TITLE, f"config.json을 저장하지 못했습니다: {e}\n다음 실행 때 다시 묻습니다.")
             changed = set()
         self._done = True
         self.hooks.setup_finished(finished, changed, old)

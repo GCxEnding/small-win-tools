@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox, QSy
 
 from . import hotkey as hk
 from . import settings as S
+from . import theme as T
 from .ask import OFF_MESSAGE, AskError
 from .core import Core, setup_logging
 from .hotkey import HotkeyManager
@@ -156,7 +157,13 @@ class App:
         self.searcher = Searcher(self.search_conn, self.core.config.get("weights"),
                                  int(self.core.config.get("max_results", 50)))
 
-        self.window = SearchWindow()
+        self.theme = T.from_config(self.core.config)
+        T.apply_app(qapp, self.theme)
+        self.window = SearchWindow(self.theme)
+        try:                              # 시스템 모드: Windows 앱 모드가 바뀌면 따라간다 (Qt 6.5+)
+            qapp.styleHints().colorSchemeChanged.connect(lambda _s: self.apply_theme())
+        except AttributeError:
+            pass
         self.window.searchRequested.connect(self.on_query)
         self.window.action.connect(self.on_action)
         self.window.settingsRequested.connect(self._settings_from_search)
@@ -360,7 +367,7 @@ class App:
             return
         if self._archive_was_ok is False:
             self.update_archive_state()
-        if "capture" not in self.worker.pending and self.core.pending_captures():
+        if "capture" not in self.worker.pending and (self.core.pending_captures() or self.core.exclusions_pending()):
             self.worker.submit("capture", self.core.import_captures)   # 폴더 감시가 없어도 2초 확인으로 잡힘
         for p in self.poller.poll(self.core.watch_dir):
             self.poller.mark_done(p)
@@ -548,6 +555,8 @@ class App:
             self.searcher.max_results = self.core._int_cfg("max_results", 50)
         if "ask_provider" in changed:
             self.window.set_ask_enabled(self.core.ask_provider != "off")
+        if changed & {"theme_mode", "theme_accent"}:
+            self.apply_theme()
         if start and not self._setup_pending:
             if "archive_dir" in changed:
                 self._archive_was_ok = None
@@ -559,6 +568,18 @@ class App:
                 self.import_now()             # 새로 켠 서비스: '지금 가져오기'와 같은 작업
         if self.window.isVisible():
             self.on_query(self._last_query)
+
+    def apply_theme(self):
+        """설정의 모드, 강조색(시스템 모드면 지금 Windows 앱 모드)으로 앱 전체를 다시 칠한다."""
+        self.theme = T.from_config(self.core.config)
+        T.apply_app(self.qapp, self.theme)
+        self.window.set_theme(self.theme)
+        w = self.settings_win
+        if w is not None:
+            try:
+                w.system_theme_changed()
+            except RuntimeError:          # 이미 지워진 창
+                pass
 
     def _setup_finished(self, finished: bool, changed: set, old: dict):
         self._setup_pending = False
@@ -765,6 +786,7 @@ def main() -> int:
     qapp = QApplication(sys.argv)
     qapp.setApplicationName(APP_NAME)
     qapp.setQuitOnLastWindowClosed(False)
+    qapp.setStyle("Fusion")       # Windows 기본 스타일은 입력칸 테두리 등 스타일시트 일부를 무시한다 (theme.py)
     if not fts5_available():
         QMessageBox.critical(None, APP_NAME, "이 Python의 sqlite3에 FTS5가 없습니다.\n"
                                              "python.org 배포판 Python 3.10 이상으로 실행하세요.")

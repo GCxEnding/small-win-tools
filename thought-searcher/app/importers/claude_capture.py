@@ -14,6 +14,8 @@ data는 대화 본문 API(/backend-api/conversation/<id>) 응답이고, 내보�
 from __future__ import annotations
 
 import json
+import re
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +31,7 @@ PATTERNS = ("claude-ai_*.json", "chatgpt_*.json")
 STATUS_NAMES = {"claude-ai": "_status.json", "chatgpt": "_status_chatgpt.json"}
 SITE_LABEL = {"claude-ai": "claude.ai", "chatgpt": "ChatGPT"}
 STATUS_NAME = STATUS_NAMES["claude-ai"]
+_UUID = re.compile(r"[0-9A-Za-z-]{8,64}")     # 파일 이름에 넣으므로 경로 글자(/ \ .)는 막는다
 
 
 def capture_files(folder: Path) -> list[Path]:
@@ -146,3 +149,49 @@ def read_status(folder: Path, site: str = "claude-ai") -> dict | None:
 
 def last_ok(status: dict | None) -> datetime | None:
     return parse_iso((status or {}).get("last_ok"))
+
+
+# ---- 수집 제외 (claude.ai) ------------------------------------------------------
+# 사용자가 Tampermonkey 메뉴에서 뺀 대화, 프로젝트. 스크립트가 상태 파일(_status.json)의 "exclude"에 쓴다:
+#   {"conversations": [{"uuid", "title", "project"}], "projects": [{"uuid", "name"}]}
+# conversations에는 직접 뺀 대화와, 뺀 프로젝트에 속해 스크립트가 찾은 대화가 같이 들어 있다
+# (claude.ai 내보내기 zip에는 대화마다 프로젝트 정보가 없어서 앱은 대화 uuid로만 거른다).
+@dataclass
+class Exclude:
+    conversations: dict[str, str] = field(default_factory=dict)    # uuid -> 제목 (기록용)
+    projects: dict[str, str] = field(default_factory=dict)         # uuid -> 이름 (기록용)
+
+    def to_json(self) -> dict:
+        return {"conversations": dict(self.conversations), "projects": dict(self.projects)}
+
+    @classmethod
+    def from_json(cls, d) -> "Exclude":
+        d = d if isinstance(d, dict) else {}
+        return cls({str(k): str(v) for k, v in (d.get("conversations") or {}).items()},
+                   {str(k): str(v) for k, v in (d.get("projects") or {}).items()})
+
+    def __bool__(self) -> bool:
+        return bool(self.conversations or self.projects)
+
+
+def read_exclude(status: dict | None) -> Exclude | None:
+    """상태 파일의 제외 목록. 키가 없으면(예전 스크립트) None, 비어 있으면 빈 Exclude."""
+    if not isinstance(status, dict) or not isinstance(status.get("exclude"), dict):
+        return None
+    raw = status["exclude"]
+    out = Exclude()
+    for c in raw.get("conversations") or []:
+        if isinstance(c, dict) and _UUID.fullmatch(str(c.get("uuid") or "")):
+            out.conversations[str(c["uuid"])] = str(c.get("title") or "")
+    for p in raw.get("projects") or []:
+        if isinstance(p, dict) and _UUID.fullmatch(str(p.get("uuid") or "")):
+            out.projects[str(p["uuid"])] = str(p.get("name") or "")
+    return out
+
+
+def capture_uuid(name: str) -> str:
+    """'claude-ai_<uuid>.json' -> uuid (아니면 빈 문자열)."""
+    if name.startswith("claude-ai_") and name.endswith(".json"):
+        u = name[len("claude-ai_"):-len(".json")]
+        return u if _UUID.fullmatch(u) else ""
+    return ""

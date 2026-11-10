@@ -1,3 +1,88 @@
+# 인수인계: 설정 창 디자인 개편과 테마 (2026-11-10 밤)
+
+> 이 절이 최신입니다. 아래 "설정 창과 시작 안내" 절은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
+> **커밋은 하지 않았습니다**(CLAUDE.md 6번).
+
+## A. 한 일
+
+CG가 준 시안(라이트/다크 고급 탭 그림)대로 설정 창을 바꾸고 테마를 넣었습니다. UI 프레임워크(PySide6)는 그대로이고 화면 구성과 스타일만 바꿨습니다.
+
+| 파일 | 내용 |
+|---|---|
+| `app/theme.py` (새) | **색 값은 여기에만** 있습니다. `BASE`(라이트/다크 기본색), `ACCENT`(강조색 4종 x 모드), `BRAND`/`BADGE_STYLE`(출처 배지), `make(mode, accent, dark=None)`/`from_config(cfg)` → `Theme`, `palette()`(앱 전체 QPalette), `dialog_qss()`(설정 창, 시작 안내), `search_qss()`(검색 창), 단색 선 아이콘(`icon()`, SVG 문자열), 강조색 동그라미(`swatch()`), 제목 표시줄 색(`style_titlebar`, DWM) |
+| `app/settings.py` | `THEME_MODES`/`THEME_MODE_LABEL`, `THEME_ACCENTS`/`THEME_ACCENT_LABEL`, `read_theme`, 칸 종류 `theme_mode`/`theme_accent` 검사. 가중치 이름 `반감기(일)` → `반감기`(단위는 칸 안에 붙음) |
+| `app/store.py` | 새 키 `theme_mode`(기본 `system`), `theme_accent`(기본 `ink_blue`) |
+| `app/settings_window.py` | 위 탭 → 왼쪽 사이드바(208px, `nav_buttons`) + `QStackedWidget`(`stack`). 화면 도우미 `_page`(제목, 설명) → `_section`(제목 + 옆 설명 + 오른쪽 링크, 섹션 간격 36px) → `_row`(왼쪽 이름 14px + 설명 12.5px / 오른쪽 칸, `stacked=True`면 위아래). 새 위젯 `NumEdit`(화살표 없는 숫자 칸 + 단위), `LinesEdit`(가림 정규식 여러 줄 칸), `Section`. 모드, 강조색 고르기(`_chips`)는 저장 전에 창에 먼저 칠함(`_preview_theme`). 색을 직접 쓰던 `setStyleSheet(color:...)`는 모두 `tone="error"` 속성(`set_tone`)으로 바꿈. 시작 안내도 같은 테마와 섹션/줄 구조 |
+| `app/window.py` | `Theme` 클래스를 `theme.py`로 옮김(`from .theme import Theme`는 남김). `SearchWindow(theme)`, `set_theme(t)`. ⚙ 글자 → 선 아이콘. 배지 색은 `theme.badge_colors`. 요약 줄의 💬 → `요약:` |
+| `app/main.py` | `qapp.setStyle("Fusion")`, 시작 때 `T.apply_app`, `apply_theme()`(저장 때 `theme_*`가 바뀌면, Windows 앱 모드가 바뀌면 `colorSchemeChanged`) |
+| `tests/test_theme.py` (새), `tests/test_settings_window.py` | 시안 색 값 대조, 이름 표 일치, 스타일시트에 테마 밖 색이 없는지, 배지, 검색 창 `set_theme`. 창 테스트는 `tabs` → `nav_buttons`/`stack`/`current_tab()`/`select_tab()`, 정규식 칸, 숫자 칸 단위, 테마 미리보기와 저장, 시작 안내 테마 |
+| `README.md` | 설정 창 표(탭 → 메뉴, 모양 항목), 테마 설명, ⚙ → 톱니바퀴 아이콘 |
+
+## B. 정한 것
+
+| 정한 것 | 이유 |
+|---|---|
+| 글자색은 본문/보조/플레이스홀더 세 단계. **오류와 경고만 빨강**(`error`: 라이트 `#C5221F`, 다크 `#F28B82`), 경고 앞 ⚠는 뺌 | CG 결정 (2026-11-10) |
+| 출처 배지만 서비스 고유색: Claude `#D97757`, GPT `#74AA9C`. 같은 회사는 같은 색, **칠하는 방식으로 종류 구분**: 웹 채팅(claude.ai, ChatGPT) 꽉 채움, 코드 도구(Claude Code, Codex) 테두리만, claude.ai 프로젝트/메모리 옅은 바탕(24%), 노트/일지 무채색 | CG가 GPT, 클로드 고유색을 주고 Code/Codex 구분 방법을 물음. 제안안을 넣음. **CG가 실제 검색 창에서 아직 안 봄**. 바꾸려면 `theme.BADGE_STYLE`, `BRAND`만 고치면 됨 |
+| GPT 배지 글자는 흰색이 아닌 `#10201C` | `#74AA9C` 위 흰 글자는 대비가 2.5:1로 작은 글자에 약함 |
+| 체크박스, 라디오의 체크 표시는 본문색(강조색 아님) | 강조색은 저장 버튼, 링크, 초점 테두리에만 쓴다는 규칙 |
+| 선택된 모드/강조색 단추는 사이드바 선택처럼 옅은 회색 + 굵게 | 같은 규칙 |
+| `Fusion` 스타일을 앱 전체에 씀 | Windows 기본 스타일은 입력칸 테두리, 콤보 상자 등 스타일시트 일부를 무시함 |
+| 콤보 화살표, 체크 표시는 색을 넣은 SVG를 `%TEMP%\thought-searcher-ui\`에 써서 `url()`로 씀 | 스타일시트로 indicator를 꾸미면 Qt 기본 그림이 사라져 그림 파일이 필요. Fusion 기본 체크박스는 다크에서 거의 안 보였음 |
+| 반감기 칸은 소수점 없이(정수) 보여 줌 | 시안 `180 일`. 손으로 넣은 소수값(예: 90.5)은 창에서 반올림돼 보이지만 그 칸을 건드리지 않으면 저장 때 쓰지 않음 |
+| 넓은 칸(노트 폴더 목록, 큐 출처 체크 5개, 쓰는 서비스, 강조색 4개, 가림 정규식, 폴더 열기 단추 3개)은 stacked(이름 아래) | 오른쪽 칸 폭에 안 들어가거나, 왼쪽 설명이 좁아져 줄바꿈 높이 계산이 깨짐(강조색 설명이 잘렸음) |
+| 다크 제목 표시줄: `DWMWA_USE_IMMERSIVE_DARK_MODE` + Windows 11은 제목 표시줄 색을 배경색으로 | 시안의 제목 줄 색과 맞춤. Windows 10은 다크/라이트만 |
+
+### 다음 AI가 알아 둘 함정
+- **숫자 칸(`NumEdit`) 안의 `QSpinBox`에 스타일시트로 `border`, `padding`, `::up-button`을 주면 안쪽 편집칸이 1px로 줄어 숫자가 안 보입니다.** 테두리는 바깥 `QFrame#numBox`가 그리고 스핀은 `setFrame(False)`로 처리했습니다. 또 일반 `QLineEdit` 규칙이 스핀과 편집 가능 콤보의 안쪽 편집칸에도 걸리므로 `QFrame#numBox QLineEdit, QComboBox QLineEdit`에서 초기화합니다.
+- 색을 새로 쓸 때는 `theme.py`의 `BASE`에 키를 더하고 `Theme`에 같은 이름의 필드를 더합니다. `test_stylesheets_use_only_theme_values`가 스타일시트 안의 `#rrggbb`가 테마 값인지 검사합니다.
+- 설정 키를 더하는 순서는 아래 6번 그대로입니다. 칸은 `_row(sec, 이름, 칸, 설명, key)`로 넣습니다.
+
+## C. 확인한 것
+- offscreen으로 설정 창 4개 메뉴와 시작 안내 3단계를 라이트/다크로 그려 시안과 비교했습니다(숫자 칸, 콤보 화살표, 체크박스, 강조색 줄을 이 과정에서 고침).
+- pytest(`test_perf.py` 제외): **330 passed, 12 failed**. 실패 12개는 모두 `test_settings.py`의 "기본값이 검사를 통과" 계열이고, 이 PC에 지금 `%USERPROFILE%\.codex`가 없어서 납니다. 커밋된 HEAD(888d9ef)에서도 똑같이 12개가 실패하는 것을 확인했습니다(이번 변경과 무관). `.codex`가 있는 PC에서는 통과해야 합니다.
+
+### C-2. CG 확인 뒤 고친 것 (2026-11-11)
+- CG가 실제 앱에서 보고 결과에 만족함.
+- 서비스 순서를 회사별로: claude.ai, Claude Code, ChatGPT, Codex (`settings.SERVICES`, `SERVICE_LABEL`, `QUEUE_CHOICES`, `QUEUE_LABEL`, `store.DEFAULT_CONFIG["sources"]`). 쓰는 서비스, 큐 출처, 시작 안내가 모두 이 순서.
+- 설정 창의 `QMessageBox`를 모두 `settings_window.ask()`/`tell()`(`Confirm` 대화 상자)로 바꿈. QMessageBox는 Windows 알림 소리를 내고 단추가 영어(Yes/No, Qt 번역 파일을 안 실어서)였음. 새 창은 테마를 따르고 아이콘이 없어 소리가 안 나며, 단추는 `저장/돌아가기`, `만들기/취소`, `닫기/계속 고치기`처럼 하는 일을 적음. 테스트는 `sw.ask`를 바꿔 끼움.
+- 저장할 때 "CLI를 찾지 못했습니다" 경고를 없앰. Claude Code만 쓰거나 Codex만 쓰는 PC가 보통이고, CLI 상태 줄과 F2 실패 사유로 이미 보임.
+- `settings.validate`: 경로 칸이 **기본값이면** 폴더가 없어도 통과(예: Codex를 안 쓰는 PC의 `%USERPROFILE%\.codex`). 이 때문에 이 PC에서 실패하던 `test_settings.py` 12개가 통과함. 직접 고른 경로는 그대로 검사.
+- pytest(`test_perf.py` 제외): **345 passed** (C-3 뒤 351 passed).
+
+### C-3. claude.ai 수집 제외 (2026-11-11, CG 요청: 개인 대화를 수집에서 빼기)
+
+CG가 고른 안: **Tampermonkey 메뉴에서 빼기, claude.ai만, 기존 md도 지움.**
+
+| 파일 | 내용 |
+|---|---|
+| `userscript/claude-sync.user.js` (0.2.0) | 메뉴 `이 대화 수집에서 빼기`, `이 프로젝트 수집에서 빼기`, `수집에서 뺀 목록 (되돌리기)`. GM 저장소 `exclude = {conversations: {uuid: {title, project}}, projects: {uuid: name}}`. 대화 목록을 훑을 때 뺀 대화, 뺀 프로젝트의 대화는 받지 않고 `seen`에만 적음. 뺀 프로젝트의 대화는 찾는 대로 `conversations`에 `project: <프로젝트 uuid>`로 더함. 프로젝트를 빼거나 되돌리면 `backfilled=false`로 전체 목록을 한 번 훑음. `_status.json`에 `exclude: {conversations: [{uuid,title,project}], projects: [{uuid,name}]}`를 같이 씀 (메뉴를 누르면 바로 씀) |
+| `app/importers/claude_capture.py` | `Exclude`, `read_exclude(status)`(키가 없으면 None = 예전 스크립트), `capture_uuid(name)`. uuid는 `[0-9A-Za-z-]{8,64}`만 받음(파일 이름에 넣으므로) |
+| `app/core.py` | `exclusions_pending()`(상태 파일 stat이 바뀌었는지, 2초 확인용), `capture_exclude`(상태 파일 → 없으면 `state["capture_exclude"]` 사본), `apply_exclusions()`: md(`claude-ai:<uuid>`, `claude-ai-project:<uuid>`)를 `Archive.find`로 찾아 지움, 수집 폴더/다운로드 폴더/원본 사본의 `claude-ai_<uuid>.json` 지움, `summaries.drop`, `queue_closed`에서 뺌, 색인 갱신. `import_captures`가 처음에 부르고, 뺀 대화의 새 수집 파일은 가져오지 않고 지움. zip(`claude-ai` 가져오기)은 `_drop_excluded`로 대화, 프로젝트 문서, 프로젝트 메모리 항목(`native_id = project:<uuid>`)을 뺌. `CaptureResult.removed` |
+| `app/ask.py` | `SummaryStore.drop(ids)` |
+| `app/main.py` | 2초 확인에 `exclusions_pending()` 더함 |
+| `tests/test_exclude.py` (새) | 6개: 목록 읽기, 기존 흔적 지우기, 뺀 수집 파일 안 가져옴, 상태 파일이 없어도 목록 유지, zip에서 빼기(대화, 프로젝트 문서, 프로젝트 메모리), 되돌리면 다시 들어옴 |
+| `README.md` | '개인 대화 빼기 (claude.ai)' 절 |
+
+정한 것과 이유
+- **내보내기 zip에는 대화마다 프로젝트 정보가 없음**(`tests/local/export`의 실제 zip에서 확인: 대화 키는 `account, computer_folders, created_at, name, summary, updated_at, uuid`뿐). 그래서 프로젝트를 빼도 앱은 대화 uuid로 거르고, 프로젝트에 속한 대화 uuid는 스크립트가 목록을 훑으며 모아 줌. 프로젝트 문서와 프로젝트 메모리는 프로젝트 uuid로 거름.
+- 목록의 원본은 스크립트(GM 저장소). 앱의 `state["capture_exclude"]`는 상태 파일이 잠깐 없을 때 쓰는 사본. 되돌리면 앱은 아무것도 지우지 않고, 스크립트가 다시 받은 파일로 md가 다시 생김.
+- 다운로드 폴더의 zip 파일 자체는 지우지 않음(내 대화만 든 파일이 아님). README에 적음.
+
+확인 못 한 것 (**CG가 실제 claude.ai에서 확인 필요**)
+- 대화 목록 API(`chat_conversations?limit=...`) 항목에 `project_uuid`가 오는지. 안 오더라도 본문을 받을 때 `project_uuid`로 다시 거르므로 새로 받는 대화는 빠지지만, **이미 받아 둔(바뀌지 않은) 프로젝트 대화는 목록에 project가 와야 찾아짐.** 안 오면 프로젝트 대화 목록 API를 따로 불러야 함.
+- 대화 메타 API(`chat_conversations/<uuid>`, tree 없이)가 `name`, `project_uuid`를 주는지(메뉴에서 씀).
+- 이 PC에는 수집 파일이 없어(`%LOCALAPPDATA%\thought-searcher\raw\claude-ai-capture` 비어 있음) 실제 응답으로 시험하지 못함. 스크립트는 `node --check`만 통과.
+
+## D. 남은 일
+0. **수집 제외 실제 확인** (C-3 '확인 못 한 것'): 스크립트 0.2.0을 Tampermonkey에 다시 붙여 넣고, 대화 하나와 프로젝트 하나를 빼 본 뒤 보관 폴더에서 md가 지워지는지, 개발자 도구 콘솔에 오류가 없는지.
+1. **CG가 실제 트레이 앱을 재시작해 확인**: 설정 창 4개 메뉴, 라이트/다크/시스템 전환, 강조색 4종, 제목 표시줄 색, 검색 창 배지(위 B의 배지 구분안이 괜찮은지), 시작 안내(`THOUGHT_SEARCHER_APPDATA`, `THOUGHT_SEARCHER_LOCALAPPDATA`를 빈 폴더로 두고 실행).
+2. 실제 Windows 화면(고해상도 배율 포함)에서 글자 크기와 줄 간격이 시안과 맞는지. 스타일시트 글자 크기는 pt(14px = 10.5pt, 12.5px ≈ 9.4pt)입니다.
+3. (해결됨, C-2) 이 PC에서 `test_settings.py` 12개가 실패하던 문제.
+4. 아래 5번(설정 창 E2E, 동료 PC 시험)은 그대로 남아 있습니다.
+
+---
+
 # 인수인계: 설정 창과 시작 안내 (SPEC-settings.md 구현)
 
 > 작성: 2026-11-10. 다음 세션은 이 문서와 `SPEC-settings.md`를 먼저 읽습니다.

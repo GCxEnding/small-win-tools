@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QStyle,
                                QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
 
+from . import theme as T
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit
+from .theme import Theme
 
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
 ROLE_HIT = Qt.UserRole + 1
@@ -24,35 +26,12 @@ HINT_QUEUE = "열린 일 · Enter 열기 · F2 요약 · F4 완료 · Shift+F4 �
 HINT_QUEUE_NO_ASK = HINT_QUEUE.replace("F2 요약 · ", "")
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
          "journal": "일지"}
-BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
-               "claude-ai-memory": "#a855f7", "chatgpt": "#6b7280", "note": "#ca8a04", "codex": "#0d9488",
-               "journal": "#7c3aed"}
 DEBOUNCE_MS = 150
 WIN_W, WIN_H = 820, 560
 
 
 def center_position(g: QRect, w: int, h: int) -> QPoint:
     return QPoint(g.left() + (g.width() - w) // 2, g.top() + (g.height() - h) // 3)
-
-
-def _dark() -> bool:
-    try:
-        return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
-    except AttributeError:
-        return False
-
-
-class Theme:
-    def __init__(self):
-        d = _dark()
-        self.bg = QColor("#202124" if d else "#ffffff")
-        self.border = QColor("#3c4043" if d else "#c9ced6")
-        self.text = QColor("#e8eaed" if d else "#1f2328")
-        self.sub = QColor("#9aa0a6" if d else "#6a737d")
-        self.sel = QColor("#2f4a6d" if d else "#dbe9fb")
-        self.input_bg = QColor("#2a2b2e" if d else "#f4f6f8")
-        self.mark_bg = QColor("#6b5b16" if d else "#fff1a8")
-        self.warn = QColor("#f28b82" if d else "#c5221f")
 
 
 class QueryEdit(QLineEdit):
@@ -160,7 +139,7 @@ class HitDelegate(QStyledItemDelegate):
         if it.id in self.ask_state:
             return self.ask_state[it.id]
         if it.summary:
-            return (f"💬 {it.summary}" + ("  (새 흔적 있음)" if it.summary_stale else "")
+            return (f"요약: {it.summary}" + ("  (새 흔적 있음)" if it.summary_stale else "")
                     + (f"  · {it.summary_model}" if it.summary_model else ""))
         return ""
 
@@ -184,11 +163,14 @@ class HitDelegate(QStyledItemDelegate):
         badge = BADGE.get(source, "MD")
         bw = fms.horizontalAdvance(badge) + 10
         rect = QRect(x, top + (line_h - fms.height()) // 2 - 1, bw, fms.height() + 2)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(BADGE_COLOR.get(source, "#888888")))
-        p.drawRoundedRect(rect, 4, 4)
+        fill, edge, color = T.badge_colors(self.t, source)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(edge, 1) if edge is not None else Qt.NoPen)
+        p.setBrush(fill if fill is not None else Qt.NoBrush)
+        p.drawRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), 4, 4)
+        p.setRenderHint(QPainter.Antialiasing, False)
         p.setFont(self.small)
-        p.setPen(QColor("#ffffff"))
+        p.setPen(color)
         p.drawText(rect, Qt.AlignCenter, badge)
         return bw
 
@@ -271,15 +253,7 @@ class HitDelegate(QStyledItemDelegate):
         max_x = r.right() - 10
         y1 = r.top() + 5 + fm.ascent()
         # 1줄: 출처 | 제목 | 프로젝트 | 날짜 | (원본 없음)
-        badge = BADGE.get(hit.source, "MD")
-        bw = fms.horizontalAdvance(badge) + 10
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor(BADGE_COLOR.get(hit.source, "#888888")))
-        p.drawRoundedRect(QRect(x0, r.top() + 5 + (fm.height() - fms.height()) // 2 - 1, bw, fms.height() + 2), 4, 4)
-        p.setFont(self.small)
-        p.setPen(QColor("#ffffff"))
-        p.drawText(QRect(x0, r.top() + 5 + (fm.height() - fms.height()) // 2 - 1, bw, fms.height() + 2),
-                   Qt.AlignCenter, badge)
+        bw = self._badge(p, x0, r.top() + 5, fm.height(), hit.source)
         right_parts = []
         if hit.project and hit.source != "claude-ai-project":
             right_parts.append(hit.project)
@@ -318,28 +292,16 @@ class SearchWindow(QWidget):
     action = Signal(str, object, int)    # (종류, Hit, 맞은 메시지 순번)
     settingsRequested = Signal()         # 상태 줄 ⚙
 
-    def __init__(self):
+    def __init__(self, theme: Theme | None = None):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_ShowWithoutActivating, False)
         self.setWindowTitle("생각 검색기")
-        self.t = Theme()
+        self.t = theme or T.make()
         font = QFont()
         font.setFamilies(TEXT_FONTS)
         font.setPointSize(10)
         self.setFont(font)
         self.resize(WIN_W, WIN_H)
-        self.setStyleSheet(f"""
-            QWidget#root {{ background:{self.t.bg.name()}; border:1px solid {self.t.border.name()}; }}
-            QLineEdit {{ background:{self.t.input_bg.name()}; color:{self.t.text.name()};
-                        border:1px solid {self.t.border.name()}; border-radius:6px; padding:8px 10px;
-                        font-size:13pt; }}
-            QListWidget {{ background:{self.t.bg.name()}; border:none; outline:none; }}
-            QLabel {{ color:{self.t.sub.name()}; padding:2px 4px; }}
-            QLabel#detail {{ color:{self.t.text.name()}; background:{self.t.input_bg.name()};
-                            border-radius:6px; padding:6px 10px; }}
-            QToolButton#gear {{ color:{self.t.sub.name()}; border:none; padding:0 4px; }}
-            QToolButton#gear:hover {{ color:{self.t.text.name()}; }}
-        """)
         self.ask_enabled = True
         root = QWidget(self)
         root.setObjectName("root")
@@ -375,7 +337,7 @@ class SearchWindow(QWidget):
         status_row.addWidget(self.status, 1)
         self.gear = QToolButton()
         self.gear.setObjectName("gear")
-        self.gear.setText("⚙")
+        self.gear.setIconSize(QSize(16, 16))
         self.gear.setToolTip("설정")
         self.gear.setFocusPolicy(Qt.NoFocus)
         self.gear.setCursor(Qt.PointingHandCursor)
@@ -391,6 +353,7 @@ class SearchWindow(QWidget):
         self._queue: QueueResult | None = None
         self._show_rest = False
         self._show_closed = False
+        self.set_theme(self.t)
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -405,6 +368,15 @@ class SearchWindow(QWidget):
         self.edit.cancelled.connect(self.hide)
 
     # ---- 표시 ---------------------------------------------------------
+    def set_theme(self, t: Theme) -> None:
+        """테마 바꾸기 (설정 저장, 시스템 모드 전환 때 main.py가 부른다)."""
+        self.t = t
+        self.delegate.t = t
+        self.setPalette(T.palette(t))
+        self.setStyleSheet(T.search_qss(t))
+        self.gear.setIcon(T.icon("settings", t.sub, 16))
+        self.list.viewport().update()
+
     def popup(self) -> None:
         screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
         g = screen.availableGeometry()

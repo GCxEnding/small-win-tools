@@ -358,6 +358,15 @@ class SummaryStore:
                               "at": _iso(now if now is not None else datetime.now().timestamp())}
         atomic_json(self.path, self.data)
 
+    def drop(self, item_ids) -> int:
+        """요약 지우기 (수집에서 뺀 대화). 지운 개수."""
+        gone = [i for i in item_ids if i in self.data]
+        for i in gone:
+            del self.data[i]
+        if gone:
+            atomic_json(self.path, self.data)
+        return len(gone)
+
     def is_stale(self, item_id: str, trace_ts: float) -> bool:
         """요약을 만든 뒤 새 흔적이 생겼는지 (1초 넘게 늦은 흔적)."""
         rec = self.get(item_id)

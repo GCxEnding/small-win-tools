@@ -1,0 +1,371 @@
+"""화면 색과 스타일. 설정 창, 시작 안내, 검색 창이 같이 쓴다.
+
+색 값은 이 파일에만 둔다. 다른 파일은 Theme 속성(t.text, t.accent ...)이나 여기 함수만 쓴다.
+모드와 강조색 이름, 화면 글자는 settings.py(THEME_MODES, THEME_ACCENTS)에 있다.
+
+색 규칙
+- 글자색은 세 단계: text(본문), sub(설명, 단위), placeholder. 예외로 저장을 막는 오류만 error(빨강).
+- 강조색(accent)은 저장 버튼, 텍스트 링크, 초점 받은 입력칸 테두리에만 쓴다.
+- 출처 배지만 서비스 고유색(BRAND)을 쓴다. 같은 회사는 같은 색, 칠하는 방식으로 종류를 나눈다.
+"""
+from __future__ import annotations
+
+import ctypes
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+
+from PySide6.QtCore import QByteArray, QRectF, Qt
+from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtSvg import QSvgRenderer
+
+from . import settings as S
+
+# ---- 색 값 --------------------------------------------------------------------
+BASE = {
+    "light": {"bg": "#FFFFFF", "sidebar": "#F7F7F5", "line": "#EDEDEA", "text": "#1F1F1D", "sub": "#6B6B67",
+              "placeholder": "#73736F", "input_bg": "#FFFFFF", "input_border": "#D9D9D5", "button": "#F2F2EF",
+              "nav_sel": "#EAEAE6", "error": "#C5221F", "mark_bg": "#FFF1A8"},
+    "dark": {"bg": "#1E1E1D", "sidebar": "#191918", "line": "#2C2C2A", "text": "#ECECE8", "sub": "#A1A19C",
+             "placeholder": "#8C8C87", "input_bg": "#262625", "input_border": "#3A3A37", "button": "#2A2A28",
+             "nav_sel": "#2C2C2A", "error": "#F28B82", "mark_bg": "#6B5B16"},
+}
+# 강조색: 모드별 (강조색, 강조색 위 글자색)
+ACCENT = {
+    "ink_blue": {"light": ("#2F5D8C", "#FFFFFF"), "dark": ("#8FB3DA", "#0F1B2A")},
+    "deep_teal": {"light": ("#1E6F6B", "#FFFFFF"), "dark": ("#7CC6C0", "#0B201F")},
+    "sage_green": {"light": ("#4A6B4F", "#FFFFFF"), "dark": ("#A3C4A6", "#142016")},
+    "rust": {"light": ("#9A4A2E", "#FFFFFF"), "dark": ("#E0A487", "#2A140B")},
+}
+# 출처 배지: 서비스 고유색과 그 위 글자색
+BRAND = {"claude": ("#D97757", "#FFFFFF"), "gpt": ("#74AA9C", "#10201C")}
+# 출처 -> (회사, 칠하기). fill: 웹 채팅, outline: 코드 도구, tint: claude.ai 프로젝트/메모리, neutral: 내 문서
+BADGE_STYLE = {
+    "claude-ai": ("claude", "fill"), "claude-ai-project": ("claude", "tint"), "claude-ai-memory": ("claude", "tint"),
+    "claude-code": ("claude", "outline"), "chatgpt": ("gpt", "fill"), "codex": ("gpt", "outline"),
+    "note": (None, "neutral"), "journal": (None, "neutral"),
+}
+TINT_ALPHA = 0.24
+MONO_FONTS = '"Consolas", "D2Coding", "Malgun Gothic", monospace'
+
+# 단색 선 아이콘 (24x24, stroke만). 색은 그릴 때 정한다.
+_SVG = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{c}" stroke-width="1.6" '
+        'stroke-linecap="round" stroke-linejoin="round">{body}</svg>')
+ICONS = {
+    "general": '<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+    "collect": '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/>',
+    "ask": '<path d="M5 7h14M5 12h14M5 17h9"/>',
+    "advanced": '<circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6'
+                'M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/>',
+}
+ICONS["settings"] = ICONS["advanced"]
+# 스타일시트 url()로 쓰는 작은 그림 (콤보 화살표, 체크 표시). 색을 넣어 임시 폴더에 파일로 쓴다.
+_ASSETS = {
+    "chevron": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" stroke="{a}" '
+               'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6 7.5 9 4.5"/></svg>',
+    "check": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect x="0.5" y="0.5" width="15" '
+             'height="15" rx="3.5" fill="{a}"/><path d="M4.2 8.3 6.8 10.8 11.8 5.4" fill="none" stroke="{b}" '
+             'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+}
+
+
+@dataclass(frozen=True)
+class Theme:
+    mode: str              # 설정값 (light, dark, system)
+    accent_key: str
+    dark: bool             # 실제로 그리는 모드
+    bg: QColor
+    sidebar: QColor
+    line: QColor
+    text: QColor
+    sub: QColor
+    placeholder: QColor
+    input_bg: QColor
+    input_border: QColor
+    button: QColor
+    nav_sel: QColor
+    error: QColor
+    mark_bg: QColor        # 검색 결과의 맞은 글자 바탕
+    accent: QColor
+    on_accent: QColor
+
+    # 검색 창이 쓰던 이름
+    @property
+    def border(self) -> QColor:
+        return self.input_border
+
+    @property
+    def sel(self) -> QColor:
+        return self.nav_sel
+
+    @property
+    def warn(self) -> QColor:
+        return self.error
+
+    def hex(self, name: str) -> str:
+        return getattr(self, name).name()
+
+
+def system_dark() -> bool:
+    try:
+        return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
+    except AttributeError:
+        return False
+
+
+def make(mode: str = "system", accent: str = "ink_blue", dark: bool | None = None) -> Theme:
+    """dark: 시스템 모드일 때 시스템이 다크인지 (None이면 지금 Windows 설정을 읽음)."""
+    mode = mode if mode in S.THEME_MODES else "system"
+    accent = accent if accent in S.THEME_ACCENTS else "ink_blue"
+    if mode == "system":
+        is_dark = system_dark() if dark is None else bool(dark)
+    else:
+        is_dark = mode == "dark"
+    key = "dark" if is_dark else "light"
+    acc, on_acc = ACCENT[accent][key]
+    return Theme(mode=mode, accent_key=accent, dark=is_dark, accent=QColor(acc), on_accent=QColor(on_acc),
+                 **{k: QColor(v) for k, v in BASE[key].items()})
+
+
+def from_config(cfg: dict, dark: bool | None = None) -> Theme:
+    mode, accent = S.read_theme(cfg)
+    return make(mode, accent, dark)
+
+
+def accent_color(accent: str, dark: bool) -> QColor:
+    return QColor(ACCENT[accent]["dark" if dark else "light"][0])
+
+
+# ---- 배지 ---------------------------------------------------------------------
+def _blend(fg: QColor, bg: QColor, a: float) -> QColor:
+    return QColor(round(fg.red() * a + bg.red() * (1 - a)), round(fg.green() * a + bg.green() * (1 - a)),
+                  round(fg.blue() * a + bg.blue() * (1 - a)))
+
+
+def badge_colors(t: Theme, source: str) -> tuple[QColor | None, QColor | None, QColor]:
+    """(바탕 또는 None, 테두리 또는 None, 글자색)."""
+    brand, style = BADGE_STYLE.get(source, (None, "neutral"))
+    if brand is None:
+        return t.button, t.input_border, t.sub
+    color, on = (QColor(c) for c in BRAND[brand])
+    if style == "fill":
+        return color, None, on
+    if style == "outline":
+        return None, color, t.text
+    return _blend(color, t.bg, TINT_ALPHA), None, t.text
+
+
+# ---- 아이콘 ---------------------------------------------------------------------
+def icon(name: str, color: QColor, size: int = 16) -> QIcon:
+    data = QByteArray(_SVG.format(c=color.name(), body=ICONS[name]).encode("utf-8"))
+    out = QIcon()
+    for scale in (1, 2):
+        pm = QPixmap(size * scale, size * scale)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        QSvgRenderer(data).render(p, QRectF(0, 0, size * scale, size * scale))
+        p.end()
+        pm.setDevicePixelRatio(scale)
+        out.addPixmap(pm)
+    return out
+
+
+def swatch(color: QColor, size: int = 14) -> QIcon:
+    """강조색 고르기 칸의 동그라미."""
+    out = QIcon()
+    for scale in (1, 2):
+        pm = QPixmap(size * scale, size * scale)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(Qt.NoPen)
+        p.setBrush(color)
+        p.drawEllipse(QRectF(0, 0, size * scale, size * scale))
+        p.end()
+        pm.setDevicePixelRatio(scale)
+        out.addPixmap(pm)
+    return out
+
+
+# ---- 팔레트, 스타일시트 -----------------------------------------------------------
+def palette(t: Theme) -> QPalette:
+    pal = QPalette()
+    for group in (QPalette.Active, QPalette.Inactive, QPalette.Disabled):
+        dis = group == QPalette.Disabled
+        pal.setColor(group, QPalette.Window, t.bg)
+        pal.setColor(group, QPalette.WindowText, t.placeholder if dis else t.text)
+        pal.setColor(group, QPalette.Base, t.input_bg)
+        pal.setColor(group, QPalette.AlternateBase, t.sidebar)
+        pal.setColor(group, QPalette.Text, t.placeholder if dis else t.text)
+        pal.setColor(group, QPalette.PlaceholderText, t.placeholder)
+        pal.setColor(group, QPalette.Button, t.button)
+        pal.setColor(group, QPalette.ButtonText, t.placeholder if dis else t.text)
+        pal.setColor(group, QPalette.Highlight, t.nav_sel)
+        pal.setColor(group, QPalette.HighlightedText, t.text)
+        pal.setColor(group, QPalette.ToolTipBase, t.input_bg)
+        pal.setColor(group, QPalette.ToolTipText, t.text)
+        pal.setColor(group, QPalette.Link, t.accent)
+        pal.setColor(group, QPalette.Light, t.input_bg)
+        pal.setColor(group, QPalette.Midlight, t.line)
+        pal.setColor(group, QPalette.Mid, t.input_border)
+        pal.setColor(group, QPalette.Dark, t.input_border)
+        pal.setColor(group, QPalette.Shadow, t.input_border)
+        pal.setColor(group, QPalette.BrightText, t.error)
+    return pal
+
+
+def apply_app(app, t: Theme) -> None:
+    """앱 전체(트레이 메뉴, 메시지 상자 포함)의 기본 팔레트."""
+    app.setPalette(palette(t))
+
+
+def _scrollbar_qss(c: dict) -> str:
+    return f"""
+        QScrollBar:vertical {{ background:transparent; width:10px; margin:2px 2px 2px 0; }}
+        QScrollBar::handle:vertical {{ background:{c['input_border']}; border-radius:3px; min-height:32px; }}
+        QScrollBar:horizontal {{ background:transparent; height:10px; margin:0 2px 2px 2px; }}
+        QScrollBar::handle:horizontal {{ background:{c['input_border']}; border-radius:3px; min-width:32px; }}
+        QScrollBar::add-line, QScrollBar::sub-line {{ width:0; height:0; }}
+        QScrollBar::add-page, QScrollBar::sub-page {{ background:none; }}
+        QToolTip {{ background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']}; padding:4px; }}
+    """
+
+
+def _asset(name: str, a: str, b: str = "") -> str:
+    """색을 넣은 SVG 파일 경로 (스타일시트 url()용, / 구분자)."""
+    folder = Path(tempfile.gettempdir()) / "thought-searcher-ui"
+    p = folder / f"{name}-{a.lstrip('#')}{b.lstrip('#')}.svg"
+    if not p.exists():
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            p.write_text(_ASSETS[name].format(a=a, b=b), encoding="utf-8")
+        except OSError:
+            return ""
+    return p.as_posix()
+
+
+def _c(t: Theme) -> dict:
+    return {k: getattr(t, k).name() for k in (*BASE["light"], "accent", "on_accent")}
+
+
+def dialog_qss(t: Theme) -> str:
+    """설정 창, 시작 안내."""
+    c = _c(t)
+    return f"""
+        QDialog {{ background:{c['bg']}; }}
+        QLabel {{ color:{c['text']}; }}
+        QLabel#desc, QLabel#unit, QLabel#caption {{ color:{c['sub']}; font-size:9.4pt; }}
+        QLabel#sideCaption {{ color:{c['sub']}; font-size:9pt; padding:0 12px 6px 12px; }}
+        QLabel#name {{ font-size:10.5pt; }}
+        QLabel#pageTitle {{ font-size:16.5pt; font-weight:700; }}
+        QLabel#pageDesc {{ color:{c['sub']}; font-size:9.75pt; }}
+        QLabel#sectionTitle {{ font-size:11.25pt; font-weight:700; }}
+        QLabel[tone="error"] {{ color:{c['error']}; }}
+        QLabel#banner {{ color:{c['error']}; font-weight:700; padding:10px 24px; background:{c['bg']};
+                         border-bottom:1px solid {c['line']}; }}
+        QFrame#hline {{ background:{c['line']}; border:none; }}
+        QFrame#sidebar {{ background:{c['sidebar']}; border:none; border-right:1px solid {c['line']}; }}
+        QFrame#footer {{ background:{c['bg']}; border:none; border-top:1px solid {c['line']}; }}
+        QWidget#content {{ background:{c['bg']}; }}
+        QScrollArea {{ background:{c['bg']}; border:none; }}
+
+        QPushButton {{ background:{c['button']}; color:{c['text']}; border:1px solid {c['input_border']};
+                       border-radius:6px; padding:6px 14px; font-size:10pt; }}
+        QPushButton:hover {{ background:{c['nav_sel']}; }}
+        QPushButton:disabled {{ color:{c['placeholder']}; }}
+        QPushButton#primary {{ background:{c['accent']}; color:{c['on_accent']}; border:1px solid {c['accent']};
+                               font-weight:700; padding:7px 18px; }}
+        QPushButton#primary:disabled {{ background:{c['button']}; color:{c['placeholder']};
+                                        border-color:{c['input_border']}; }}
+        QPushButton#secondary {{ padding:7px 18px; }}
+        QPushButton#link {{ background:transparent; border:none; color:{c['accent']}; padding:2px 4px; }}
+        QPushButton#link:hover {{ text-decoration:underline; }}
+        QPushButton#nav {{ background:transparent; border:none; border-radius:6px; text-align:left;
+                           padding:9px 12px; font-size:10.5pt; color:{c['text']}; }}
+        QPushButton#nav:hover {{ background:{c['button']}; }}
+        QPushButton#nav:checked {{ background:{c['nav_sel']}; font-weight:700; }}
+        QPushButton#chip {{ background:transparent; border:1px solid {c['input_border']}; border-radius:6px;
+                            padding:6px 12px; }}
+        QPushButton#chip:hover {{ background:{c['button']}; }}
+        QPushButton#chip:checked {{ background:{c['nav_sel']}; font-weight:700; }}
+
+        QLineEdit, QPlainTextEdit, QComboBox, QListWidget {{
+            background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']};
+            border-radius:6px; padding:6px 10px; font-size:10.5pt;
+            selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
+        QPlainTextEdit, QListWidget {{ padding:6px 6px; }}
+        QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QListWidget:focus {{ border-color:{c['accent']}; }}
+        QLineEdit:disabled, QPlainTextEdit:disabled, QComboBox:disabled {{ color:{c['placeholder']}; }}
+        QLineEdit#mono {{ font-family:{MONO_FONTS}; }}
+        QComboBox::drop-down {{ border:none; background:transparent; width:26px; }}
+        QComboBox::down-arrow {{ image:url("{_asset('chevron', c['sub'])}"); width:12px; height:12px; }}
+        QComboBox QAbstractItemView {{ background:{c['input_bg']}; color:{c['text']}; outline:0;
+            border:1px solid {c['input_border']}; selection-background-color:{c['nav_sel']};
+            selection-color:{c['text']}; }}
+        QListWidget::item {{ padding:3px 4px; border-radius:4px; }}
+        QListWidget::item:selected {{ background:{c['nav_sel']}; color:{c['text']}; }}
+
+        QFrame#numBox {{ background:{c['input_bg']}; border:1px solid {c['input_border']}; border-radius:6px; }}
+        QFrame#numBox[focus="true"] {{ border-color:{c['accent']}; }}
+        /* 숫자 칸: border, padding, ::up-button 규칙을 주면 Qt가 안쪽 편집칸을 1px로 줄인다. 틀은 setFrame(False) */
+        QFrame#numBox QAbstractSpinBox {{ background:transparent; color:{c['text']}; font-size:10.5pt;
+            selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
+        QFrame#numBox QLineEdit, QComboBox QLineEdit {{ background:transparent; border:none; padding:0;
+            border-radius:0; }}
+
+        QCheckBox, QRadioButton {{ color:{c['text']}; spacing:6px; font-size:10.5pt; }}
+        QCheckBox:disabled, QRadioButton:disabled {{ color:{c['placeholder']}; }}
+        QCheckBox::indicator, QRadioButton::indicator {{ width:14px; height:14px; background:{c['input_bg']};
+            border:1px solid {c['sub']}; }}
+        QCheckBox::indicator {{ border-radius:4px; }}
+        QCheckBox::indicator:checked {{ border:none; width:16px; height:16px;
+            image:url("{_asset('check', c['text'], c['bg'])}"); }}
+        QRadioButton::indicator {{ border-radius:8px; }}
+        QRadioButton::indicator:checked {{ border:4px solid {c['text']}; width:8px; height:8px; }}
+        QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{ border-color:{c['input_border']}; }}
+    """ + _scrollbar_qss(c)
+
+
+def search_qss(t: Theme) -> str:
+    c = _c(t)
+    return f"""
+        QWidget#root {{ background:{c['bg']}; border:1px solid {c['input_border']}; }}
+        QLineEdit {{ background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']};
+                     border-radius:6px; padding:8px 10px; font-size:13pt;
+                     selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
+        QLineEdit:focus {{ border-color:{c['accent']}; }}
+        QListWidget {{ background:{c['bg']}; border:none; outline:none; }}
+        QLabel {{ color:{c['sub']}; padding:2px 4px; }}
+        QLabel#detail {{ color:{c['text']}; background:{c['sidebar']}; border:1px solid {c['line']};
+                         border-radius:6px; padding:6px 10px; }}
+        QToolButton#gear {{ background:transparent; border:none; border-radius:4px; padding:2px; }}
+        QToolButton#gear:hover {{ background:{c['button']}; }}
+    """ + _scrollbar_qss(c)
+
+
+# ---- Windows 제목 표시줄 -------------------------------------------------------------
+_DWMWA_DARK = (20, 19)        # DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 10 20H1 이전은 19)
+_DWMWA_CAPTION_COLOR, _DWMWA_TEXT_COLOR = 35, 36     # Windows 11
+
+
+def _colorref(c: QColor) -> int:
+    return c.red() | (c.green() << 8) | (c.blue() << 16)
+
+
+def style_titlebar(widget, t: Theme) -> None:
+    """제목 표시줄을 테마에 맞춘다. Windows 아닌 곳, 오래된 Windows에서는 아무것도 하지 않음."""
+    if sys.platform != "win32" or QGuiApplication.platformName() != "windows":
+        return
+    try:
+        dwm = ctypes.windll.dwmapi
+        hwnd = ctypes.c_void_p(int(widget.winId()))
+        on = ctypes.c_int(1 if t.dark else 0)
+        for attr in _DWMWA_DARK:
+            if dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(on), ctypes.sizeof(on)) == 0:
+                break
+        for attr, color in ((_DWMWA_CAPTION_COLOR, t.bg), (_DWMWA_TEXT_COLOR, t.text)):
+            v = ctypes.c_uint(_colorref(color))
+            dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
+    except (OSError, AttributeError):
+        pass
