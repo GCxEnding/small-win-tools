@@ -20,7 +20,7 @@ ROLE_TEXT = Qt.UserRole + 4
 K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus", "row", "rest", "closed", "empty"
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
 HINT_SEARCH = "Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기"
-HINT_QUEUE = "열린 일 · Enter 열기 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
+HINT_QUEUE = "열린 일 · Enter 열기 · F2 요약 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
          "journal": "일지"}
 BADGE_COLOR = {"claude-ai": "#d97757", "claude-code": "#3b82f6", "claude-ai-project": "#10a37f",
@@ -153,6 +153,14 @@ class HitDelegate(QStyledItemDelegate):
         self.title_big.setPointSizeF(font.pointSizeF() * 1.15)
         self.title_big.setBold(True)
         self.now = 0.0      # 큐 상대 시각 기준 (창이 채운다)
+        self.ask_state: dict[str, str] = {}   # 요약 중이거나 실패한 항목: id -> 표시할 한 줄
+
+    def summary_line(self, it: QueueItem) -> str:
+        if it.id in self.ask_state:
+            return self.ask_state[it.id]
+        if it.summary:
+            return f"💬 {it.summary}" + ("  (새 흔적 있음)" if it.summary_stale else "")
+        return ""
 
     def sizeHint(self, option, index):
         fm = QFontMetrics(self.font)
@@ -161,7 +169,7 @@ class HitDelegate(QStyledItemDelegate):
             return QSize(option.rect.width(), fm.height() * 2 + 14)
         if kind == K_FOCUS:
             it: QueueItem = index.data(ROLE_HIT)
-            extra = sum(1 for s in (it.subtitle, it.summary) if s)
+            extra = sum(1 for s in (it.subtitle, self.summary_line(it)) if s)
             fms = QFontMetrics(self.small)
             return QSize(option.rect.width(),
                          QFontMetrics(self.title_big).height() + fms.height() * (1 + extra) + 6 + 3 * extra + 16)
@@ -220,13 +228,12 @@ class HitDelegate(QStyledItemDelegate):
             y = top + fmt.height() + 4 + fms.ascent()
             parts = [s for s in (it.project, datetime.fromtimestamp(it.trace_ts).strftime("%m-%d %H:%M")) if s]
             p.drawText(x0 + bw + 8, y, fms.elidedText("  ·  ".join(parts), Qt.ElideRight, max_x - x0 - bw - 8))
-            for s in (it.subtitle, it.summary):
+            for s, is_sub in ((it.subtitle, True), (self.summary_line(it), False)):
                 if s:
                     y += fms.height() + 3
-                    p.setFont(self.font if s is it.subtitle else self.small)
-                    p.setPen(self.t.text if s is it.subtitle else self.t.sub)
-                    p.drawText(x0 + bw + 8, y, QFontMetrics(p.font()).elidedText(s, Qt.ElideRight,
-                                                                                max_x - x0 - bw - 8))
+                    p.setFont(self.small)
+                    p.setPen(self.t.text if is_sub else self.t.sub)
+                    p.drawText(x0 + bw + 8, y, fms.elidedText(s, Qt.ElideRight, max_x - x0 - bw - 8))
         else:
             top = r.top() + 5
             bw = self._badge(p, x0 + 12, top, fm.height(), it.source)
@@ -325,6 +332,8 @@ class SearchWindow(QWidget):
                         font-size:13pt; }}
             QListWidget {{ background:{self.t.bg.name()}; border:none; outline:none; }}
             QLabel {{ color:{self.t.sub.name()}; padding:2px 4px; }}
+            QLabel#detail {{ color:{self.t.text.name()}; background:{self.t.input_bg.name()};
+                            border-radius:6px; padding:6px 10px; }}
         """)
         root = QWidget(self)
         root.setObjectName("root")
@@ -343,11 +352,18 @@ class SearchWindow(QWidget):
         self.list.setFocusPolicy(Qt.NoFocus)
         self.list.itemDoubleClicked.connect(lambda _i: self._emit("open"))
         self.list.itemClicked.connect(self._on_clicked)
+        self.list.currentRowChanged.connect(lambda _r: self._update_detail())
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
         self.status = QLabel("")
+        self.detail = QLabel("")          # 큐: 고른 일의 저장된 요약
+        self.detail.setWordWrap(True)
+        self.detail.setTextFormat(Qt.PlainText)
+        self.detail.setObjectName("detail")
+        self.detail.hide()
         inner.addWidget(self.edit)
         inner.addWidget(self.list, 1)
+        inner.addWidget(self.detail)
         inner.addWidget(self.status)
         self.hint = QLabel(HINT_SEARCH)
         f = QFont(font)
@@ -403,6 +419,7 @@ class SearchWindow(QWidget):
 
     def set_results(self, hits: list[Hit], status: str) -> None:
         self.mode = "search"
+        self.detail.hide()
         self.hint.setText(HINT_SEARCH)
         self.list.clear()
         for h in hits:
@@ -460,6 +477,37 @@ class SearchWindow(QWidget):
         if self.list.count():
             self.list.setCurrentRow(row)
         self.status.setText(status)
+        self._update_detail()
+
+    def _update_detail(self) -> None:
+        """고른 일의 요약 칸. 저장본만 보여 준다(AI 호출 없음)."""
+        if self.mode != "queue":
+            self.detail.hide()
+            return
+        q = self._current_queue_item()
+        if q is None:
+            self.detail.hide()
+            return
+        if q.id in self.delegate.ask_state:
+            text = self.delegate.ask_state[q.id]
+        elif q.summary_text:
+            text = q.summary_text
+            if q.summary_stale:
+                text += "\n(요약 이후 새 흔적 있음, F2로 새로)"
+        else:
+            text = "F2: 어디까지 했지? (요약)"
+        self.detail.setText(text)
+        self.detail.show()
+
+    def set_ask_state(self, item_id: str, text: str | None) -> None:
+        """요약 중, 실패 표시. None이면 지움."""
+        if text is None:
+            self.delegate.ask_state.pop(item_id, None)
+        else:
+            self.delegate.ask_state[item_id] = text
+        self.list.doItemsLayout()
+        self.list.viewport().update()
+        self._update_detail()
 
     def _toggle(self, kind: str) -> bool:
         if self.mode != "queue" or self._queue is None or kind not in (K_TOGGLE_REST, K_TOGGLE_CLOSED):
@@ -498,7 +546,7 @@ class SearchWindow(QWidget):
         self.list.setCurrentItem(it)
         q: QueueItem = it.data(ROLE_HIT)
         menu = QMenu(self)
-        acts = [("열기\tEnter", "open"), ("대화 복사\tShift+Enter", "copy_conv")]
+        acts = [("열기\tEnter", "open"), ("요약\tF2", "summary"), ("대화 복사\tShift+Enter", "copy_conv")]
         acts += [("다시 열기\tF4", "reopen")] if q.closed_kind else [("완료\tF4", "done"), ("버림\tShift+F4", "drop")]
         for label, kind in acts:
             menu.addAction(label).triggered.connect(lambda _=False, k=kind: self.action.emit(k, q, 0))

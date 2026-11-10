@@ -30,6 +30,11 @@ DEFAULT_CONFIG = {
     "queue_focus": 5,           # 크게 보여 줄 개수
     "queue_note_exclude": [],   # 큐에서 뺄 노트 폴더 (노트 폴더 기준 상대 경로)
     "journal_dir": "",          # 업무 일지 보관함 루트. 비면 일지 기능 끔
+    "ask_model": "haiku",       # F2 요약 모델
+    "ask_command": ["claude"],  # claude CLI가 PATH에 없으면 전체 경로로
+    "ask_tail_messages": 20,    # 요약 재료: 마지막 메시지 수
+    "ask_max_chars": 12000,     # 요약 재료 상한 (넘치면 오래된 쪽부터 자름)
+    "ask_timeout_seconds": 120,
 }
 
 DEFAULT_STATE = {

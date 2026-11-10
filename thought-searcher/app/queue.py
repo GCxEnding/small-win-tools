@@ -46,7 +46,10 @@ class QueueItem:
     closed_kind: str = ""               # 닫은 일 목록에서만: "done" | "drop"
     closed_at: float = 0.0
     subtitle: str = ""                  # 연결된 일지 항목 한 줄 (2단계)
-    summary: str = ""                   # 저장된 요약 첫 줄 (3단계)
+    summary: str = ""                   # 저장된 요약 첫 줄
+    summary_text: str = ""              # 저장된 요약 전체
+    summary_stale: bool = False         # 요약 뒤 새 흔적이 생김
+    journal: list = field(default_factory=list)   # 연결된 일지 항목 (연결 안 된 일지 일은 자기 항목들)
 
 
 @dataclass
@@ -158,13 +161,15 @@ def compute(docs: list[QueueDoc], closed: dict, now: float, days: int = 14, focu
         if ents:
             last = _latest(ents)
             it.subtitle = f"일지 {last.day:%m-%d} · {STATE_LABEL.get(last.state, '')} · {last.title}"
+        it.journal = list(ents)
         candidates.append((it, ents))
     for title, ents in unlinked.items():
         last = _latest(ents)
         trace = max(e.at for e in ents)
         if trace < since:
             continue
-        candidates.append((QueueItem(f"journal:{title}", "journal", title, "", last.path, last.line, trace), ents))
+        it = QueueItem(f"journal:{title}", "journal", title, "", last.path, last.line, trace, journal=list(ents))
+        candidates.append((it, ents))
 
     open_items: list[QueueItem] = []
     closed_items: list[QueueItem] = []

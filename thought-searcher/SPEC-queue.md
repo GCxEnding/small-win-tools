@@ -84,7 +84,10 @@
    - 제목, 출처, 프로젝트
    - 채팅: 보관 md의 마지막 `ask_tail_messages`(기본 20)개 메시지. 노트: 본문 끝부분
    - 연결된 일지 항목(최근 3일치, 하위 내용 포함)
-3. 질문(한국어 존댓말로 답하도록): "어디까지 했나 / 남은 일 / 다음 한 걸음" 세 덩어리, 합쳐서 8줄 이하.
+3. 질문: "어디까지 했나 / 남은 일 / 다음 한 걸음" 세 덩어리. 덩어리 머리 한 줄 아래 `1.`부터 번호 붙인 개조식 항목(한 줄 30자 안팎), 항목 수는 3 / 3 / 1개 이하. 원인, 이유, 배경 설명은 쓰지 않는다(물어볼 때만 필요한 내용). 알 수 없는 덩어리는 "1. 기록에 없음".
+   - 앱이 답을 다시 정리한다: 머리말과 꾸밈(굵은 글씨, 글머리표)을 지우고, 덩어리마다 번호를 1부터 다시 매기고, 항목 수를 위 상한으로 자르고, 빠진 덩어리는 "기록에 없음"으로 채운다. 형식을 아예 안 지킨 답은 빈 줄만 정리해 12줄까지 둔다.
+   - 큐의 큰 줄에는 "다음: (다음 한 걸음)"을 보여 준다. 다음 한 걸음이 없으면 어디까지 했나의 첫 항목.
+   - 2026-11-09 실제 일 3개 비교: Haiku 14~23초, Sonnet 16~20초로 둘 다 형식을 지켰고 내용 차이가 작아 기본은 Haiku로 둔다.
 4. 실행: `claude -p --model haiku` (모델은 `ask_model` 설정). 재료는 표준 입력으로 넘긴다. 도구를 쓰지 않게 하고, 이 호출이 Claude Code 세션 기록으로 남지 않게 한다(남는다면 전용 작업 폴더 `%LOCALAPPDATA%\thought-searcher\ask\`에서 실행하고 그 프로젝트를 수집에서 뺀다). 제한 시간 `ask_timeout_seconds` 기본 120초.
 5. 결과는 `%LOCALAPPDATA%\thought-searcher\summaries.json`에 `{id: {"trace_at", "text", "model", "at"}}`로 저장한다. 다음에 고르면 저장본을 바로 보여 주고, 저장 뒤 새 흔적이 생겼으면 "요약 이후 새 흔적 있음 (F2로 새로)"를 붙인다. 자동으로 다시 부르지 않는다.
 6. 실패(`claude` 없음, 로그인 안 됨, 시간 초과, 오류 종료): 항목 아래에 사유 한 줄 + 트레이 알림. 재료는 그대로 버린다.
@@ -195,7 +198,7 @@
 
 ## 10. 미결 사항 (구현 전 확인)
 - ~~세션 id를 일지 스킬이 얻는 방법~~ (2026-11-09 확정, Claude Code 2.1.317): Bash 도구 환경 변수 `CLAUDE_CODE_SESSION_ID`가 현재 세션 id(원본 jsonl 파일 이름)와 같고, 서브에이전트의 Bash에서도 메인 세션 id가 나온다. 스킬 본문 치환 `${CLAUDE_SESSION_ID}`도 있다. 스킬이 이 값으로 `[session:: <id>]`를 남기는 방식으로 확정. jsonl에서 일지 Edit/Write를 찾는 대안은 버림(obsidian-log 서브에이전트가 Bash로만 쓰는 경우가 많아 놓침).
-- ~~`claude -p` 옵션~~ (2026-11-09 확정): `claude -p --model haiku --no-session-persistence --tools "" --disable-slash-commands --strict-mcp-config`. `--no-session-persistence`는 세션을 디스크에 저장하지 않고, `--tools ""`는 내장 도구를 모두 끈다. 그래도 전용 작업 폴더 실행과 수집 제외(3-C-4)는 보험으로 둔다. 개인 PC에는 PATH에 `claude`가 없어(npm 전역 설치는 네이티브 바이너리 누락, 데스크톱 번들은 앱 밖에서 로그인 안 됨) 3단계 전에 CLI 설치와 로그인이 필요하다.
+- ~~`claude -p` 옵션~~ (2026-11-09 확정): `claude -p --model haiku --no-session-persistence --tools "" --disable-slash-commands --strict-mcp-config`. `--no-session-persistence`는 세션을 디스크에 저장하지 않고, `--tools ""`는 내장 도구를 모두 끈다. 그래도 전용 작업 폴더 실행과 수집 제외(3-C-4)는 보험으로 둔다. (3단계 구현 때 실제 실행으로 확인: Haiku 응답 약 27초, 세션 jsonl은 남지 않고 작업 폴더 이름의 빈 `memory/` 폴더만 생김) 개인 PC에는 PATH에 `claude`가 없어(npm 전역 설치는 네이티브 바이너리 누락, 데스크톱 번들은 앱 밖에서 로그인 안 됨) 3단계 전에 CLI 설치와 로그인이 필요하다.
 - **claude.ai API 응답 구조**: 대화 목록과 본문 API의 실제 필드가 공식 내보내기 `conversations.json`과 얼마나 같은지. 실제 수집 파일 1~2개로 확인 후 `claude_capture.py`의 맞춤 범위를 정한다.
 - 회사 PC에서 Tampermonkey 설치와 `GM_download` 하위 폴더 저장이 허용되는지(사내 보안 프로그램, 크롬 정책).
 - 회사 PC에서 `claude` CLI가 PATH에 있는지.

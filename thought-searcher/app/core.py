@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from . import codex, collector, queue
+from . import ask, codex, collector, queue
 from .journal import JournalReader
 from .archive import Archive, ArchiveMissing, FORMAT_VERSION, md_files, read_front_file
 from .importers import ImportFailed, detect
@@ -81,6 +81,7 @@ class Core:
         self._apply_note_dirs()
         self._journal = JournalReader()
         self._journal_warned = False
+        self.summaries = ask.SummaryStore(self.store.local / "summaries.json")
 
     # ---- 공통 -----------------------------------------------------------
     def _warn(self, msg: str | None) -> None:
@@ -289,7 +290,7 @@ class Core:
         archive = self.archive()
         with self.lock:
             res = collector.collect(self.projects_dir, self.store.raw_dir, archive, self.state, force,
-                                    progress)
+                                    progress, {ask.project_dir_name(self.ask_dir)})
             # Codex는 Claude Code 다음에: 옮겨 온 대화가 Claude Code md와 겹치는지 보려면 그쪽이 먼저 있어야 한다
             cx = codex.collect(self.codex_dir, archive, self.state, force)
             res.new += cx.new
@@ -407,8 +408,39 @@ class Core:
         docs = queue.load_docs(conn, now - days * queue.DAY, extra)
         with self.lock:
             closed = dict(self.state.get("queue_closed") or {})
-        return queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters(),
-                             entries)
+        res = queue.compute(docs, closed, now, days, self._int_cfg("queue_focus", 5), self.queue_filters(),
+                            entries)
+        for it in (*res.focus, *res.rest, *res.closed):
+            self.attach_summary(it)
+        return res
+
+    # ---- 요약 (F2) -------------------------------------------------------
+    @property
+    def ask_dir(self) -> Path:
+        """요약용 claude -p를 실행하는 폴더. 세션 기록이 남더라도 이 프로젝트는 수집에서 뺀다."""
+        return self.store.local / "ask"
+
+    def attach_summary(self, it: queue.QueueItem) -> None:
+        rec = self.summaries.get(it.id)
+        if not rec:
+            return
+        it.summary_text = str(rec["text"])
+        it.summary = ask.headline(it.summary_text)
+        it.summary_stale = self.summaries.is_stale(it.id, it.trace_ts)
+
+    def summarize(self, it: queue.QueueItem) -> str:
+        """claude -p로 요약하고 저장한다. 실패하면 ask.AskError. 작업 스레드에서 부른다."""
+        cfg = self.config
+        cmd = cfg.get("ask_command") or ["claude"]
+        if isinstance(cmd, str):
+            cmd = [cmd]
+        model = str(cfg.get("ask_model") or "haiku")
+        limits = ask.Limits(self._int_cfg("ask_tail_messages", 20), self._int_cfg("ask_max_chars", 12000))
+        text = ask.summarize(it, ask_command=cmd, model=model, limits=limits, cwd=self.ask_dir,
+                             timeout=self._int_cfg("ask_timeout_seconds", 120))
+        with self.lock:
+            self.summaries.put(it.id, it.trace_ts, text, model)
+        return text
 
     def close_item(self, item_id: str, kind: str) -> None:
         with self.lock:

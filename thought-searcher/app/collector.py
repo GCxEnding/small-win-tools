@@ -25,8 +25,13 @@ class CollectResult:
     written: list[Path] = field(default_factory=list)
 
 
-def sync_raw(projects_dir: Path, raw_dir: Path, record: dict) -> int:
-    """projects 폴더 전체를 같은 구조로 복사. 크기나 수정 시각이 바뀐 파일만. 원본에서 지워진 복사본은 남긴다."""
+def _skipped(rel: str, skip_projects) -> bool:
+    return bool(skip_projects) and rel.split("/", 1)[0].lower() in skip_projects
+
+
+def sync_raw(projects_dir: Path, raw_dir: Path, record: dict, skip_projects=frozenset()) -> int:
+    """projects 폴더 전체를 같은 구조로 복사. 크기나 수정 시각이 바뀐 파일만. 원본에서 지워진 복사본은 남긴다.
+    skip_projects: 수집하지 않을 프로젝트 폴더 이름(소문자). 요약용 claude -p 작업 폴더."""
     copied = 0
     if not projects_dir.is_dir():
         return 0
@@ -34,6 +39,8 @@ def sync_raw(projects_dir: Path, raw_dir: Path, record: dict) -> int:
         if not src.is_file():
             continue
         rel = src.relative_to(projects_dir).as_posix()
+        if _skipped(rel, skip_projects):
+            continue
         try:
             st = src.stat()
         except OSError:
@@ -54,13 +61,15 @@ def sync_raw(projects_dir: Path, raw_dir: Path, record: dict) -> int:
 
 
 def collect(projects_dir: Path, raw_dir: Path, archive: Archive, state: dict, force: bool = False,
-            progress=None) -> CollectResult:
+            progress=None, skip_projects=frozenset()) -> CollectResult:
     res = CollectResult()
-    res.copied = sync_raw(projects_dir, raw_dir, state.setdefault("code_files", {}))
+    skip_projects = {s.lower() for s in skip_projects}
+    res.copied = sync_raw(projects_dir, raw_dir, state.setdefault("code_files", {}), skip_projects)
     sessions = state.setdefault("code_sessions", {})
     if state.get("code_render_version") != RENDER_VERSION:
         force = True
     files = main_sessions(raw_dir) if raw_dir.is_dir() else []
+    files = [f for f in files if not _skipped(f.relative_to(raw_dir).as_posix(), skip_projects)]
     for i, raw in enumerate(files, 1):
         if progress:
             progress(i, len(files))

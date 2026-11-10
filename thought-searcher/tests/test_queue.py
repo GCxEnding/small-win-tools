@@ -419,6 +419,32 @@ def test_window_queue_rows_toggle_and_keys(window):
                    ("reopen", "claude-code:z")]
 
 
+def test_window_summary_detail_and_state(window):
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+
+    w = window
+    res = compute([doc("claude-code:a", H), doc("claude-code:b", 2 * H)], {}, NOW)
+    res.focus[0].summary_text = "어디까지 했나: 큐\n남은 일: 요약"
+    res.focus[0].summary = "어디까지 했나: 큐"
+    res.focus[0].summary_stale = True
+    w.set_queue(res, "s", NOW)
+    assert w.detail.text().startswith("어디까지 했나: 큐\n남은 일: 요약") and "새 흔적 있음" in w.detail.text()
+    assert "새 흔적 있음" in w.delegate.summary_line(res.focus[0])
+    w.list.setCurrentRow(1)
+    assert w.detail.text().startswith("F2")
+    got = []
+    w.action.connect(lambda k, item, _i: got.append((k, item.id)))
+    w.edit.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_F2, Qt.NoModifier))
+    assert got == [("summary", "claude-code:b")]
+    w.set_ask_state("claude-code:b", "⏳ 요약 중...")
+    assert w.detail.text() == "⏳ 요약 중..." and w.delegate.summary_line(res.focus[1]) == "⏳ 요약 중..."
+    w.set_ask_state("claude-code:b", None)
+    assert w.detail.text().startswith("F2")
+    w.set_results([], "x")
+    assert w.detail.isHidden()
+
+
 def test_window_empty_queue_and_search_mode(window):
     w = window
     w.set_queue(compute([], {}, NOW), "s", NOW)

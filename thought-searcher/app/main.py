@@ -18,6 +18,7 @@ from PySide6.QtCore import QFileSystemWatcher, QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QDesktopServices, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QFileDialog, QMenu, QMessageBox, QSystemTrayIcon
 
+from .ask import AskError
 from .core import Core, setup_logging
 from .hotkey import HotkeyManager
 from .index import connect, fts5_available
@@ -100,6 +101,11 @@ class Worker:
             self.bridge.done.emit(name, result)
 
 
+class AskBridge(QObject):
+    """요약 작업 스레드 -> 화면 스레드."""
+    finished = Signal(str, object, object)    # (id, 요약 또는 None, 실패 사유 또는 None)
+
+
 class App:
     def __init__(self, qapp: QApplication):
         self.qapp = qapp
@@ -125,6 +131,9 @@ class App:
         self.window = SearchWindow()
         self.window.searchRequested.connect(self.on_query)
         self.window.action.connect(self.on_action)
+        self.ask_bridge = AskBridge()
+        self.ask_bridge.finished.connect(self.on_ask_finished)
+        self._asking: set[str] = set()
 
         self.tray = QSystemTrayIcon(make_icon())
         self.tray.setToolTip(APP_NAME)
@@ -510,7 +519,38 @@ class App:
         elif kind == "reopen":
             self.core.reopen_item(item.id)
             self.show_queue(keep=item.id)
-        # "summary"(F2)는 3단계
+        elif kind == "summary":
+            self.start_summary(item)
+
+    # ---- 요약 (F2) ---------------------------------------------------------
+    def start_summary(self, item: QueueItem):
+        if item.id in self._asking:
+            return
+        self._asking.add(item.id)
+        model = str(self.core.config.get("ask_model") or "haiku")
+        self.window.set_ask_state(item.id, f"⏳ 요약 중... ({model})")
+        threading.Thread(target=self._summary_thread, args=(item,), name="ask", daemon=True).start()
+
+    def _summary_thread(self, item: QueueItem):
+        try:
+            text = self.core.summarize(item)
+            self.ask_bridge.finished.emit(item.id, text, None)
+        except AskError as e:
+            self.ask_bridge.finished.emit(item.id, None, str(e))
+        except Exception as e:  # noqa: BLE001
+            log.exception("요약 실패")
+            self.ask_bridge.finished.emit(item.id, None, f"오류: {e}")
+
+    def on_ask_finished(self, item_id: str, text, err):
+        self._asking.discard(item_id)
+        if err:
+            log.warning("요약 실패 %s: %s", item_id, err)
+            self.window.set_ask_state(item_id, f"⚠ 요약 실패: {err}")
+            self.notify(f"요약 실패: {err}", QSystemTrayIcon.Warning)
+            return
+        self.window.set_ask_state(item_id, None)
+        if self.window.isVisible() and self.window.mode == "queue":
+            self.show_queue(keep=item_id)
 
     def on_action(self, kind: str, hit, idx: int):
         if isinstance(hit, QueueItem):
