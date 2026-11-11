@@ -194,3 +194,75 @@ def test_queue_wide_shows_saved_summary_in_preview(qt):
     qt.processEvents()
     assert w.left.isAncestorOf(w.detail) and not w.detail.isHidden()
     w.close()
+
+
+# ---- 검색 옵션 칩 ------------------------------------------------------------------
+def test_chip_tokens_and_helpers():
+    from datetime import date
+    from app.window import period_after, project_token
+    d = date(2026, 11, 12)
+    assert period_after(None, d) is None and period_after(7, d) == date(2026, 11, 5)
+    assert period_after(30, d) == date(2026, 10, 13) and period_after("year", d) == date(2026, 1, 1)
+    assert project_token("생각 검색기") == "검색기" and project_token("small-win-tools") == "small-win-tools"
+    assert project_token("") == ""
+
+
+def test_chips_append_tokens_and_reset_on_popup(qt):
+    from datetime import date
+    from app.window import SearchWindow
+    w = SearchWindow(projects=lambda: ["프로젝트A", "small-win-tools"])
+    got = []
+    w.searchRequested.connect(got.append)
+    c = w.chips
+    c.src_buttons["code"].click()
+    c.src_buttons["gpt"].click()
+    c.period_buttons[7].click()
+    c.project = "small-win-tools"
+    today = date(2026, 11, 12)
+    assert c.tokens(today) == ["src:code", "src:gpt", "after:2026-11-05", "proj:small-win-tools"]
+    assert c.compose("배포 ", today) == "배포 src:code src:gpt after:2026-11-05 proj:small-win-tools"
+    assert w.edit.text() == ""                                         # 검색칸에는 글자를 넣지 않음
+    assert got and got[-1].startswith("src:code src:gpt after:")       # 누르면 바로 다시 검색 (단어 없이 필터만)
+    assert not c.clear_button.isHidden()
+    for b in [*c.src_buttons.values(), *c.period_buttons.values(), c.proj_button, c.clear_button]:
+        assert b.focusPolicy() == Qt_NoFocus()
+    w.popup()
+    assert not c.active() and c.tokens(today) == [] and c.clear_button.isHidden()
+    assert c.period_buttons[None].isChecked()
+    w.hide()
+    w.deleteLater()
+
+
+def test_typed_tokens_light_chips_without_duplicates(qt):
+    from datetime import date
+    from app.window import SearchWindow
+    w = SearchWindow()
+    c = w.chips
+    w.edit.setText("배포 src:code proj:demo")
+    assert c.src_buttons["code"].isChecked() and not c.src_buttons["gpt"].isChecked()
+    assert c.proj_button.isChecked() and "demo" in c.proj_button.text()
+    assert c.tokens(date(2026, 11, 12)) == []                         # 표시만, 토큰은 더 붙이지 않음
+    assert not c.active() and c.clear_button.isHidden()
+    w.edit.setText("배포")
+    assert not c.src_buttons["code"].isChecked() and not c.proj_button.isChecked()
+    w.chips.clear()
+    w.deleteLater()
+
+
+def test_project_names_from_index(tmp_path):
+    from app.main import project_names
+    idx = Index(tmp_path / "index.db")
+    idx.open().close()
+    conn = connect(tmp_path / "index.db")
+    with conn:
+        for cid, src, proj, ts in [("a", "claude-code", "old", 1), ("b", "claude-ai", "new", 9), ("c", "note", "vault/x", 99),
+                                   ("d", "codex", "", 50), ("e", "claude-code", "old", 5)]:
+            conn.execute("INSERT INTO docs(conv_id, path, title, source, project, updated_ts) VALUES(?,?,?,?,?,?)",
+                         (cid, f"C:/{cid}.md", cid, src, proj, ts))
+    assert project_names(conn) == ["new", "old"]
+    conn.close()
+
+
+def Qt_NoFocus():
+    from PySide6.QtCore import Qt
+    return Qt.NoFocus

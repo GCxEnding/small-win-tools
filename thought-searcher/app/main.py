@@ -89,6 +89,16 @@ def swap_hotkey(mgr: HotkeyManager, text: str) -> tuple[bool, str]:
     return True, ""
 
 
+PROJECT_MENU_MAX = 40
+
+
+def project_names(conn, limit: int = PROJECT_MENU_MAX) -> list[str]:
+    rows = conn.execute(
+        "SELECT project FROM docs WHERE project IS NOT NULL AND trim(project) != '' AND source != 'note' "
+        "GROUP BY project ORDER BY max(updated_ts) DESC LIMIT ?", (limit,)).fetchall()
+    return [r[0] for r in rows]
+
+
 class Bridge(QObject):
     """작업 스레드 -> GUI 스레드."""
     done = Signal(str, object)
@@ -159,7 +169,8 @@ class App:
 
         self.theme = T.from_config(self.core.config)
         T.apply_app(qapp, self.theme)
-        self.window = SearchWindow(self.theme, state_path=self.core.store.ui_state_path)
+        self.window = SearchWindow(self.theme, state_path=self.core.store.ui_state_path,
+                                   projects=self.project_names)
         try:                              # 시스템 모드: Windows 앱 모드가 바뀌면 따라간다 (Qt 6.5+)
             qapp.styleHints().colorSchemeChanged.connect(lambda _s: self.apply_theme())
         except AttributeError:
@@ -622,6 +633,10 @@ class App:
             self.window.set_results([], f"검색 오류: {e}")
             return
         self.window.set_results(hits, self._compose_status(len(hits)))
+
+    def project_names(self) -> list[str]:
+        """프로젝트 칩 메뉴: 색인의 프로젝트 이름, 최근에 쓴 것부터 (노트는 폴더 경로라 뺀다)."""
+        return project_names(self.search_conn)
 
     def _compose_status(self, n_hits: int) -> str:
         if n_hits:

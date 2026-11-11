@@ -3,6 +3,19 @@
 > 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
+## 검색 옵션 칩 구현 (2026-11-12 아침)
+- `app/window.py`: `ChipBar`(머리 프레임 안, 검색칸 아래 두 줄), `SOURCE_CHIPS`, `PERIOD_CHIPS`, `project_token`, `period_after`. `SearchWindow(..., projects=)`, `query_text()`(검색칸 + 칩 토큰), `_on_chips`(바로 다시 검색, 초점은 검색칸). `popup()` 때 `chips.reset()`. placeholder는 `기억나는 단어 몇 개`.
+- `app/theme.py` `search_qss`: `#chips`, `#qchip`(꺼짐 line 테두리, 켜짐 `accent_soft` + 강조색 테두리 + 굵게), `#chipClear`, `#chipSep`, `#chipCaption`. 새 색 값 없음.
+- `app/main.py`: `project_names(conn)`(색인 docs의 프로젝트, 최근 순, 노트 제외, 40개). 메뉴를 열 때마다 읽음.
+- 단어 없이 칩만 켜면 검색이 필터만으로 돌아 최근 순 목록이 나옵니다(`Searcher.search`의 `q.terms` 없는 분기). 큐로 돌아가지 않음.
+- 함정
+  - `proj:`는 공백에서 끊기므로 프로젝트 이름의 가장 긴 공백 없는 조각을 씁니다(`project_token`). 부분 일치라 그 조각을 가진 다른 프로젝트도 걸릴 수 있습니다. 검색 문법을 고치지 않으려고 이렇게 둠.
+  - 손으로 친 `src:`, `proj:`는 칩을 켜진 것으로만 보이고 토큰을 더 붙이지 않습니다. 이 상태에서 칩을 눌러도 검색칸의 글자를 지우지는 않으므로 켜진 모양이 남습니다. 손으로 친 `after:`는 기간 칩에 반영하지 않습니다.
+  - 프로젝트 메뉴(`QMenu.exec`)가 떠 있는 동안 창이 비활성이 되어 숨겨지지 않게 `chips.menu_open`을 `_hide_if_inactive`가 봅니다. 메뉴가 닫히면 창을 다시 활성화.
+  - 칩은 `QSizePolicy.Fixed`(좁은 창에서 글자가 잘리지 않게), 프로젝트 칩 이름은 12자에서 줄임(전체는 툴팁).
+- 시험: `tests/test_search_window.py`의 칩 4개(토큰, popup 비우기, NoFocus, 손으로 친 토큰, 프로젝트 목록). 전체 377 통과.
+- 남은 확인: Windows 실화면에서 프로젝트 메뉴를 열고 닫아도 창이 안 닫히는지, 한글 글꼴로 둘째 줄이 560px에서 넘치지 않는지.
+
 ## 추가 수정 (같은 날, CG 확인 뒤)
 - 설정창 아래 막대에서 취소/저장 옆 키캡(Esc, Ctrl S)을 뺐습니다. Esc, Ctrl+S 단축키는 그대로 동작하고, 설정 찾기 칸 안의 `Ctrl F` 안내는 그대로입니다.
 - 설정 찾기로 섹션이 숨겨지면 보이는 첫 섹션의 위 간격을 없앱니다(`Section.set_first`, `_refresh_filter`). 전에는 숨은 섹션 뒤 첫 보이는 섹션이 36px 간격을 그대로 가져 제목 아래가 크게 비었습니다.
@@ -49,7 +62,7 @@
 1. CG가 `docs/copy-table.md`를 확인하면 `settings_window.py`에 문구 반영(`tip=`, `empty_desc=`), 임시 규칙 제거, 깨지는 테스트 기대값 갱신. "크게 보여 줄 개수" 이름 변경 여부도 그때 정합니다.
 2. Windows 11 실제 화면에서 둥근 모서리, 테두리 끌기, 나누기 막대 끌기 확인.
 3. `SPEC.md`/`SPEC-settings.md`에 새 화면 설명을 옮길지 결정(지금은 계획 문서와 README에만 반영).
-4. 검색 옵션 칩 (CG와 정함, 아직 시작 안 함). 검색 문법을 직접 입력하지 않게 큰 검색칸 아래에 칩 두 줄을 넣습니다. 손댈 곳은 `app/window.py`, `app/theme.py`, 필요하면 `app/main.py`.
+4. ~~검색 옵션 칩~~ **2026-11-12 구현함** (아래 "검색 옵션 칩 구현" 절). Windows 실화면 확인만 남음. 아래는 정한 내용 그대로 둡니다.
    - 1줄 `출처`(여러 개 고름, 회사별 순서): AI(`src:ai`), 프로젝트(`src:project`), 메모리(`src:memory`), Code(`src:code`), GPT(`src:gpt`), Codex(`src:codex`), 노트(`src:note`).
    - 2줄 `기간`(하나만 고름): 전체 / 1주 / 1달 / 3달 / 올해 -> `after:YYYY-MM-DD`(오늘-7일, -30일, -90일, 1월 1일). 구분선 뒤 `프로젝트 ▾` 칩: 색인의 프로젝트 이름 메뉴(+ "모든 프로젝트"), 고르면 칩에 이름 표시(`proj:`). 하나라도 켜지면 줄 끝에 `모두 지우기`.
    - 칩 모양: 둥근 알약, 작은 글자. 꺼짐은 line 테두리 + 본문색, 켜짐은 옅은 강조색 바탕(`accent_soft`) + 강조색 테두리와 굵은 글자. 줄 앞에 회색 작은 제목. 새 색 값 없음.

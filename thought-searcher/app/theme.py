@@ -398,6 +398,17 @@ def search_qss(t: Theme) -> str:
         QLineEdit#query {{ background:transparent; color:{c['text']}; border:none; padding:6px 4px;
                            font-size:15pt; selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
         QLabel#count {{ color:{c['sub']}; font-size:9.4pt; padding:0 4px; }}
+        /* 검색 옵션 칩: 꺼짐은 line 테두리 + 본문색, 켜짐은 옅은 강조색 바탕 + 강조색 테두리, 굵게 */
+        QFrame#chips {{ background:transparent; border:none; }}
+        QFrame#chips QLabel#chipCaption {{ color:{c['sub']}; font-size:8.5pt; padding:0; }}
+        QPushButton#qchip {{ background:transparent; color:{c['text']}; border:1px solid {c['line']};
+                             border-radius:11px; padding:2px 10px; font-size:9pt; min-height:18px; }}
+        QPushButton#qchip:hover {{ background:{c['button']}; }}
+        QPushButton#qchip:checked {{ background:{c['accent_soft']}; border-color:{c['accent']}; font-weight:700; }}
+        QPushButton#chipClear {{ background:transparent; border:none; color:{c['accent']}; font-size:9pt;
+                                 padding:2px 4px; }}
+        QPushButton#chipClear:hover {{ text-decoration:underline; }}
+        QFrame#chipSep {{ background:{c['line']}; border:none; }}
         QListWidget {{ background:{c['bg']}; border:none; outline:none; }}
         QLabel {{ color:{c['sub']}; padding:2px 4px; }}
         QLabel#detail {{ color:{c['text']}; background:{c['sidebar']}; border:1px solid {c['line']};

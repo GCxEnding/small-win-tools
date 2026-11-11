@@ -8,17 +8,20 @@ from __future__ import annotations
 import html
 import re
 from collections import OrderedDict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Callable
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
-                               QScrollArea, QSplitter, QStyle, QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+                               QMenu, QPushButton, QScrollArea, QSizePolicy, QSplitter, QStyle, QStyledItemDelegate, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from . import mdparse
 from . import theme as T
 from . import ui_state
+from .query import parse as parse_query
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit, find_spans
 from .theme import Theme
@@ -41,7 +44,15 @@ BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "cl
 SOURCE_NAME = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "claude-ai-project": "claude.ai 프로젝트",
                "claude-ai-memory": "claude.ai 메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex",
                "journal": "업무 일지"}
-PLACEHOLDER = "기억나는 단어 몇 개   \"구문\"  -제외  src:  proj:  after:"
+PLACEHOLDER = "기억나는 단어 몇 개"
+# 검색 옵션 칩: (글자, src: 값). 회사별로 모아 둔 순서
+SOURCE_CHIPS = [("AI", "ai"), ("프로젝트", "project"), ("메모리", "memory"), ("Code", "code"), ("GPT", "gpt"),
+                ("Codex", "codex"), ("노트", "note")]
+_SRC_VALUE = {"claude-ai": "ai", "claude-ai-project": "project", "claude-ai-memory": "memory", "claude-code": "code",
+              "chatgpt": "gpt", "codex": "codex", "note": "note"}
+# 기간 칩: (글자, 며칠 전부터 / "year" / None=전체)
+PERIOD_CHIPS = [("전체", None), ("1주", 7), ("1달", 30), ("3달", 90), ("올해", "year")]
+PROJECT_LABEL_MAX = 12   # 최소 폭(560)에서도 둘째 줄이 넘치지 않게. 전체 이름은 툴팁
 QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
 DEBOUNCE_MS = 150
 PREVIEW_DEBOUNCE_MS = 60
@@ -604,12 +615,206 @@ class PreviewPane(QFrame):
         self.body_lay.addWidget(frame)
 
 
+def project_token(name: str) -> str:
+    """프로젝트 이름 -> proj: 값. 검색 문법은 공백에서 끊기므로 이름에서 가장 긴 공백 없는 조각을 쓴다
+    (proj:는 부분 일치라 그 조각을 가진 프로젝트가 같이 걸릴 수 있다)."""
+    parts = [p.strip('"') for p in str(name or "").split()]
+    parts = [p for p in parts if p]
+    return max(parts, key=len) if parts else ""
+
+
+def period_after(kind, today: date) -> date | None:
+    if kind is None:
+        return None
+    if kind == "year":
+        return date(today.year, 1, 1)
+    return today - timedelta(days=int(kind))
+
+
+class ChipBar(QFrame):
+    """검색칸 아래 옵션 칩 두 줄 (출처 / 기간, 프로젝트). 검색칸에는 글자를 넣지 않고,
+    검색할 때 compose()가 칩 토큰을 검색어 뒤에 붙인다. 칩은 초점을 가져가지 않는다."""
+    changed = Signal()
+
+    def __init__(self, projects: Callable[[], list[str]] | None = None):
+        super().__init__()
+        self.setObjectName("chips")
+        self.projects = projects or (lambda: [])
+        self.menu_open = False                    # 프로젝트 메뉴가 떠 있는 동안 창을 숨기지 않게
+        self._clicked: set[str] = set()           # 누른 출처 칩 (src 값)
+        self._typed: set[str] = set()             # 검색칸에 손으로 친 src: (표시만)
+        self._typed_proj: list[str] = []
+        self.period = None
+        self.project = ""
+        v = QVBoxLayout(self)
+        v.setContentsMargins(18, 0, 18, 10)
+        v.setSpacing(6)
+        row1 = self._row(v, "출처")
+        self.src_buttons: dict[str, QPushButton] = {}
+        for label, value in SOURCE_CHIPS:
+            b = self._chip(label)
+            b.clicked.connect(lambda _c=False, val=value: self._toggle_source(val))
+            row1.addWidget(b)
+            self.src_buttons[value] = b
+        row1.addStretch(1)
+        row2 = self._row(v, "기간")
+        self.period_group = QButtonGroup(self)
+        self.period_group.setExclusive(True)
+        self.period_buttons: dict[object, QPushButton] = {}
+        for label, kind in PERIOD_CHIPS:
+            b = self._chip(label)
+            self.period_group.addButton(b)
+            b.clicked.connect(lambda _c=False, k=kind: self._set_period(k))
+            row2.addWidget(b)
+            self.period_buttons[kind] = b
+        sep = QFrame()
+        sep.setObjectName("chipSep")
+        sep.setFixedSize(1, 16)
+        row2.addSpacing(4)
+        row2.addWidget(sep)
+        row2.addSpacing(4)
+        self.proj_button = self._chip("프로젝트 ▾", checkable=False)
+        self.proj_button.clicked.connect(self._pick_project)
+        row2.addWidget(self.proj_button)
+        row2.addStretch(1)
+        self.clear_button = QPushButton("모두 지우기")
+        self.clear_button.setObjectName("chipClear")
+        self.clear_button.setFocusPolicy(Qt.NoFocus)
+        self.clear_button.setCursor(Qt.PointingHandCursor)
+        self.clear_button.clicked.connect(self.clear)
+        row2.addWidget(self.clear_button)
+        self._render()
+
+    def _row(self, v: QVBoxLayout, caption: str) -> QHBoxLayout:
+        h = QHBoxLayout()
+        h.setSpacing(6)
+        cap = QLabel(caption)
+        cap.setObjectName("chipCaption")
+        cap.setFixedWidth(30)
+        h.addWidget(cap)
+        v.addLayout(h)
+        return h
+
+    def _chip(self, text: str, checkable: bool = True) -> QPushButton:
+        b = QPushButton(text)
+        b.setObjectName("qchip")
+        b.setCheckable(True)                     # 켜짐 모양은 :checked로. 프로젝트 칩은 _render가 정한다
+        b.setFocusPolicy(Qt.NoFocus)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)    # 좁은 창에서 글자가 잘리게 줄어들지 않게
+        if not checkable:
+            b.setProperty("menu", True)
+        return b
+
+    # ---- 상태 -----------------------------------------------------------------
+    def _toggle_source(self, value: str) -> None:
+        if value in self._clicked:
+            self._clicked.discard(value)
+        else:
+            self._clicked.add(value)
+        self._render()
+        self.changed.emit()
+
+    def _set_period(self, kind) -> None:
+        self.period = kind
+        self._render()
+        self.changed.emit()
+
+    def _pick_project(self) -> None:
+        menu = QMenu(self)
+        menu.addAction("모든 프로젝트").setData("")
+        try:
+            names = list(self.projects())
+        except Exception:  # noqa: BLE001  색인을 못 읽어도 창은 그대로
+            names = []
+        if names:
+            menu.addSeparator()
+        for n in names:
+            act = menu.addAction(n)
+            act.setData(n)
+            act.setCheckable(True)
+            act.setChecked(n == self.project)
+        if not names:
+            act = menu.addAction("(프로젝트가 있는 대화 없음)")
+            act.setEnabled(False)
+        self.menu_open = True
+        try:
+            got = menu.exec(self.proj_button.mapToGlobal(self.proj_button.rect().bottomLeft()))
+        finally:
+            self.menu_open = False
+            self.window().activateWindow()       # 메뉴가 닫히면 검색 창을 다시 앞으로
+        self._render()                           # 누른 순간 :checked가 바뀐 것을 되돌린다
+        if got is None or got.data() is None:
+            return
+        self.project = str(got.data())
+        self._render()
+        self.changed.emit()
+
+    def clear(self) -> None:
+        had = self.active()
+        self.reset()
+        if had:
+            self.changed.emit()
+
+    def reset(self) -> None:
+        """창을 열 때마다 모두 끈다."""
+        self._clicked.clear()
+        self.period = None
+        self.project = ""
+        self._render()
+
+    def active(self) -> bool:
+        return bool(self._clicked or self.period is not None or self.project)
+
+    def sync_from_text(self, text: str) -> None:
+        """손으로 친 src:, proj:는 해당 칩을 켜진 것으로만 보인다(토큰을 더 붙이지 않는다)."""
+        q = parse_query(text or "")
+        self._typed = {_SRC_VALUE[s] for s in q.sources if s in _SRC_VALUE}
+        self._typed_proj = list(q.projects)
+        self._render()
+
+    def _render(self) -> None:
+        for value, b in self.src_buttons.items():
+            b.setChecked(value in self._clicked or value in self._typed)
+        self.period_buttons[self.period].setChecked(True)
+        if self.project:
+            name = self.project if len(self.project) <= PROJECT_LABEL_MAX else self.project[:PROJECT_LABEL_MAX - 1] + "…"
+            self.proj_button.setText(f"{name} ▾")
+            self.proj_button.setToolTip(self.project)
+        elif self._typed_proj:
+            self.proj_button.setText(f"{self._typed_proj[0]} ▾")
+            self.proj_button.setToolTip("")
+        else:
+            self.proj_button.setText("프로젝트 ▾")
+            self.proj_button.setToolTip("")
+        self.proj_button.setChecked(bool(self.project or self._typed_proj))
+        self.clear_button.setVisible(self.active())
+
+    # ---- 토큰 -----------------------------------------------------------------
+    def tokens(self, today: date | None = None) -> list[str]:
+        out = [f"src:{v}" for _l, v in SOURCE_CHIPS if v in self._clicked]
+        after = period_after(self.period, today or date.today())
+        if after:
+            out.append(f"after:{after.isoformat()}")
+        tok = project_token(self.project)
+        if tok:
+            out.append(f"proj:{tok}")
+        return out
+
+    def compose(self, text: str, today: date | None = None) -> str:
+        toks = self.tokens(today)
+        if not toks:
+            return text
+        return f"{text.rstrip()} {' '.join(toks)}".strip()
+
+
 class SearchWindow(QWidget):
     searchRequested = Signal(str)
     action = Signal(str, object, int)    # (종류, Hit, 맞은 메시지 순번)
     settingsRequested = Signal()         # 아래 막대 ⚙
 
-    def __init__(self, theme: Theme | None = None, state_path=None):
+    def __init__(self, theme: Theme | None = None, state_path=None, projects: Callable[[], list[str]] | None = None):
+        """projects: 프로젝트 칩 메뉴에 보일 이름 목록을 돌려주는 함수 (main.py가 색인에서 읽는다)."""
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         self.state_path = state_path          # ui_state.json (없으면 크기를 저장하지 않음)
         self._state = ui_state.search_state(ui_state.load(state_path))
@@ -640,9 +845,16 @@ class SearchWindow(QWidget):
         # 머리: 돋보기, 큰 검색칸, 결과 수
         head = QFrame()
         head.setObjectName("head")
-        hh = QHBoxLayout(head)
-        hh.setContentsMargins(18, 12, 18, 12)
+        hv = QVBoxLayout(head)
+        hv.setContentsMargins(0, 0, 0, 0)
+        hv.setSpacing(0)
+        hh = QHBoxLayout()
+        hh.setContentsMargins(18, 12, 18, 8)
         hh.setSpacing(10)
+        hv.addLayout(hh)
+        self.chips = ChipBar(projects)
+        self.chips.changed.connect(self._on_chips)
+        hv.addWidget(self.chips)
         self.search_icon = QLabel()
         self.search_icon.setFixedSize(22, 22)
         self.edit = QueryEdit()
@@ -733,7 +945,7 @@ class SearchWindow(QWidget):
         self._timer.setSingleShot(True)
         self._timer.setInterval(DEBOUNCE_MS)
         self._pending = ""
-        self._timer.timeout.connect(lambda: self.searchRequested.emit(self._pending))
+        self._timer.timeout.connect(lambda: self.searchRequested.emit(self.query_text()))
         self.edit.queryChanged.connect(self._on_changed)
         self.edit.navigate.connect(self._navigate)
         self.edit.switchMatch.connect(self._switch)
@@ -775,11 +987,24 @@ class SearchWindow(QWidget):
         self.edit.setFocus()
         self.edit.selectAll()
         self._show_rest = self._show_closed = False
+        self.chips.reset()
+        self.chips.sync_from_text(self.edit.full_text())
         self.refresh()
+
+    def query_text(self) -> str:
+        """검색에 넘기는 글자: 검색칸 + 켜진 칩 토큰."""
+        return self.chips.compose(self._pending)
 
     def refresh(self) -> None:
         self._pending = self.edit.full_text()
-        self.searchRequested.emit(self._pending)
+        self.searchRequested.emit(self.query_text())
+
+    def _on_chips(self) -> None:
+        """칩을 눌렀다: 바로 다시 검색. 초점은 검색칸에 그대로."""
+        self._timer.stop()
+        self._show_rest = self._show_closed = False
+        self.refresh()
+        self.edit.setFocus()
 
     # ---- 크기 조절, 저장 ------------------------------------------------------
     def _place_grips(self) -> None:
@@ -915,11 +1140,14 @@ class SearchWindow(QWidget):
         super().changeEvent(e)
 
     def _hide_if_inactive(self):
+        if self.chips.menu_open:
+            return                         # 프로젝트 칩 메뉴가 떠 있는 동안은 숨기지 않는다
         if not self.isActiveWindow():
             self.hide()
 
     def _on_changed(self, text: str) -> None:
         self._pending = text
+        self.chips.sync_from_text(text)
         self._timer.start()
 
     def set_results(self, hits: list[Hit], status: str) -> None:
