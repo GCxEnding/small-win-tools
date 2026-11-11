@@ -140,3 +140,46 @@ def test_mode_is_segmented_and_hotkey_uses_keycaps(qt, core_env):
     assert w.hotkey.property("caps") is True
     w._done = True
     w.close()
+
+
+def test_fresh_window_has_no_changed_count(qt, core_env):
+    """연 직후 건드리지 않았으면 바뀐 설정 수가 없어야 한다 (정규화된 값이 config와 달라 보이면 버그)."""
+    app, sw = qt
+    core_env.config["note_dirs"] = ["~/notes"]               # 경로 확장 전 값
+    core_env.config["journal_dir"] = "%USERPROFILE%/vault"
+    w = make(sw, core_env)
+    app.processEvents()
+    assert w.changed_keys() == set() and w.changed_text.isHidden() and w.changed_dot.isHidden()
+    assert not w.btn_save.isEnabled() and w.windowTitle() == sw.TITLE
+    w.select_tab("advanced")
+    w.select_tab("ask")
+    app.processEvents()
+    assert w.changed_keys() == set() and w.changed_text.isHidden()
+    w._done = True
+    w.close()
+
+
+def test_bottom_bar_has_no_keycaps_but_shortcuts_work(qt, core_env):
+    app, sw = qt
+    w = make(sw, core_env)
+    footer = w.btn_save.parentWidget()
+    assert [lb.text() for lb in footer.findChildren(sw.QLabel) if lb.objectName() == "keycap"] == []
+    assert any(lb.objectName() == "keycap" for lb in w.search.findChildren(sw.QLabel))     # 설정 찾기 칸의 Ctrl F는 그대로
+    w._done = True
+    w.close()
+
+
+def test_hidden_sections_leave_no_gap(qt, core_env):
+    app, sw = qt
+    w = make(sw, core_env)
+    secs = [s for s in w._secs if s.tab == "general"]
+    assert secs[0]._v.contentsMargins().top() == 0 and secs[1]._v.contentsMargins().top() == sw.SECTION_GAP
+    w.search.edit.setText("폴더")                          # '검색 창', '모양' 섹션이 숨겨짐
+    app.processEvents()
+    visible = [s for s in secs if not s.isHidden()]
+    assert secs[0].isHidden() and visible and visible[0]._v.contentsMargins().top() == 0
+    assert all(s._v.contentsMargins().top() == sw.SECTION_GAP for s in visible[1:])
+    w.search.edit.setText("")
+    assert secs[0]._v.contentsMargins().top() == 0 and secs[1]._v.contentsMargins().top() == sw.SECTION_GAP
+    w._done = True
+    w.close()

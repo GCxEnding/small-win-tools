@@ -3,6 +3,11 @@
 > 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
+## 추가 수정 (같은 날, CG 확인 뒤)
+- 설정창 아래 막대에서 취소/저장 옆 키캡(Esc, Ctrl S)을 뺐습니다. Esc, Ctrl+S 단축키는 그대로 동작하고, 설정 찾기 칸 안의 `Ctrl F` 안내는 그대로입니다.
+- 설정 찾기로 섹션이 숨겨지면 보이는 첫 섹션의 위 간격을 없앱니다(`Section.set_first`, `_refresh_filter`). 전에는 숨은 섹션 뒤 첫 보이는 섹션이 36px 간격을 그대로 가져 제목 아래가 크게 비었습니다.
+- "열자마자 바뀐 설정 1개"는 버그가 아니었습니다. 확인용 그림 스크립트가 `queue_days`를 일부러 7로 바꾼 뒤 찍은 것입니다. 경로 확장 전 값(`~/notes`, `%USERPROFILE%`)을 넣은 config로도 열자마자 바뀐 키가 없음을 `tests/test_settings_search.py::test_fresh_window_has_no_changed_count`가 확인합니다.
+
 ## 바뀐 파일
 | 파일 | 내용 |
 |---|---|

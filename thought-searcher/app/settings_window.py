@@ -461,8 +461,10 @@ class Section(QWidget):
     def __init__(self, title: str, caption: str = "", link: tuple[str, Callable] | None = None, intro: str = "",
                  first: bool = False):
         super().__init__()
+        self.tab = ""                    # 속한 탭 (설정 찾기에서 첫 보이는 섹션을 가리는 데 씀)
         v = QVBoxLayout(self)
         v.setContentsMargins(0, 0 if first else SECTION_GAP, 0, 0)
+        self._v = v
         v.setSpacing(0)
         head = QHBoxLayout()
         head.setContentsMargins(0, 0, 0, 10)
@@ -482,10 +484,16 @@ class Section(QWidget):
             v.addWidget(lb)
         self.card = QFrame()
         self.card.setObjectName("card")
+        self.card.setAttribute(Qt.WA_StyledBackground, True)
         self.rows = QVBoxLayout(self.card)
         self.rows.setContentsMargins(0, 0, 0, 0)
         self.rows.setSpacing(0)
         v.addWidget(self.card)
+
+
+    def set_first(self, first: bool) -> None:
+        """페이지에서 첫 보이는 섹션이면 위 간격을 없앤다 (숨은 섹션 뒤에 큰 빈칸이 남지 않게)."""
+        self._v.setContentsMargins(0, 0 if first else SECTION_GAP, 0, 0)
 
 
 class InfoButton(QToolButton):
@@ -739,7 +747,7 @@ class SettingsWindow(QDialog):
                 getattr(self, f"_build_{key}")()
             for lay in self._sections:
                 lay.addStretch(1)                 # 내용이 창보다 짧으면 남는 높이는 맨 아래로
-            # 아래 막대: 바뀐 설정 수 | 취소 Esc, 저장 Ctrl S
+            # 아래 막대: 바뀐 설정 수 | 취소, 저장 (Esc, Ctrl+S 단축키는 키 안내 없이 동작)
             self.changed_dot = QLabel()
             self.changed_dot.setObjectName("changedDot")
             self.changed_dot.setFixedSize(8, 8)
@@ -755,10 +763,7 @@ class SettingsWindow(QDialog):
             buttons.addWidget(self.changed_text)
             buttons.addStretch(1)
             buttons.addWidget(self.btn_cancel)
-            buttons.addLayout(self._keycaps("Esc"))
-            buttons.addSpacing(8)
             buttons.addWidget(self.btn_save)
-            buttons.addLayout(self._keycaps("Ctrl", "S"))
             QShortcut(QKeySequence("Ctrl+S"), self, activated=self._shortcut_save)
             QShortcut(QKeySequence("Ctrl+F"), self, activated=self.search.focus_all)
         root.addWidget(footer)
@@ -818,16 +823,6 @@ class SettingsWindow(QDialog):
         g = screen.availableGeometry()
         self.move(g.left() + (g.width() - self.width()) // 2, g.top() + (g.height() - self.height()) // 2)
 
-    @staticmethod
-    def _keycaps(*keys: str) -> QHBoxLayout:
-        h = QHBoxLayout()
-        h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(4)
-        for k in keys:
-            cap = QLabel(k)
-            cap.setObjectName("keycap")
-            h.addWidget(cap)
-        return h
 
     def _shortcut_save(self) -> None:
         if not self.setup_mode and self.btn_save.isEnabled():
@@ -895,6 +890,7 @@ class SettingsWindow(QDialog):
         if first:
             self._sections.append(lay)        # 붙잡아 둔다 (id 재사용 방지)
         sec = Section(title, caption, link, intro, first=first)
+        sec.tab = self._build_tab
         lay.addWidget(sec)
         self._secs.append(sec)
         return sec
@@ -1586,9 +1582,14 @@ class SettingsWindow(QDialog):
             for lb in (r.name_lb, r.desc_lb):
                 if isinstance(lb, ElideLabel):
                     lb.set_marks(marks, mark)
+        first_in_tab: set[str] = set()
         for sec in self._secs:
             rows = by_sec.get(sec, [])
-            sec.setVisible(self._nat.get(sec, True) and (not terms or any(r.counted for r in rows)))
+            vis = self._nat.get(sec, True) and (not terms or any(r.counted for r in rows))
+            sec.setVisible(vis)
+            if vis:
+                sec.set_first(sec.tab not in first_in_tab)       # 보이는 첫 섹션만 위 간격 없음
+                first_in_tab.add(sec.tab)
             first = True
             for r in rows:
                 if r.counted:
