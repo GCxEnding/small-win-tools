@@ -135,6 +135,10 @@ class Store:
         return self.local / "raw" / "claude-code"
 
     @property
+    def ui_state_path(self) -> Path:
+        return self.local / "ui_state.json"
+
+    @property
     def log_dir(self) -> Path:
         return self.local / "logs"
 

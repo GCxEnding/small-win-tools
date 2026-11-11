@@ -159,7 +159,7 @@ class App:
 
         self.theme = T.from_config(self.core.config)
         T.apply_app(qapp, self.theme)
-        self.window = SearchWindow(self.theme)
+        self.window = SearchWindow(self.theme, state_path=self.core.store.ui_state_path)
         try:                              # 시스템 모드: Windows 앱 모드가 바뀌면 따라간다 (Qt 6.5+)
             qapp.styleHints().colorSchemeChanged.connect(lambda _s: self.apply_theme())
         except AttributeError:

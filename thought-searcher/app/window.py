@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QLis
                                QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
 
 from . import theme as T
+from . import ui_state
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit
 from .theme import Theme
@@ -28,10 +29,45 @@ BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "cl
          "journal": "일지"}
 DEBOUNCE_MS = 150
 WIN_W, WIN_H = 820, 560
+EDGE = 6              # 크기를 끌 수 있는 테두리 두께
+CORNER_MARK = 14      # 오른쪽 아래 모서리 표시
+SAVE_DELAY_MS = 500
 
 
 def center_position(g: QRect, w: int, h: int) -> QPoint:
     return QPoint(g.left() + (g.width() - w) // 2, g.top() + (g.height() - h) // 3)
+
+
+class EdgeGrip(QWidget):
+    """창 테두리 한 변(또는 모서리). 누르고 끌면 시스템이 크기를 바꿔 준다 (QWindow.startSystemResize).
+    mark=True면 오른쪽 아래 모서리 표시(점 세 줄)를 그린다."""
+
+    def __init__(self, owner: "SearchWindow", edges, mark: bool = False):
+        super().__init__(owner)
+        self.owner, self.edges, self.mark = owner, edges, mark
+        horiz = bool(edges & (Qt.LeftEdge | Qt.RightEdge))
+        vert = bool(edges & (Qt.TopEdge | Qt.BottomEdge))
+        diag_back = (edges & Qt.LeftEdge and edges & Qt.BottomEdge) or (edges & Qt.RightEdge and edges & Qt.TopEdge)
+        if horiz and vert:
+            self.setCursor(Qt.SizeBDiagCursor if diag_back else Qt.SizeFDiagCursor)
+        else:
+            self.setCursor(Qt.SizeHorCursor if horiz else Qt.SizeVerCursor)
+        self.color = QColor("#808080")
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self.owner.begin_user_resize(self.edges)
+            e.accept()
+
+    def paintEvent(self, _e):
+        if not self.mark:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        p.setPen(QPen(self.color, 1.2, Qt.SolidLine, Qt.RoundCap))
+        w, h = self.width(), self.height()
+        for k in (4, 8, 12):
+            p.drawLine(w - 2, h - 2 - k, w - 2 - k, h - 2)
 
 
 class QueryEdit(QLineEdit):
@@ -292,8 +328,12 @@ class SearchWindow(QWidget):
     action = Signal(str, object, int)    # (종류, Hit, 맞은 메시지 순번)
     settingsRequested = Signal()         # 상태 줄 ⚙
 
-    def __init__(self, theme: Theme | None = None):
+    def __init__(self, theme: Theme | None = None, state_path=None):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.state_path = state_path          # ui_state.json (없으면 크기를 저장하지 않음)
+        self._state = ui_state.search_state(ui_state.load(state_path))
+        self._saved = dict(self._state)
+        self._user_dirty = False              # 사용자가 크기를 바꿨나 (화면에 맞춰 줄인 크기는 저장하지 않는다)
         self.setAttribute(Qt.WA_ShowWithoutActivating, False)
         self.setWindowTitle("생각 검색기")
         self.t = theme or T.make()
@@ -301,7 +341,8 @@ class SearchWindow(QWidget):
         font.setFamilies(TEXT_FONTS)
         font.setPointSize(10)
         self.setFont(font)
-        self.resize(WIN_W, WIN_H)
+        self.setMinimumSize(ui_state.MIN_W, ui_state.MIN_H)
+        self.resize(self._state.get("w", WIN_W), self._state.get("h", WIN_H))
         self.ask_enabled = True
         root = QWidget(self)
         root.setObjectName("root")
@@ -349,6 +390,14 @@ class SearchWindow(QWidget):
         f.setPointSizeF(8.5)
         self.hint.setFont(f)
         inner.addWidget(self.hint)
+        self._grips = [EdgeGrip(self, edges, mark) for edges, mark in (
+            (Qt.LeftEdge, False), (Qt.RightEdge, False), (Qt.TopEdge, False), (Qt.BottomEdge, False),
+            (Qt.LeftEdge | Qt.TopEdge, False), (Qt.RightEdge | Qt.TopEdge, False),
+            (Qt.LeftEdge | Qt.BottomEdge, False), (Qt.RightEdge | Qt.BottomEdge, True))]
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(SAVE_DELAY_MS)
+        self._save_timer.timeout.connect(self.save_state)
         self.mode = "search"
         self._queue: QueueResult | None = None
         self._show_rest = False
@@ -375,11 +424,16 @@ class SearchWindow(QWidget):
         self.setPalette(T.palette(t))
         self.setStyleSheet(T.search_qss(t))
         self.gear.setIcon(T.icon("settings", t.sub, 16))
+        for g in getattr(self, "_grips", []):
+            g.color = t.placeholder
         self.list.viewport().update()
 
     def popup(self) -> None:
         screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
         g = screen.availableGeometry()
+        w, h = ui_state.fit_size(self.width(), self.height(), g.width(), g.height())
+        if (w, h) != (self.width(), self.height()):
+            self.resize(w, h)                 # 이 모니터보다 크면 줄인다 (저장된 크기는 그대로 둔다)
         self.move(center_position(g, self.width(), self.height()))
         self.show()
         self.raise_()
@@ -392,6 +446,59 @@ class SearchWindow(QWidget):
     def refresh(self) -> None:
         self._pending = self.edit.full_text()
         self.searchRequested.emit(self._pending)
+
+    # ---- 크기 조절, 저장 ------------------------------------------------------
+    def _place_grips(self) -> None:
+        w, h, b = self.width(), self.height(), EDGE
+        left, right, top, bottom, tl, tr, bl, br = self._grips
+        left.setGeometry(0, b, b, h - 2 * b)
+        right.setGeometry(w - b, b, b, h - 2 * b)
+        top.setGeometry(b, 0, w - 2 * b, b)
+        bottom.setGeometry(b, h - b, w - 2 * b, b)
+        tl.setGeometry(0, 0, b, b)
+        tr.setGeometry(w - b, 0, b, b)
+        bl.setGeometry(0, h - b, b, b)
+        br.setGeometry(w - CORNER_MARK, h - CORNER_MARK, CORNER_MARK, CORNER_MARK)
+        for g in self._grips:
+            g.raise_()
+
+    def begin_user_resize(self, edges) -> None:
+        """테두리를 눌렀다: 시스템 크기 조절을 시작한다 (끝날 때까지 돌아오지 않음). 끝나면 저장 예약."""
+        handle = self.windowHandle()
+        if handle is None:
+            return
+        if handle.startSystemResize(edges):
+            self.user_resized()
+
+    def user_resized(self) -> None:
+        """사용자가 크기(또는 나누기 위치)를 바꿨다: 잠시 뒤 저장."""
+        self._user_dirty = True
+        self._save_timer.start()
+
+    def current_state(self) -> dict:
+        return {**self._state, "w": self.width(), "h": self.height()}
+
+    def save_state(self) -> None:
+        """바뀐 것이 있을 때만 ui_state.json에 쓴다. 다른 키는 그대로 둔다."""
+        self._save_timer.stop()
+        if self.state_path is None or not self._user_dirty:
+            return
+        cur = self.current_state()
+        if cur == self._saved:
+            return
+        data = ui_state.load(self.state_path)
+        if ui_state.save(self.state_path, ui_state.with_search_state(data, cur)):
+            self._saved = cur
+            self._state = cur
+            self._user_dirty = False
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._place_grips()
+
+    def hideEvent(self, e):
+        self.save_state()
+        super().hideEvent(e)
 
     def changeEvent(self, e):
         if e.type() == QEvent.ActivationChange and not self.isActiveWindow() and self.isVisible():
