@@ -1,6 +1,54 @@
+# 인수인계: 검색창, 설정창 새 디자인 (2026-11-12)
+
+> 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
+> 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
+
+## 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/theme.py` | 옅은 강조색(`accent_soft`, `accent_badge`, `derived`), 키캡/찾기 칸/카드/세그먼트/강조색 막대/아래 막대/나누기 막대 스타일, 아이콘 `search`/`info`, `round_corners`(DWM 모서리) |
+| `app/ui_state.py` (새) | `ui_state.json`(LOCALAPPDATA) 읽기/쓰기, 값 검사, 화면 맞춤(`fit_size`). `Store.ui_state_path` 추가 |
+| `app/window.py` | 검색창 전면 개편: 큰 검색칸, 한 줄 `HitDelegate`, `QSplitter`+`PreviewPane`(좁음/넓음 `WIDE_MIN_W=760`), 아래 막대, 크기 조절 `EdgeGrip`, `ElideLabel`(줄임 라벨, 낱말 칠하기) |
+| `app/settings_window.py` | 카드 섹션, 두 줄 `_row`(+`tip`, `empty_desc`, `plain`), `InfoButton`(ⓘ), `SearchBox` 설정 찾기, `NavButton` 배지, 아래 막대(바뀐 설정 수, 키캡), Ctrl+S/Ctrl+F, 모드 세그먼트, 단축키 칸 키캡 |
+| `app/main.py` | `SearchWindow(theme, state_path=...)` |
+| `tests/test_ui_state.py`, `test_search_window.py`, `test_settings_search.py` (새), `test_theme.py` | 새 동작 시험. `test_theme.py`의 "스타일시트에 테마 밖 색 없음"은 섞어 만든 옅은 강조색을 허용하도록 고침 |
+| `README.md`, `docs/redesign-plan.md`, `docs/copy-table.md` | 화면 설명, 계획, 문구표 |
+
+## 정한 것
+- 검색창 넓음/좁음 기준은 760px(`window.WIDE_MIN_W`). 기본 창 크기 820x560은 넓음에 속합니다. 최소 560x360.
+- 목록 칸 비율은 `ui_state.json`의 `search_window.split`(0.2~0.8). 크기와 같이, 사용자가 끌어서 바꿨을 때만 저장합니다(화면에 맞춰 줄인 크기를 덮어쓰지 않으려고).
+- 미리보기는 `mdparse`로 md를 읽어 `MatchedMessage.ordinal` 앞뒤를 고릅니다(`MdCache`, 경로+수정시각 키, 8개). 맞은 낱말은 목록 미리보기의 강조 글자들을 모아 본문에서 다시 찾습니다(검색 코드를 건드리지 않으려고). md 형식이 아닌 원본(노트 등)이면 목록의 미리보기 한 줄을 보입니다. `missing`이면 "원본 없음".
+- 큐 줄은 모두 한 줄 모양입니다. 일지 항목(`subtitle`)은 좁을 때 고른 줄의 둘째 줄에, 넓을 때 미리보기 머리에 보입니다. 저장된 요약(`detail` 라벨)은 넓을 때 미리보기 칸, 좁을 때 목록 아래로 옮겨 다닙니다.
+- 설정 찾기: 줄의 이름+설명+툴팁(+빈 칸 글)에서 모든 낱말(AND)을 찾습니다. 설정값 때문에 숨은 줄(서비스 끔 등)은 `_nat`로 따로 기억해 찾기와 상관없이 숨깁니다. 저장 오류가 나면 찾기 칸을 비워 오류 줄이 보이게 합니다.
+- 문구 확정 전 임시 규칙: 설명이 46자(`AUTO_TIP_LEN`)를 넘으면 한 줄로 줄여 보이고 전체는 ⓘ 툴팁에 둡니다. 문구표가 확정되면 각 `_row`에 `tip=`/`empty_desc=`를 넣고 이 규칙은 빼면 됩니다.
+- 경로 칸(`PathEdit`)이 든 줄은 자동으로 stacked(이름 아래 가로로 펼침)입니다.
+- Esc 동작은 그대로(바뀐 것 있으면 확인). 시작 안내(setup)는 같은 카드/아래 막대를 쓰고 찾기 칸은 없습니다.
+
+## 함정
+- `QPushButton`에 동적 속성 이름을 `pos`로 쓰면 `QWidget.pos`와 겹칩니다. 세그먼트 위치는 `segpos`.
+- 창을 `show()`하기 전에는 `resize()`해도 `resizeEvent`가 안 옵니다. 좁음/넓음은 `_apply_mode()`가 `set_results`, `set_queue`에서도 다시 정합니다. 테스트에서 폭을 바꿀 때는 먼저 `show()`.
+- 레이아웃에서 뺀 위젯은 `deleteLater()`만으로는 이벤트 루프가 돌 때까지 화면에 남아 겹쳐 보입니다. `hide()`(+`setParent(None)`)를 같이 합니다(미리보기 본문, 아래 막대 키 안내).
+- Qt 툴팁은 순수 글자면 줄바꿈하지 않아 `tip_html`이 폭 340의 표로 감쌉니다.
+- 정해진 계획과 impeccable 지침이 부딪힌 곳: 지침은 "카드 모서리 12~16px, 1px 넘는 색 있는 border-left 금지"인데 계획은 카드 모서리 9px, 선택 줄/탭의 왼쪽 강조 막대 3px입니다. 계획(CG 합의)을 따랐습니다.
+- 둥근 모서리(DWM 33)와 `startSystemResize` 끌기는 offscreen에서 시험할 수 없어 Windows 11 실화면 확인이 필요합니다(함수는 실패해도 사각형/무동작으로 안전).
+- 검색칸 placeholder는 큰 글자에서 잘려서 `src:|proj:|after:` 요약형으로 줄이고, 전체 문법은 검색칸 툴팁으로 옮겼습니다(검색 문법 자체는 그대로).
+- 아래 막대 키 안내에서 `←/→`, `Esc 닫기` 문구는 계획대로 뺐습니다. `←→`는 좁은 줄과 미리보기 머리에 보입니다.
+- `tests/test_perf.py::test_query_under_limit[docker 컨테이너 네트워크]`가 이 PC에서 300ms 기준을 313ms로 넘겨 실패합니다(작업 전부터 그랬고 UI와 무관). 나머지는 모두 통과.
+
+## 확인한 것
+- `python -m pytest -q --ignore=tests/test_perf.py`: 374개 통과. `tests/test_perf.py`는 위 1건만 실패(이전과 같음).
+- `QWidget.grab()`으로 검색창(좁음 620/넓음 980 x 검색/큐 x 라이트/다크)과 설정창(일반, 찾기 중 x 라이트/다크)을 찍어 봤습니다. 찍은 스크립트는 세션 scratch에 있었고 저장소에는 없습니다(합성 데이터 사용).
+- 찍어서 고친 것: 미리보기에 이전 결과가 겹쳐 보임, 아래 막대 키 안내 겹침(큐 전환), 경로 칸 줄이 좁아 설명이 잘림.
+
+## 남은 일
+1. CG가 `docs/copy-table.md`를 확인하면 `settings_window.py`에 문구 반영(`tip=`, `empty_desc=`), 임시 규칙 제거, 깨지는 테스트 기대값 갱신. "크게 보여 줄 개수" 이름 변경 여부도 그때 정합니다.
+2. Windows 11 실제 화면에서 둥근 모서리, 테두리 끌기, 나누기 막대 끌기 확인.
+3. `SPEC.md`/`SPEC-settings.md`에 새 화면 설명을 옮길지 결정(지금은 계획 문서와 README에만 반영).
+
+---
 # 인수인계: 설정 창 디자인 개편과 테마 (2026-11-10 밤)
 
-> 이 절이 최신입니다. 아래 "설정 창과 시작 안내" 절은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
+> (2026-11-10 시점) 아래 "설정 창과 시작 안내" 절은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > **커밋은 하지 않았습니다**(CLAUDE.md 6번).
 
 ## A. 한 일

@@ -578,6 +578,7 @@ class PreviewPane(QFrame):
                 w.hide()
                 w.setParent(self)          # 지우지 않고 잠시 맡아 둔다 (창이 다시 가져감)
             else:
+                w.hide()                   # 지워지기 전까지 남아 겹쳐 보이지 않게
                 w.deleteLater()
 
     def set_header(self, source: str, title: str, meta: str, index: str = "", sub: str = "") -> None:
@@ -880,6 +881,8 @@ class SearchWindow(QWidget):
         while self.hint_box.count():
             item = self.hint_box.takeAt(0)
             if item.widget():
+                item.widget().hide()
+                item.widget().setParent(None)      # 바로 떼어 새 안내와 겹치지 않게
                 item.widget().deleteLater()
         self._hint_widgets = []
         specs = HINTS_QUEUE if self.mode == "queue" else HINTS_SEARCH

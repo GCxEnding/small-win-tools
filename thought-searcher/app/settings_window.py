@@ -909,6 +909,10 @@ class SettingsWindow(QDialog):
         plain: 이름을 굵지 않게, 줄바꿈하며 보인다 (설치 단계처럼 문장인 줄). after/warn/extras/알림은 아래에 붙는다."""
         if isinstance(control, QLayout):
             control = _wrap(control)
+        if isinstance(control, PathEdit):         # 경로 칸은 넓다: 이름 아래에 가로로 펼친다
+            stacked = True
+            control.setMinimumWidth(0)
+            control.setMaximumWidth(16777215)
         box = QWidget()
         box.setObjectName("rowBox")
         v = QVBoxLayout(box)
