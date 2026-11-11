@@ -145,14 +145,38 @@ class QueryEdit(QLineEdit):
             super().keyPressEvent(e)
 
 
+def term_spans(text: str, terms: list[str]) -> list[tuple[int, int]]:
+    """글 안에서 낱말(대소문자 무시)이 나오는 구간. 겹치면 합친다."""
+    low = text.lower()
+    spans: list[tuple[int, int]] = []
+    for t in terms:
+        t = t.lower()
+        i = low.find(t) if t else -1
+        while i >= 0:
+            spans.append((i, i + len(t)))
+            i = low.find(t, i + len(t))
+    spans.sort()
+    merged: list[tuple[int, int]] = []
+    for s, e in spans:
+        if merged and s <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+        else:
+            merged.append((s, e))
+    return merged
+
+
 class ElideLabel(QLabel):
-    """넘치면 '…'로 줄여 보이는 한 줄 라벨. text()는 전체 글자를 돌려준다 (결과 수, 상태)."""
+    """넘치면 '…'로 줄여 보이는 한 줄 라벨. text()는 전체 글자를 돌려준다 (결과 수, 상태, 설정 줄 설명).
+    줄여진 때만 툴팁에 전체 글자를 보인다. set_marks로 낱말을 칠할 수 있다 (설정 찾기)."""
 
     MAX_W = 300
 
     def __init__(self, text: str = ""):
         super().__init__("")
         self._full = ""
+        self._terms: list[str] = []
+        self._mark = ""
+        self.setTextFormat(Qt.PlainText)
         self.setText(text)
 
     def text(self) -> str:
@@ -160,13 +184,25 @@ class ElideLabel(QLabel):
 
     def setText(self, t: str) -> None:
         self._full = str(t)
-        self.setToolTip(self._full if len(self._full) > 24 else "")
         self._elide()
         self.updateGeometry()
 
+    def set_marks(self, terms: list[str], mark_hex: str = "") -> None:
+        self._terms = [t for t in terms if t]
+        self._mark = mark_hex
+        self._elide()
+
     def _elide(self) -> None:
         w = max(10, self.width() - 8)
-        super().setText(self.fontMetrics().elidedText(self._full, Qt.ElideRight, w) if self.width() > 8 else self._full)
+        shown = self.fontMetrics().elidedText(self._full, Qt.ElideRight, w) if self.width() > 8 else self._full
+        self.setToolTip(self._full if shown != self._full else "")
+        spans = term_spans(shown, self._terms) if self._terms and self._mark else []
+        if spans:
+            self.setTextFormat(Qt.RichText)
+            super().setText(_marked_html(shown, spans, self._mark))
+        else:
+            self.setTextFormat(Qt.PlainText)
+            super().setText(shown)
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
@@ -430,14 +466,18 @@ def crop(text: str, spans: list[tuple[int, int]], limit: int) -> tuple[str, list
     return out, new
 
 
-def to_html(text: str, spans: list[tuple[int, int]], mark: str) -> str:
+def _marked_html(text: str, spans: list[tuple[int, int]], mark: str) -> str:
     out, pos = [], 0
     for s, e in spans:
         out.append(html.escape(text[pos:s]))
         out.append(f'<span style="background-color:{mark}">{html.escape(text[s:e])}</span>')
         pos = e
     out.append(html.escape(text[pos:]))
-    return "".join(out).replace("\n", "<br>")
+    return "".join(out)
+
+
+def to_html(text: str, spans: list[tuple[int, int]], mark: str) -> str:
+    return _marked_html(text, spans, mark).replace("\n", "<br>")
 
 
 class BadgeWidget(QWidget):

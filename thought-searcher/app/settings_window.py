@@ -4,31 +4,35 @@
 여기는 화면 구성만 다룬다. 저장 뒤 트레이 앱 쪽 적용(단축키, 타이머, 감시 폴더, 검색 가중치, 테마)은
 Hooks로 main.py에 맡긴다.
 
-화면 구성: 왼쪽 사이드바(208px) + 오른쪽 페이지. 페이지는 섹션(_section) 단위, 섹션 안은 줄(_row) 단위.
-줄은 "왼쪽 이름+설명 / 오른쪽 입력칸"이고, 넓은 칸(목록, 여러 줄 입력)만 stacked로 이름 아래에 둔다.
+화면 구성 (docs/redesign-plan.md): 위 설정 찾기 칸, 왼쪽 사이드바(208px) + 오른쪽 페이지, 아래 막대(바뀐 설정 수, 취소, 저장).
+페이지는 섹션(_section) 단위: 제목 아래 카드 하나, 카드 안은 줄(_row) 단위.
+줄은 두 줄까지다. 보통은 "왼쪽 이름(+ⓘ) / 설명 한 줄, 오른쪽 입력칸"이고, 넓은 칸(목록, 여러 줄 입력)만
+stacked로 "이름 + ⓘ + 설명 한 줄" 아래에 입력칸을 둔다. 긴 설명은 ⓘ 툴팁에 담는다.
 """
 from __future__ import annotations
 
 import copy
+import html
 import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal
-from PySide6.QtGui import QCursor, QFont, QGuiApplication
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import QCursor, QFont, QFontMetrics, QGuiApplication, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (QAbstractSpinBox, QApplication, QButtonGroup, QCheckBox, QComboBox, QDialog,
                                QDoubleSpinBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLayout, QLineEdit,
                                QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton, QRadioButton,
-                               QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
+                               QScrollArea, QSizePolicy, QSpinBox, QStackedWidget, QToolButton, QToolTip, QVBoxLayout,
+                               QWidget)
 
 from . import cli_check
 from . import settings as S
 from . import theme as T
 from .store import expand
 from .watcher import downloads_dir
-from .window import TEXT_FONTS
+from .window import TEXT_FONTS, ElideLabel
 
 TITLE = "생각 검색기 설정"
 SETUP_TITLE = "생각 검색기 시작하기"
@@ -45,6 +49,9 @@ SIDEBAR_W = 208
 SECTION_GAP = 36
 PATH_W = 380          # 경로 칸(입력 + 찾아보기 + 열기) 폭
 NUM_W = 118           # 숫자 칸 폭
+AUTO_TIP_LEN = 46     # 설명이 이보다 길면 한 줄에 줄여 보이고 전체는 ⓘ 툴팁에 둔다 (문구 확정 전 임시 규칙)
+TIP_W = 340           # ⓘ 툴팁 폭
+ROW_PAD_X, ROW_PAD_Y = 16, 12
 
 
 @dataclass
@@ -353,10 +360,20 @@ class HotkeyEdit(QLineEdit):
 
     def __init__(self):
         super().__init__()
+        self.setObjectName("hotkey")
         self.setReadOnly(True)
         self.setAttribute(Qt.WA_InputMethodEnabled, False)    # 한글 IME가 키를 가로채지 않게
         self._value = ""
         self.active = False
+        self.t: T.Theme | None = None          # 키캡을 칠할 색 (창이 채운다)
+        self._set_caps(True)
+
+    def _set_caps(self, on: bool) -> None:
+        """평소에는 글자를 숨기고 키캡 모양으로 그린다. 기록 중에는 안내 글자를 그대로 보인다."""
+        self.setProperty("caps", on)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
 
     def value(self) -> str:
         return self._value
@@ -365,18 +382,46 @@ class HotkeyEdit(QLineEdit):
         self._value = str(v or "")
         if not self.active:
             self.setText(S.display_hotkey(self._value))
+            self.update()
 
     def start(self) -> None:
         if not self.active:
             self.active = True
             self.setText(self.PROMPT)
+            self._set_caps(False)
             self.recording.emit(True)
 
     def stop(self) -> None:
         if self.active:
             self.active = False
             self.setText(S.display_hotkey(self._value))
+            self._set_caps(True)
             self.recording.emit(False)
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        if self.active or self.t is None or not self._value:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        f = QFont(self.font())
+        f.setPointSizeF(9.5)
+        f.setBold(True)
+        p.setFont(f)
+        fm = QFontMetrics(f)
+        x, h = 10, fm.height() + 8
+        y = (self.height() - h) // 2
+        for part in S.display_hotkey(self._value).split("+"):
+            w = fm.horizontalAdvance(part) + 18
+            rect = QRect(x, y, w, h)
+            p.setPen(QPen(self.t.input_border, 1))
+            p.setBrush(self.t.button)
+            p.drawRoundedRect(rect.adjusted(0, 0, 0, 0), 5, 5)
+            p.setPen(QPen(self.t.input_border, 2))              # 아래쪽이 조금 두꺼운 키캡 선
+            p.drawLine(rect.left() + 4, rect.bottom(), rect.right() - 4, rect.bottom())
+            p.setPen(self.t.text)
+            p.drawText(rect.adjusted(0, 0, 0, -1), Qt.AlignCenter, part)
+            x += w + 6
 
     def mousePressEvent(self, e):
         self.setFocus()
@@ -411,7 +456,7 @@ class HotkeyEdit(QLineEdit):
 
 
 class Section(QWidget):
-    """섹션: 제목(+ 옆 설명, 오른쪽 링크) 아래에 줄이 쌓인다. 줄마다 위에 얇은 구분선."""
+    """섹션: 제목(+ 옆 설명, 오른쪽 링크) 아래에 카드 하나. 카드 안에 줄이 쌓인다(줄 위에 얇은 구분선)."""
 
     def __init__(self, title: str, caption: str = "", link: tuple[str, Callable] | None = None, intro: str = "",
                  first: bool = False):
@@ -420,7 +465,7 @@ class Section(QWidget):
         v.setContentsMargins(0, 0 if first else SECTION_GAP, 0, 0)
         v.setSpacing(0)
         head = QHBoxLayout()
-        head.setContentsMargins(0, 0, 0, 12)
+        head.setContentsMargins(0, 0, 0, 10)
         head.setSpacing(12)
         head.addWidget(_label(title, "sectionTitle", wrap=False), 0, Qt.AlignBottom)
         if caption:
@@ -433,13 +478,141 @@ class Section(QWidget):
         v.addLayout(head)
         if intro:
             lb = _label(intro, "desc")
-            lb.setContentsMargins(0, 0, 0, 12)
+            lb.setContentsMargins(0, 0, 0, 10)
             v.addWidget(lb)
-        self.rows = QVBoxLayout()
+        self.card = QFrame()
+        self.card.setObjectName("card")
+        self.rows = QVBoxLayout(self.card)
         self.rows.setContentsMargins(0, 0, 0, 0)
         self.rows.setSpacing(0)
-        v.addLayout(self.rows)
+        v.addWidget(self.card)
 
+
+class InfoButton(QToolButton):
+    """이름 옆 ⓘ. 올려 두면(또는 누르면) 자세한 설명 툴팁이 뜬다."""
+
+    def __init__(self, tip: str):
+        super().__init__()
+        self.setObjectName("info")
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setCursor(Qt.WhatsThisCursor)
+        self.setIconSize(QSize(14, 14))
+        self.setAutoRaise(True)
+        self.tip = tip
+        self.setToolTip(tip_html(tip))
+        self.setToolTipDuration(60000)
+
+    def mousePressEvent(self, e):
+        QToolTip.showText(self.mapToGlobal(QPoint(0, self.height())), self.toolTip(), self)
+        e.accept()
+
+
+def tip_html(text: str) -> str:
+    """툴팁 글을 일정한 폭(TIP_W)에서 줄바꿈되는 표로 감싼다 (Qt 툴팁은 순수 글자면 줄바꿈하지 않는다)."""
+    return f'<table width="{TIP_W}"><tr><td>{html.escape(text).replace(chr(10), "<br>")}</td></tr></table>'
+
+
+class NavButton(QPushButton):
+    """사이드바 탭. 찾기 중에는 오른쪽에 맞은 수 배지가 붙는다 (text()는 탭 이름 그대로)."""
+
+    def __init__(self, text: str):
+        super().__init__(text)
+        self.badge = QLabel("", self)
+        self.badge.setObjectName("navBadge")
+        self.badge.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.badge.hide()
+
+    def set_count(self, n: int | None) -> None:
+        """n: 맞은 수. None이면 찾기를 안 하는 중 (배지, 흐림 없음)."""
+        self.badge.setVisible(bool(n))
+        if n:
+            self.badge.setText(str(n))
+            self.badge.adjustSize()
+            self._place()
+        dim = n == 0
+        if self.property("dim") != dim:
+            self.setProperty("dim", dim)
+            self.style().unpolish(self)
+            self.style().polish(self)
+
+    def _place(self) -> None:
+        self.badge.move(self.width() - self.badge.width() - 10, (self.height() - self.badge.height()) // 2)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._place()
+
+
+class SearchBox(QFrame):
+    """설정 찾기 칸: 강조색 돋보기, 입력, 오른쪽에 (비었을 때) Ctrl F 키캡 또는 (입력 중) 맞은 수."""
+
+    changed = Signal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("searchBox")
+        h = QHBoxLayout(self)
+        h.setContentsMargins(12, 2, 12, 2)
+        h.setSpacing(8)
+        self.icon = QLabel()
+        self.icon.setFixedSize(18, 18)
+        self.edit = QLineEdit()
+        self.edit.setPlaceholderText("설정 찾기")
+        self.edit.setClearButtonEnabled(False)
+        self.edit.textChanged.connect(self._on_text)
+        self.count = QLabel("")
+        self.count.setObjectName("searchCount")
+        self.keys = QWidget()
+        kh = QHBoxLayout(self.keys)
+        kh.setContentsMargins(0, 0, 0, 0)
+        kh.setSpacing(4)
+        for k in ("Ctrl", "F"):
+            cap = QLabel(k)
+            cap.setObjectName("keycap")
+            kh.addWidget(cap)
+        h.addWidget(self.icon)
+        h.addWidget(self.edit, 1)
+        h.addWidget(self.count)
+        h.addWidget(self.keys)
+        self.count.hide()
+
+    def text(self) -> str:
+        return self.edit.text().strip()
+
+    def set_count(self, n: int) -> None:
+        typing = bool(self.text())
+        self.keys.setVisible(not typing)
+        self.count.setVisible(typing)
+        self.count.setText(f"{n}개" if n else "맞는 설정 없음")
+
+    def focus_all(self) -> None:
+        self.edit.setFocus()
+        self.edit.selectAll()
+
+    def _on_text(self, _t: str) -> None:
+        self.keys.setVisible(not self.text())
+        self.changed.emit(self.text())
+
+
+@dataclass
+class RowRef:
+    """설정 찾기에 쓰는 줄 정보."""
+    tab: str
+    sec: "Section"
+    box: QWidget
+    line: QWidget              # 줄 위 구분선 (카드의 첫 보이는 줄에서는 숨긴다)
+    name: str
+    desc: str
+    tip: str
+    name_lb: QLabel | None
+    desc_lb: ElideLabel | None
+    key: str | None = None
+    empty_desc: str = ""       # 칸이 비어 있을 때만 설명 줄에 보일 글
+    counted: bool = True
+
+    @property
+    def haystack(self) -> str:
+        return " ".join(s for s in (self.name, self.desc, self.tip, self.empty_desc) if s).lower()
 
 class _CheckBridge(QObject):
     done = Signal(str, object)    # (provider, CliStatus)
@@ -483,6 +656,12 @@ class SettingsWindow(QDialog):
         self._boxes: dict[str, QWidget] = {}
         self._scrolls: dict[str, QScrollArea] = {}
         self._sections: list[QVBoxLayout] = []   # 섹션이 하나라도 들어간 페이지 (첫 섹션은 위 간격 없음)
+        self._secs: list[Section] = []           # 만든 섹션 전부 (설정 찾기에서 보임/숨김)
+        self._rows: list[RowRef] = []            # 만든 줄 전부 (설정 찾기 대상)
+        self._nat: dict[QWidget, bool] = {}      # 설정값에 따라 줄, 섹션이 보여야 하나 (찾기 필터와 따로 기억)
+        self._info_buttons: list[InfoButton] = []
+        self._build_tab = ""
+        self.search: SearchBox | None = None
         self._loading = False
         self._done = False
         self._tab = "general"
@@ -530,24 +709,58 @@ class SettingsWindow(QDialog):
         else:
             self.setMinimumSize(760, 520)
             self.resize(920, 740)
+            # 머리: 설정 찾기 칸
+            self.search = SearchBox()
+            self.search.setMaximumWidth(680)
+            self.search.changed.connect(lambda _t: self._refresh_filter())
+            head = QFrame()
+            head.setObjectName("searchHead")
+            hh = QHBoxLayout(head)
+            hh.setContentsMargins(24, 14, 24, 14)
+            hh.addWidget(self.search, 1)
+            hh.addStretch(1)
+            root.addWidget(head)
             body = QHBoxLayout()
             body.setContentsMargins(0, 0, 0, 0)
             body.setSpacing(0)
             body.addWidget(self._build_sidebar())
+            right = QVBoxLayout()
+            right.setContentsMargins(0, 0, 0, 0)
+            right.setSpacing(0)
+            self.no_match = _label("", "pageDesc")
+            self.no_match.setContentsMargins(42, 20, 42, 0)
+            self.no_match.hide()
+            right.addWidget(self.no_match)
             self.stack = QStackedWidget()
-            body.addWidget(self.stack, 1)
+            right.addWidget(self.stack, 1)
+            body.addLayout(right, 1)
             root.addLayout(body, 1)
             for key in S.TABS:
                 getattr(self, f"_build_{key}")()
             for lay in self._sections:
                 lay.addStretch(1)                 # 내용이 창보다 짧으면 남는 높이는 맨 아래로
+            # 아래 막대: 바뀐 설정 수 | 취소 Esc, 저장 Ctrl S
+            self.changed_dot = QLabel()
+            self.changed_dot.setObjectName("changedDot")
+            self.changed_dot.setFixedSize(8, 8)
+            self.changed_text = QLabel("")
+            self.changed_text.setObjectName("changedText")
+            self.changed_dot.hide()
+            self.changed_text.hide()
             self.btn_cancel = _button("취소", "secondary")
             self.btn_save = _button("저장", "primary")
             self.btn_save.clicked.connect(self.save)
             self.btn_cancel.clicked.connect(self.reject)
+            buttons.addWidget(self.changed_dot, 0, Qt.AlignVCenter)
+            buttons.addWidget(self.changed_text)
             buttons.addStretch(1)
             buttons.addWidget(self.btn_cancel)
+            buttons.addLayout(self._keycaps("Esc"))
+            buttons.addSpacing(8)
             buttons.addWidget(self.btn_save)
+            buttons.addLayout(self._keycaps("Ctrl", "S"))
+            QShortcut(QKeySequence("Ctrl+S"), self, activated=self._shortcut_save)
+            QShortcut(QKeySequence("Ctrl+F"), self, activated=self.search.focus_all)
         root.addWidget(footer)
         for b in self.findChildren(QPushButton):
             b.setAutoDefault(False)           # Enter로 엉뚱한 버튼이 눌리지 않게
@@ -570,6 +783,15 @@ class SettingsWindow(QDialog):
             b.setIcon(T.icon(name, t.text, 16))
         for acc, b in self._swatches.items():
             b.setIcon(T.swatch(T.accent_color(acc, t.dark)))
+        for b in self._info_buttons:
+            b.setIcon(T.icon("info", t.sub, 14))
+        if self.search is not None:
+            self.search.icon.setPixmap(T.icon("search", t.accent, 18).pixmap(18, 18))
+        if hasattr(self, "hotkey"):
+            self.hotkey.t = t
+            self.hotkey.update()
+        if self._rows and self.search is not None:
+            self._refresh_filter()                # 맞은 글자 바탕색이 테마를 따라 바뀐다
         if self.isVisible():
             T.style_titlebar(self, t)
 
@@ -596,6 +818,21 @@ class SettingsWindow(QDialog):
         g = screen.availableGeometry()
         self.move(g.left() + (g.width() - self.width()) // 2, g.top() + (g.height() - self.height()) // 2)
 
+    @staticmethod
+    def _keycaps(*keys: str) -> QHBoxLayout:
+        h = QHBoxLayout()
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(4)
+        for k in keys:
+            cap = QLabel(k)
+            cap.setObjectName("keycap")
+            h.addWidget(cap)
+        return h
+
+    def _shortcut_save(self) -> None:
+        if not self.setup_mode and self.btn_save.isEnabled():
+            self.save()
+
     def _help(self, text: str, warn: bool = False) -> QLabel:
         lb = _label(text, "desc")
         if warn:
@@ -614,7 +851,10 @@ class SettingsWindow(QDialog):
         self.nav.setExclusive(True)
         self.nav_buttons: list[QPushButton] = []
         for i, key in enumerate(S.TABS):
-            b = _button(S.TAB_LABEL[key], "nav")
+            b = NavButton(S.TAB_LABEL[key])
+            b.setObjectName("nav")
+            b.setCursor(Qt.PointingHandCursor)
+            b.setAutoDefault(False)
             b.setCheckable(True)
             b.setIconSize(QSize(16, 16))
             b.clicked.connect(lambda _=False, k=key: self.select_tab(k))
@@ -626,6 +866,7 @@ class SettingsWindow(QDialog):
         return side
 
     def _page(self, tab: str | None = None, title: str = "", desc: str = "") -> QVBoxLayout:
+        self._build_tab = tab or ""
         w = QWidget()
         w.setObjectName("content")
         lay = QVBoxLayout(w)
@@ -655,15 +896,21 @@ class SettingsWindow(QDialog):
             self._sections.append(lay)        # 붙잡아 둔다 (id 재사용 방지)
         sec = Section(title, caption, link, intro, first=first)
         lay.addWidget(sec)
+        self._secs.append(sec)
         return sec
 
     def _row(self, sec: Section, title: str, control=None, desc: str = "", key: str | None = None,
-             stacked: bool = False, after: str = "", warn: str = "", extras: tuple = ()) -> QWidget:
-        """줄 하나. 보통은 왼쪽 이름(+설명, 경고, 알림) / 오른쪽 칸.
-        stacked: 이름, 설명, 칸, after(칸 아래 설명) 순으로 위아래로 쌓는다 (목록, 여러 줄 입력)."""
+             stacked: bool = False, after: str = "", warn: str = "", extras: tuple = (), tip: str = "",
+             empty_desc: str = "", plain: bool = False) -> QWidget:
+        """줄 하나. 두 줄까지: 보통은 왼쪽 `이름(굵게) + ⓘ` / `설명 한 줄`, 오른쪽 입력칸.
+        stacked: `이름 + ⓘ + 설명 한 줄` 아래에 입력칸 (목록, 여러 줄 입력, 강조색 등 넓은 칸).
+        tip: ⓘ 툴팁 글. 설명이 AUTO_TIP_LEN보다 길고 tip이 없으면 설명 전체를 툴팁에 두고 한 줄로 줄여 보인다
+        (문구 확정 전 임시 규칙). empty_desc: 이 칸이 비어 있을 때만 설명 줄에 보일 글 (key 필요).
+        plain: 이름을 굵지 않게, 줄바꿈하며 보인다 (설치 단계처럼 문장인 줄). after/warn/extras/알림은 아래에 붙는다."""
         if isinstance(control, QLayout):
             control = _wrap(control)
         box = QWidget()
+        box.setObjectName("rowBox")
         v = QVBoxLayout(box)
         v.setContentsMargins(0, 0, 0, 0)
         v.setSpacing(0)
@@ -671,12 +918,33 @@ class SettingsWindow(QDialog):
         line.setObjectName("hline")
         line.setFixedHeight(1)
         v.addWidget(line)
-        text = QVBoxLayout()
-        text.setSpacing(4)
+        if not tip and not plain and len(desc) > AUTO_TIP_LEN:
+            tip = desc
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(6)
+        name_lb = None
         if title:
-            text.addWidget(_label(title, "name"))
-        if desc:
-            text.addWidget(_label(desc, "desc"))
+            if plain:
+                name_lb = _label(title, "name")
+                head.addWidget(name_lb, 1)
+            else:
+                name_lb = ElideLabel(title)
+                name_lb.setObjectName("rowName")
+                name_lb.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+                head.addWidget(name_lb, 0)
+        if tip and title and not plain:
+            info = InfoButton(tip)
+            info.setIcon(T.icon("info", self.t.sub, 14))
+            self._info_buttons.append(info)
+            head.addWidget(info, 0, Qt.AlignVCenter)
+        desc_lb = None
+        if desc and not plain:
+            desc_lb = ElideLabel(desc)
+            desc_lb.setObjectName("desc")
+            desc_lb.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        elif desc:
+            desc_lb = _label(desc, "desc")           # plain 줄: 줄바꿈하며 전부 보인다
         tail: list[QWidget] = []
         if after:
             tail.append(_label(after, "desc"))
@@ -690,27 +958,42 @@ class SettingsWindow(QDialog):
             tail.append(n)
         if stacked:
             col = QVBoxLayout()
-            col.setContentsMargins(0, 14, 0, 14)
+            col.setContentsMargins(ROW_PAD_X, ROW_PAD_Y, ROW_PAD_X, ROW_PAD_Y)
             col.setSpacing(8)
-            col.addLayout(text)
+            if desc_lb is not None and not plain:
+                head.addWidget(desc_lb, 1)
+            else:
+                head.addStretch(1)
+            if title or desc_lb is not None:
+                col.addLayout(head)
+            if desc_lb is not None and plain:
+                col.addWidget(desc_lb)
             if control is not None:
                 col.addWidget(control)
             for w in tail:
                 col.addWidget(w)
             v.addLayout(col)
         else:
+            text = QVBoxLayout()
+            text.setSpacing(2)
+            if title:
+                if not plain:
+                    head.addStretch(1)
+                text.addLayout(head)
+            if desc_lb is not None:
+                text.addWidget(desc_lb)
             for w in tail:
                 text.addWidget(w)
             h = QHBoxLayout()
-            h.setContentsMargins(0, 14, 0, 14)
+            h.setContentsMargins(ROW_PAD_X, ROW_PAD_Y, ROW_PAD_X, ROW_PAD_Y)
             h.setSpacing(24)
             h.addLayout(text, 1)
             if control is not None:
                 h.addWidget(control, 0, Qt.AlignRight | Qt.AlignVCenter)
             v.addLayout(h)
         sec.rows.addWidget(box)
+        self._rows.append(RowRef(self._build_tab, sec, box, line, title, desc, tip, name_lb, desc_lb, key, empty_desc))
         return box
-
     def _bind(self, key: str, setter: Callable, getter: Callable) -> None:
         self._io[key] = (setter, getter)
 
@@ -744,14 +1027,19 @@ class SettingsWindow(QDialog):
         row.addStretch(1)
         return _wrap(row), boxes
 
-    def _chips(self, key: str, labels: dict[str, str], default: str, swatch: bool = False) -> QWidget:
-        """하나만 고르는 단추 묶음 (모드, 강조색). 고르면 바로 이 창에 미리 칠한다."""
+    def _chips(self, key: str, labels: dict[str, str], default: str, swatch: bool = False,
+               segment: bool = False) -> QWidget:
+        """하나만 고르는 단추 묶음 (모드, 강조색). 고르면 바로 이 창에 미리 칠한다.
+        segment: 서로 붙은 버튼(세그먼트) 모양."""
         row = QHBoxLayout()
-        row.setSpacing(6)
+        row.setSpacing(0 if segment else 6)
         grp = QButtonGroup(self)
         btns: dict[str, QPushButton] = {}
-        for k, label in labels.items():
-            b = _button(label, "chip")
+        for i, (k, label) in enumerate(labels.items()):
+            b = _button(label, "seg" if segment else "chip")
+            if segment:
+                b.setProperty("segpos", "first" if i == 0 else ("last" if i == len(labels) - 1 else "mid"))
+                b.setCursor(Qt.PointingHandCursor)
             b.setCheckable(True)
             if swatch:
                 b.setIconSize(QSize(12, 12))
@@ -779,7 +1067,7 @@ class SettingsWindow(QDialog):
                   f"({S.display_hotkey(S.DEFAULT_HOTKEY)}).", "hotkey")
 
         sec = self._section(lay, "모양", "검색 창, 설정 창, 시작 안내에 같이 씁니다")
-        self._row(sec, "모드", self._chips("theme_mode", S.THEME_MODE_LABEL, "system"),
+        self._row(sec, "모드", self._chips("theme_mode", S.THEME_MODE_LABEL, "system", segment=True),
                   "시스템은 Windows 앱 모드(라이트/다크)를 따라갑니다.", "theme_mode")
         self._row(sec, "강조색", self._chips("theme_accent", S.THEME_ACCENT_LABEL, "ink_blue", swatch=True),
                   "저장 버튼, 링크, 입력 중인 칸 테두리에 씁니다.", "theme_accent", stacked=True)
@@ -1248,18 +1536,68 @@ class SettingsWindow(QDialog):
         src = self._get_sources()
         self.projects.setEnabled(src["claude_code"])
         self.codex_home.setEnabled(src["codex"])
-        self._boxes["reminder_days"].setVisible(src["claude_ai"])
-        for site, g in self._guides:
-            g.setVisible(src[SITES[site][1]])
         prov = self._io["ask_provider"][1]()
-        self.claude_box.setVisible(prov == "claude")
-        self.codex_box.setVisible(prov == "codex")
+        self._nat[self._boxes["reminder_days"]] = src["claude_ai"]
+        for site, g in self._guides:
+            self._nat[g] = src[SITES[site][1]]
+        self._nat[self.claude_box] = prov == "claude"
+        self._nat[self.codex_box] = prov == "codex"
         self.off_note.setVisible(prov == "off")
+        self._refresh_empty_descs()
+        self._refresh_filter()
         if prov in ("claude", "codex") and self._tab == "ask":
             self._start_check(prov)
-        d = self.dirty()
-        self.setWindowTitle(TITLE + (" *" if d else ""))
-        self.btn_save.setEnabled(d or bool(self.forced) or bool(self.core.store.config_broken))
+        n = len(self.changed_keys())
+        self.setWindowTitle(TITLE + (" *" if n else ""))
+        self.changed_dot.setVisible(n > 0)
+        self.changed_text.setVisible(n > 0)
+        self.changed_text.setText(f"바뀐 설정 {n}개")
+        self.btn_save.setEnabled(n > 0 or bool(self.forced) or bool(self.core.store.config_broken))
+
+    # ---- 설정 찾기 -------------------------------------------------------------
+    def _refresh_empty_descs(self) -> None:
+        """칸이 비어 있을 때만 보일 설명(empty_desc)이 있는 줄은 비었는지에 따라 설명 줄 글을 바꾼다."""
+        for r in self._rows:
+            if r.empty_desc and r.desc_lb is not None and r.key in self._io:
+                empty = not self._io[r.key][1]()
+                r.desc_lb.setText(r.empty_desc if empty else r.desc)
+
+    def _refresh_filter(self) -> None:
+        """찾기 칸 글자에 맞는 줄만 남긴다. 줄이 없는 섹션은 숨기고, 사이드바 탭에 맞은 수를 붙인다.
+        설정값 때문에 숨겨진 줄(_nat)은 찾기와 상관없이 계속 숨긴다."""
+        if self.search is None or self.setup_mode:
+            return
+        terms = self.search.text().lower().split()
+        mark = self.t.mark_bg.name()
+        counts = {k: 0 for k in S.TABS}
+        by_sec: dict[Section, list[RowRef]] = {}
+        for r in self._rows:
+            nat = self._nat.get(r.box, True) and self._nat.get(r.sec, True)
+            r.counted = nat and all(t in r.haystack for t in terms)
+            r.box.setVisible(r.counted)
+            by_sec.setdefault(r.sec, []).append(r)
+            if terms and r.counted:
+                counts[r.tab] += 1
+            marks = terms if r.counted else []
+            for lb in (r.name_lb, r.desc_lb):
+                if isinstance(lb, ElideLabel):
+                    lb.set_marks(marks, mark)
+        for sec in self._secs:
+            rows = by_sec.get(sec, [])
+            sec.setVisible(self._nat.get(sec, True) and (not terms or any(r.counted for r in rows)))
+            first = True
+            for r in rows:
+                if r.counted:
+                    r.line.setVisible(not first)         # 카드의 첫 줄 위에는 구분선이 없다
+                    first = False
+        total = sum(counts.values())
+        for i, key in enumerate(S.TABS):
+            self.nav_buttons[i].set_count(counts[key] if terms else None)
+        self.search.set_count(total)
+        self.no_match.setVisible(bool(terms) and total == 0)
+        self.no_match.setText(f"'{self.search.text()}'와 맞는 설정이 없습니다")
+        if terms and total and counts[self._tab] == 0:
+            self.select_tab(next(k for k in S.TABS if counts[k]))      # 지금 탭에 없으면 맞은 첫 탭으로
 
     def current_tab(self) -> str:
         return self._tab
@@ -1281,6 +1619,8 @@ class SettingsWindow(QDialog):
 
     # ---- 저장 ----------------------------------------------------------------
     def _show_errors(self, errs: dict[str, str]) -> None:
+        if errs and self.search is not None and self.search.text():
+            self.search.edit.clear()               # 찾는 중에 가려진 줄에 오류가 있을 수 있다
         for n in set(self._notes.values()):
             n.error("")
         first = None

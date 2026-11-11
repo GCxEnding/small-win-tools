@@ -292,6 +292,10 @@ def dialog_qss(t: Theme) -> str:
         QLabel#desc, QLabel#unit, QLabel#caption {{ color:{c['sub']}; font-size:9.4pt; }}
         QLabel#sideCaption {{ color:{c['sub']}; font-size:9pt; padding:0 12px 6px 12px; }}
         QLabel#name {{ font-size:10.5pt; }}
+        QLabel#rowName {{ font-size:10.5pt; font-weight:700; }}
+        QFrame#searchHead {{ background:{c['bg']}; border:none; border-bottom:1px solid {c['line']}; }}
+        QLineEdit#hotkey[caps="true"] {{ color:transparent; selection-color:transparent;
+                                         selection-background-color:transparent; }}
         QLabel#pageTitle {{ font-size:16.5pt; font-weight:700; }}
         QLabel#pageDesc {{ color:{c['sub']}; font-size:9.75pt; }}
         QLabel#sectionTitle {{ font-size:11.25pt; font-weight:700; }}
@@ -327,14 +331,14 @@ def dialog_qss(t: Theme) -> str:
                             padding:6px 12px; }}
         QPushButton#chip:hover {{ background:{c['button']}; }}
         QPushButton#chip:checked {{ background:{c['nav_sel']}; font-weight:700; }}
-        /* 붙은 버튼(세그먼트): 위치는 pos 속성 (first, mid, last) */
+        /* 붙은 버튼(세그먼트): 위치는 segpos 속성 (first, mid, last) */
         QPushButton#seg {{ background:transparent; border:1px solid {c['input_border']}; border-radius:0;
                            padding:6px 14px; }}
         QPushButton#seg:hover {{ background:{c['button']}; }}
         QPushButton#seg:checked {{ background:{c['nav_sel']}; font-weight:700; }}
-        QPushButton#seg[pos="first"] {{ border-top-left-radius:6px; border-bottom-left-radius:6px; }}
-        QPushButton#seg[pos="mid"] {{ border-left-width:0; }}
-        QPushButton#seg[pos="last"] {{ border-left-width:0; border-top-right-radius:6px;
+        QPushButton#seg[segpos="first"] {{ border-top-left-radius:6px; border-bottom-left-radius:6px; }}
+        QPushButton#seg[segpos="mid"] {{ border-left-width:0; }}
+        QPushButton#seg[segpos="last"] {{ border-left-width:0; border-top-right-radius:6px;
                                        border-bottom-right-radius:6px; }}
         QToolButton#info {{ background:transparent; border:none; border-radius:8px; padding:1px; }}
         QToolButton#info:hover {{ background:{c['button']}; }}
