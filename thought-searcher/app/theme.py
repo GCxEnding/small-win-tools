@@ -431,6 +431,11 @@ def search_qss(t: Theme) -> str:
         QFrame#pvHit QLabel, QFrame#pvCtx QLabel {{ padding:0; color:{c['text']}; }}
         QFrame#pvCtx QLabel {{ color:{c['sub']}; }}
         QLabel#pvRole {{ color:{c['sub']}; font-size:8.5pt; padding:0; }}
+        /* 큐 미리보기의 최근 대화: 역할은 작은 회색 굵게, 본문은 한 줄 */
+        QFrame#pvRecent {{ background:transparent; border:none; border-left:3px solid {c['line']}; }}
+        QFrame#pvRecent QLabel {{ padding:0; }}
+        QLabel#pvWho {{ color:{c['sub']}; font-size:9pt; font-weight:700; }}
+        QLabel#pvLine {{ color:{c['text']}; }}
 
         QFrame#bottomBar {{ background:{c['sidebar']}; border:none; border-top:1px solid {c['line']}; }}
         QFrame#bottomBar QLabel {{ padding:0; font-size:8.5pt; }}

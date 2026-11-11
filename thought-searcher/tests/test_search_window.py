@@ -266,3 +266,58 @@ def test_project_names_from_index(tmp_path):
 def Qt_NoFocus():
     from PySide6.QtCore import Qt
     return Qt.NoFocus
+
+
+# ---- 큐 미리보기: 최근 대화 ---------------------------------------------------------
+def _md(n_turns, branch=True):
+    out = ["---", "id: claude-code:s1", "source: claude-code", "title: t", "format_version: 1", "---", "", "# t", ""]
+    k = 0
+    for t in range(1, n_turns + 1):
+        for role, body in (("user", f"질문 {t} " + "가" * 40), ("assistant", f"**답** {t} `code`")):
+            k += 1
+            out += [f"<!-- bs:msg {k} {role} 2026-11-09T10:{k:02d}:00+09:00 -->", f"## {role}", "", body, ""]
+    if branch:
+        out += [f"<!-- bs:msg {k + 1} user 2026-11-08T10:00:00+09:00 branch -->", "## 가지", "", "가지 글", ""]
+    return "\n".join(out)
+
+
+def test_recent_turns_last_five_one_line():
+    from app.window import RECENT_CHARS, one_line, recent_turns
+    doc = mdparse.parse_text(_md(7))
+    got = recent_turns(doc)
+    assert len(got) == 10 and got[0][0] == "나" and got[0][1].startswith("질문 3") and got[1][0] == "AI"
+    assert len(got[0][1]) == RECENT_CHARS + 1 and got[0][1].endswith("…") and got[0][2].endswith("가")
+    assert got[1][1] == "답 3 code"                                  # md 꾸밈 기호는 뺌
+    assert all("가지 글" not in full for _r, _s, full in got)
+    assert len(recent_turns(mdparse.parse_text(_md(2)))) == 4          # 턴이 적으면 있는 만큼
+    assert recent_turns(None) == [] and one_line("a\n\n  b") == ("a b", "a b")
+
+
+def test_queue_preview_shows_recent_turns(qt, tmp_path):
+    from app.queue import QueueItem, QueueResult
+    from app.window import SearchWindow
+    p = tmp_path / "c.md"
+    p.write_text(_md(6), encoding="utf-8")
+    w = SearchWindow()
+    w.resize(980, 560)
+    w.show()
+    it = QueueItem("claude-code:s1", "claude-code", "t", "", str(p), 1, 1.8e9)
+    w.set_queue(QueueResult(focus=[it]), "s", 1.8e9)
+    w._refresh_preview()
+    frames = w.pane.body.findChildren(type(w.pane), "pvRecent") or \
+        [f for f in w.pane.body.findChildren(QFrameType()) if f.objectName() == "pvRecent"]
+    assert frames
+    texts = [lb.text() for lb in frames[0].findChildren(QLabelType())]
+    assert texts[0] == "최근 대화" and texts.count("나") == 5 and texts.count("AI") == 5
+    w.hide()
+    w.deleteLater()
+
+
+def QFrameType():
+    from PySide6.QtWidgets import QFrame
+    return QFrame
+
+
+def QLabelType():
+    from PySide6.QtWidgets import QLabel
+    return QLabel

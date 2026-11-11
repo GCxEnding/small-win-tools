@@ -3,6 +3,14 @@
 > 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
+## 큐 미리보기에 최근 대화 (2026-11-12 아침, CG 요청)
+- 넓은 창의 큐 미리보기 칸 위쪽에 요약 없이도 내용이 보이게 `최근 대화`를 넣었습니다(그 아래에 저장된 요약 또는 F2 안내).
+  - 채팅(claude.ai, Code, GPT, Codex): 마지막 5턴(`RECENT_TURNS`, 사용자 질문 하나 + 그 뒤 답들 = 한 턴), 한 줄 30자(`RECENT_CHARS`), `나` / `AI`. 가지 메시지, 빈 메시지는 뺌. md 꾸밈 기호(`` ` ``, `*`, `#`, `>`, 링크)는 빼고 공백은 하나로. 줄인 줄은 툴팁에 전체.
+  - 일지 항목: `최근 일지` 마지막 5개(`MM-DD` + 본문과 하위 줄). 노트: `노트 끝부분` 마지막 5줄.
+- 함수: `window.one_line`, `window.recent_turns`, `PreviewPane.add_recent`, `SearchWindow._fill_recent`. 스타일 `#pvRecent`, `#pvWho`, `#pvLine`(왼쪽 line 색 3px 막대).
+- 좁은 창(미리보기 칸 없음)에는 넣지 않았습니다.
+- 본문 끝이 원래 `...`이면 `…`와 겹쳐 `-...…`처럼 보일 수 있음(작은 흠).
+
 ## 검색 옵션 칩 구현 (2026-11-12 아침)
 - `app/window.py`: `ChipBar`(머리 프레임 안, 검색칸 아래 두 줄), `SOURCE_CHIPS`, `PERIOD_CHIPS`, `project_token`, `period_after`. `SearchWindow(..., projects=)`, `query_text()`(검색칸 + 칩 토큰), `_on_chips`(바로 다시 검색, 초점은 검색칸). `popup()` 때 `chips.reset()`. placeholder는 `기억나는 단어 몇 개`.
 - `app/theme.py` `search_qss`: `#chips`, `#qchip`(꺼짐 line 테두리, 켜짐 `accent_soft` + 강조색 테두리 + 굵게), `#chipClear`, `#chipSep`, `#chipCaption`. 새 색 값 없음.

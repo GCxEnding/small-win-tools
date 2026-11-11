@@ -14,7 +14,7 @@ from typing import Callable
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
+from PySide6.QtWidgets import (QButtonGroup, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
                                QMenu, QPushButton, QScrollArea, QSizePolicy, QSplitter, QStyle, QStyledItemDelegate, QToolButton,
                                QVBoxLayout, QWidget)
 
@@ -604,6 +604,30 @@ class PreviewPane(QFrame):
         if text:
             self.body_lay.addWidget(_wrap_label(text, "pvEmpty"))
 
+    def add_recent(self, lines: list[tuple[str, str, str]], title: str = "최근 대화") -> None:
+        """큐: 최근 몇 턴을 '나 : …', 'AI : …' 한 줄씩. 줄을 가리키면 전체 글자."""
+        if not lines:
+            return
+        frame = QFrame()
+        frame.setObjectName("pvRecent")
+        g = QGridLayout(frame)
+        g.setContentsMargins(12, 8, 10, 10)
+        g.setHorizontalSpacing(8)
+        g.setVerticalSpacing(4)
+        g.addWidget(_wrap_label(title, "pvRole"), 0, 0, 1, 2)
+        for r, (role, short, full) in enumerate(lines, 1):
+            who = QLabel(role)
+            who.setObjectName("pvWho")
+            line = QLabel(short)
+            line.setObjectName("pvLine")
+            line.setTextFormat(Qt.PlainText)
+            if full != short:
+                line.setToolTip(tip_wrap(full))
+            g.addWidget(who, r, 0, Qt.AlignTop)
+            g.addWidget(line, r, 1)
+        g.setColumnStretch(1, 1)
+        self.body_lay.addWidget(frame)
+
     def add_block(self, hit_block: bool, role: str, text: str, spans: list[tuple[int, int]]) -> None:
         frame = QFrame()
         frame.setObjectName("pvHit" if hit_block else "pvCtx")
@@ -613,6 +637,36 @@ class PreviewPane(QFrame):
         v.addWidget(_wrap_label(role, "pvRole"))
         v.addWidget(_wrap_label(to_html(text, spans, self.t.mark_bg.name()), "", rich=True))
         self.body_lay.addWidget(frame)
+
+
+RECENT_TURNS = 5       # 큐 미리보기: 최근 대화 몇 턴 (사용자 질문 하나 + 그 뒤 답들 = 한 턴)
+RECENT_CHARS = 30      # 한 줄에 보일 글자 수 (전체는 툴팁)
+_MD_NOISE = re.compile(r"```\w*|[`*#>]+|!?\[([^\]]*)\]\([^)]*\)")
+
+
+def tip_wrap(text: str, width: int = 420) -> str:
+    """Qt 툴팁은 순수 글자면 줄바꿈하지 않아 폭을 정한 표로 감싼다."""
+    return f"<table width='{width}'><tr><td>{html.escape(text)}</td></tr></table>"
+
+
+def one_line(text: str, n: int = RECENT_CHARS) -> tuple[str, str]:
+    """md 본문 -> (n자로 줄인 한 줄, 툴팁용 전체 한 줄). 꾸밈 기호는 빼고 공백은 하나로."""
+    flat = " ".join(_MD_NOISE.sub(lambda m: m.group(1) or " ", text or "").split())
+    return (flat if len(flat) <= n else flat[:n].rstrip() + "…"), flat
+
+
+def recent_turns(doc, turns: int = RECENT_TURNS, n: int = RECENT_CHARS) -> list[tuple[str, str, str]]:
+    """대화 md의 마지막 몇 턴: [(역할 이름, 줄인 한 줄, 전체 한 줄)]. 가지(branch) 메시지와 빈 메시지는 뺀다."""
+    if doc is None:
+        return []
+    msgs = [m for m in doc.messages if not m.is_branch and one_line(m.text, n)[1]]
+    starts = [i for i, m in enumerate(msgs) if m.role == "user"]
+    first = starts[-turns] if len(starts) >= turns else 0
+    out = []
+    for m in msgs[first:]:
+        short, full = one_line(m.text, n)
+        out.append((ROLE_NAME.get(m.role, m.role), short, full))
+    return out
 
 
 def project_token(name: str) -> str:
@@ -1337,6 +1391,7 @@ class SearchWindow(QWidget):
             when = datetime.fromtimestamp(q.trace_ts).strftime("%Y-%m-%d %H:%M")
             meta = "  ·  ".join(s for s in (SOURCE_NAME.get(q.source, q.source), q.project, when) if s)
             pane.set_header(q.source, q.title, meta, sub=q.subtitle)
+            self._fill_recent(q)
             self._update_detail()
             if not self.detail.isHidden():
                 pane.body_lay.addWidget(self.detail)
@@ -1345,6 +1400,30 @@ class SearchWindow(QWidget):
             pane.set_header("", "", "")
             if kind is None:
                 pane.add_note("결과가 없습니다" if self.mode == "search" else "")
+
+    def _fill_recent(self, q: QueueItem) -> None:
+        """큐 미리보기 위쪽: 채팅은 최근 몇 턴, 일지 항목은 최근 기록, 노트는 끝부분 몇 줄. 요약 없이도 내용을 본다."""
+        pane = self.pane
+        if q.source == "journal":
+            ents = sorted(q.journal or [], key=lambda e: (e.day, e.line))[-RECENT_TURNS:]
+            lines = []
+            for e in ents:
+                short, full = one_line(" ".join([e.text, *[c.strip() for c in e.children]]), RECENT_CHARS)
+                lines.append((f"{e.day:%m-%d}", short, full))
+            pane.add_recent(lines, "최근 일지")
+            return
+        doc = self.md_cache.get(q.path)
+        lines = recent_turns(doc)
+        if lines:
+            pane.add_recent(lines)
+            return
+        if q.source == "note":
+            try:
+                text = Path(q.path).read_text(encoding="utf-8-sig", errors="replace")
+            except OSError:
+                return
+            rows = [ln for ln in text.splitlines() if ln.strip() and not ln.startswith("---")][-RECENT_TURNS:]
+            pane.add_recent([("", *one_line(ln)) for ln in rows], "노트 끝부분")
 
     def _fill_hit(self, hit: Hit, idx: int) -> None:
         pane = self.pane
