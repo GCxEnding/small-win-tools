@@ -1,17 +1,26 @@
-"""검색 창 UI."""
+"""검색 창 UI.
+
+구성 (docs/redesign-plan.md): 위 큰 검색칸 + 결과 수, 가운데 목록, 아래 막대(설정, 키 안내).
+창이 WIDE_MIN_W 이상이면 목록 | 나누기 막대 | 미리보기 칸, 좁으면 목록만 (고른 줄만 두 번째 줄을 가짐).
+"""
 from __future__ import annotations
 
+import html
+import re
+from collections import OrderedDict
 from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QGuiApplication, QPainter, QPen
-from PySide6.QtWidgets import (QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QStyle,
-                               QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
+                               QScrollArea, QSplitter, QStyle, QStyledItemDelegate, QToolButton, QVBoxLayout, QWidget)
 
+from . import mdparse
 from . import theme as T
 from . import ui_state
 from .queue import QueueItem, QueueResult, relative_time
-from .search import Hit
+from .search import Hit, find_spans
 from .theme import Theme
 
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
@@ -19,19 +28,32 @@ ROLE_HIT = Qt.UserRole + 1
 ROLE_IDX = Qt.UserRole + 2
 ROLE_KIND = Qt.UserRole + 3
 ROLE_TEXT = Qt.UserRole + 4
-# 목록 항목 종류: 검색 결과, 큐(크게/한 줄), 접기 줄, 빈 큐 안내
+# 목록 항목 종류: 검색 결과, 큐(첫 줄들/나머지 줄), 접기 줄, 빈 큐 안내
 K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus", "row", "rest", "closed", "empty"
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
-HINT_SEARCH = "Enter 열기 · Ctrl+Enter 메시지 복사 · Shift+Enter 대화 복사 · ←/→ 다른 맞은 메시지 · Esc 닫기"
-HINT_QUEUE = "열린 일 · Enter 열기 · F2 요약 · F4 완료 · Shift+F4 버림 · Shift+Enter 대화 복사 · 오른쪽 클릭 메뉴 · Esc 닫기"
-HINT_QUEUE_NO_ASK = HINT_QUEUE.replace("F2 요약 · ", "")
+# 아래 막대의 키 안내: (동작, 키들, 굵게, 좁으면 숨김)
+HINTS_SEARCH = [("열기", ("Enter",), True, False), ("메시지 복사", ("Ctrl", "Enter"), False, False),
+                ("대화 복사", ("Shift", "Enter"), False, True)]
+HINTS_QUEUE = [("열기", ("Enter",), True, False), ("요약", ("F2",), False, False), ("완료", ("F4",), False, False),
+               ("버림", ("Shift", "F4"), False, False), ("대화 복사", ("Shift", "Enter"), False, True)]
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
          "journal": "일지"}
+SOURCE_NAME = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "claude-ai-project": "claude.ai 프로젝트",
+               "claude-ai-memory": "claude.ai 메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex",
+               "journal": "업무 일지"}
+PLACEHOLDER = "기억나는 단어 몇 개   \"구문\"  -제외  src:  proj:  after:"
+QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
 DEBOUNCE_MS = 150
+PREVIEW_DEBOUNCE_MS = 60
 WIN_W, WIN_H = 820, 560
+WIDE_MIN_W = 760      # 이 폭 이상이면 목록 | 미리보기 (기준값)
+DEFAULT_SPLIT = 0.4   # 넓을 때 목록 칸 비율
 EDGE = 6              # 크기를 끌 수 있는 테두리 두께
 CORNER_MARK = 14      # 오른쪽 아래 모서리 표시
 SAVE_DELAY_MS = 500
+CTX_CHARS = 500       # 미리보기: 앞뒤 메시지에서 보여 줄 글자 수
+HIT_CHARS = 3000      # 미리보기: 맞은 메시지에서 보여 줄 글자 수
+ROLE_NAME = {"user": "나", "assistant": "AI"}
 
 
 def center_position(g: QRect, w: int, h: int) -> QPoint:
@@ -123,6 +145,41 @@ class QueryEdit(QLineEdit):
             super().keyPressEvent(e)
 
 
+class ElideLabel(QLabel):
+    """넘치면 '…'로 줄여 보이는 한 줄 라벨. text()는 전체 글자를 돌려준다 (결과 수, 상태)."""
+
+    MAX_W = 300
+
+    def __init__(self, text: str = ""):
+        super().__init__("")
+        self._full = ""
+        self.setText(text)
+
+    def text(self) -> str:
+        return self._full
+
+    def setText(self, t: str) -> None:
+        self._full = str(t)
+        self.setToolTip(self._full if len(self._full) > 24 else "")
+        self._elide()
+        self.updateGeometry()
+
+    def _elide(self) -> None:
+        w = max(10, self.width() - 8)
+        super().setText(self.fontMetrics().elidedText(self._full, Qt.ElideRight, w) if self.width() > 8 else self._full)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._elide()
+
+    def sizeHint(self) -> QSize:
+        h = super().sizeHint().height()
+        return QSize(min(self.MAX_W, self.fontMetrics().horizontalAdvance(self._full) + 12), h)
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(40, super().minimumSizeHint().height())
+
+
 def _draw_runs(p: QPainter, x: int, y_base: int, max_x: int, text: str, spans, fm: QFontMetrics,
                color: QColor, mark: QColor, bold_font: QFont | None = None) -> int:
     """강조 구간을 칠하며 한 줄 그리기. 넘치면 '…'. 그린 뒤 x를 돌려준다."""
@@ -155,7 +212,28 @@ def _draw_runs(p: QPainter, x: int, y_base: int, max_x: int, text: str, spans, f
     return x
 
 
+def paint_badge(p: QPainter, t: Theme, small: QFont, x: int, top: int, line_h: int, source: str) -> int:
+    """출처 배지를 (x, 줄 top) 에 그리고 너비를 돌려준다."""
+    fms = QFontMetrics(small)
+    badge = BADGE.get(source, "MD")
+    bw = fms.horizontalAdvance(badge) + 10
+    rect = QRect(x, top + (line_h - fms.height()) // 2 - 1, bw, fms.height() + 2)
+    fill, edge, color = T.badge_colors(t, source)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.setPen(QPen(edge, 1) if edge is not None else Qt.NoPen)
+    p.setBrush(fill if fill is not None else Qt.NoBrush)
+    p.drawRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), 4, 4)
+    p.setRenderHint(QPainter.Antialiasing, False)
+    p.setFont(small)
+    p.setPen(color)
+    p.drawText(rect, Qt.AlignCenter, badge)
+    return bw
+
+
 class HitDelegate(QStyledItemDelegate):
+    """결과 줄 한 줄: 배지, 제목, 프로젝트, 날짜. 고른 줄은 바탕색 + 왼쪽 강조색 막대.
+    compact=False(좁음)이면 고른 줄만 두 번째 줄(맞은 메시지 미리보기, 큐는 일지 항목)을 가진다."""
+
     def __init__(self, theme: Theme, font: QFont, parent=None):
         super().__init__(parent)
         self.t = theme
@@ -164,12 +242,10 @@ class HitDelegate(QStyledItemDelegate):
         self.bold.setBold(True)
         self.small = QFont(font)
         self.small.setPointSizeF(font.pointSizeF() * 0.9)
-
-        self.title_big = QFont(font)
-        self.title_big.setPointSizeF(font.pointSizeF() * 1.15)
-        self.title_big.setBold(True)
         self.now = 0.0      # 큐 상대 시각 기준 (창이 채운다)
         self.ask_state: dict[str, str] = {}   # 요약 중이거나 실패한 항목: id -> 표시할 한 줄
+        self.compact = False                  # True: 모든 줄이 한 줄 (넓을 때)
+        self.current_row = -1                 # 고른 줄 번호 (창이 채운다)
 
     def summary_line(self, it: QueueItem) -> str:
         if it.id in self.ask_state:
@@ -179,100 +255,80 @@ class HitDelegate(QStyledItemDelegate):
                     + (f"  · {it.summary_model}" if it.summary_model else ""))
         return ""
 
-    def sizeHint(self, option, index):
-        fm = QFontMetrics(self.font)
+    def second_line(self, index) -> bool:
+        """이 줄이 두 번째 줄을 가지나 (좁을 때 고른 줄만)."""
+        if self.compact or index.row() != self.current_row:
+            return False
         kind = index.data(ROLE_KIND) or K_HIT
         if kind == K_HIT:
-            return QSize(option.rect.width(), fm.height() * 2 + 14)
-        if kind == K_FOCUS:
+            hit: Hit = index.data(ROLE_HIT)
+            return bool(hit and hit.matches)
+        if kind in (K_FOCUS, K_ROW):
             it: QueueItem = index.data(ROLE_HIT)
-            extra = sum(1 for s in (it.subtitle, self.summary_line(it)) if s)
-            fms = QFontMetrics(self.small)
-            return QSize(option.rect.width(),
-                         QFontMetrics(self.title_big).height() + fms.height() * (1 + extra) + 6 + 3 * extra + 16)
-        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED):
-            return QSize(option.rect.width(), fm.height() + 16)
-        return QSize(option.rect.width(), fm.height() + 10)
+            return bool(it and it.subtitle)
+        return False
 
-    def _badge(self, p: QPainter, x: int, top: int, line_h: int, source: str) -> int:
-        fms = QFontMetrics(self.small)
-        badge = BADGE.get(source, "MD")
-        bw = fms.horizontalAdvance(badge) + 10
-        rect = QRect(x, top + (line_h - fms.height()) // 2 - 1, bw, fms.height() + 2)
-        fill, edge, color = T.badge_colors(self.t, source)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(QPen(edge, 1) if edge is not None else Qt.NoPen)
-        p.setBrush(fill if fill is not None else Qt.NoBrush)
-        p.drawRoundedRect(QRectF(rect).adjusted(0.5, 0.5, -0.5, -0.5), 4, 4)
-        p.setRenderHint(QPainter.Antialiasing, False)
-        p.setFont(self.small)
-        p.setPen(color)
-        p.drawText(rect, Qt.AlignCenter, badge)
-        return bw
+    def sizeHint(self, option, index):
+        fm = QFontMetrics(self.font)
+        h = fm.height() + 14
+        if self.second_line(index):
+            h += fm.height() + 3
+        return QSize(option.rect.width(), h)
 
-    def _paint_queue(self, p: QPainter, option, index, kind: str) -> None:
+    def _bar(self, p: QPainter, r: QRect, selected: bool) -> None:
+        if selected:
+            p.fillRect(r, self.t.sel)
+            p.fillRect(QRect(r.left(), r.top(), 3, r.height()), self.t.accent)
+
+    def _paint_plain(self, p: QPainter, option, index, kind: str) -> None:
         r = option.rect
         p.save()
-        if option.state & QStyle.State_Selected:
-            p.fillRect(r, self.t.sel)
-        x0, max_x = r.left() + 10, r.right() - 10
-        fm, fms = QFontMetrics(self.font), QFontMetrics(self.small)
-        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY):
-            if kind != K_EMPTY:
-                p.setPen(QPen(self.t.border))
-                p.drawLine(r.left() + 6, r.top() + 2, r.right() - 6, r.top() + 2)
-            p.setFont(self.font)
-            p.setPen(self.t.sub)
-            p.drawText(QRect(x0, r.top() + 2, max_x - x0, r.height() - 2), Qt.AlignVCenter | Qt.AlignLeft,
-                       index.data(ROLE_TEXT) or "")
-            p.restore()
-            return
+        self._bar(p, r, bool(option.state & QStyle.State_Selected))
+        x0, max_x = r.left() + 14, r.right() - 12
+        if kind != K_EMPTY:
+            p.setPen(QPen(self.t.line))
+            p.drawLine(r.left() + 6, r.top() + 1, r.right() - 6, r.top() + 1)
+        p.setFont(self.font)
+        p.setPen(self.t.sub)
+        p.drawText(QRect(x0, r.top() + 2, max_x - x0, r.height() - 2), Qt.AlignVCenter | Qt.AlignLeft,
+                   index.data(ROLE_TEXT) or "")
+        p.restore()
+
+    def _paint_queue(self, p: QPainter, option, index) -> None:
+        r = option.rect
         it: QueueItem = index.data(ROLE_HIT)
+        p.save()
+        self._bar(p, r, bool(option.state & QStyle.State_Selected))
+        x0, max_x = r.left() + 14, r.right() - 12
+        fm, fms = QFontMetrics(self.font), QFontMetrics(self.small)
         closed = bool(it.closed_kind)
         if closed:
-            right = f"{CLOSE_LABEL.get(it.closed_kind, '')} · {relative_time(it.closed_at, self.now)}"
+            when = f"{CLOSE_LABEL.get(it.closed_kind, '')} · {relative_time(it.closed_at, self.now)}"
         else:
-            right = relative_time(it.trace_ts, self.now)
+            when = relative_time(it.trace_ts, self.now)
+        right = "  ·  ".join(s for s in (it.project, when) if s)
         rw = fms.horizontalAdvance(right)
-        if kind == K_FOCUS:
-            fmt = QFontMetrics(self.title_big)
-            top = r.top() + 8
-            bw = self._badge(p, x0, top, fmt.height(), it.source)
-            y1 = top + fmt.ascent()
-            p.setFont(self.title_big)
-            _draw_runs(p, x0 + bw + 8, y1, max_x - rw - 12, it.title or "(제목 없음)", [], fmt, self.t.text,
-                       self.t.mark_bg)
-            p.setFont(self.small)
-            p.setPen(self.t.sub)
-            p.drawText(max_x - rw, y1, right)
-            y = top + fmt.height() + 4 + fms.ascent()
-            parts = [s for s in (it.project, datetime.fromtimestamp(it.trace_ts).strftime("%m-%d %H:%M")) if s]
-            p.drawText(x0 + bw + 8, y, fms.elidedText("  ·  ".join(parts), Qt.ElideRight, max_x - x0 - bw - 8))
-            for s, is_sub in ((it.subtitle, True), (self.summary_line(it), False)):
-                if s:
-                    y += fms.height() + 3
-                    p.setFont(self.small)
-                    p.setPen(self.t.text if is_sub else self.t.sub)
-                    p.drawText(x0 + bw + 8, y, fms.elidedText(s, Qt.ElideRight, max_x - x0 - bw - 8))
-        else:
-            top = r.top() + 5
-            bw = self._badge(p, x0 + 12, top, fm.height(), it.source)
-            y1 = top + fm.ascent()
+        top = r.top() + 7
+        y1 = top + fm.ascent()
+        bw = paint_badge(p, self.t, self.small, x0, top, fm.height(), it.source)
+        p.setFont(self.bold)
+        _draw_runs(p, x0 + bw + 8, y1, max_x - rw - 12, it.title or "(제목 없음)", [], QFontMetrics(self.bold),
+                   self.t.sub if closed else self.t.text, self.t.mark_bg)
+        p.setFont(self.small)
+        p.setPen(self.t.sub)
+        p.drawText(max_x - rw, y1, right)
+        if self.second_line(index):
             p.setFont(self.font)
-            title = it.title or "(제목 없음)"
-            if it.project:
-                title += f"   {it.project}"
-            _draw_runs(p, x0 + 12 + bw + 8, y1, max_x - rw - 12, title, [], fm,
-                       self.t.sub if closed else self.t.text, self.t.mark_bg)
-            p.setFont(self.small)
-            p.setPen(self.t.sub)
-            p.drawText(max_x - rw, y1, right)
+            _draw_runs(p, x0 + bw + 8, y1 + fm.height() + 3, max_x, it.subtitle, [], fm, self.t.sub, self.t.mark_bg)
         p.restore()
 
     def paint(self, p: QPainter, option, index):
         kind = index.data(ROLE_KIND) or K_HIT
-        if kind != K_HIT:
-            self._paint_queue(p, option, index, kind)
+        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY):
+            self._paint_plain(p, option, index, kind)
+            return
+        if kind in (K_FOCUS, K_ROW):
+            self._paint_queue(p, option, index)
             return
         hit: Hit = index.data(ROLE_HIT)
         if hit is None:
@@ -280,21 +336,21 @@ class HitDelegate(QStyledItemDelegate):
         idx = index.data(ROLE_IDX) or 0
         p.save()
         r = option.rect
-        if option.state & QStyle.State_Selected:
-            p.fillRect(r, self.t.sel)
+        self._bar(p, r, bool(option.state & QStyle.State_Selected))
         fm = QFontMetrics(self.font)
         fmb = QFontMetrics(self.bold)
         fms = QFontMetrics(self.small)
-        x0 = r.left() + 10
-        max_x = r.right() - 10
-        y1 = r.top() + 5 + fm.ascent()
-        # 1줄: 출처 | 제목 | 프로젝트 | 날짜 | (원본 없음)
-        bw = self._badge(p, x0, r.top() + 5, fm.height(), hit.source)
+        x0 = r.left() + 14
+        max_x = r.right() - 12
+        top = r.top() + 7
+        y1 = top + fm.ascent()
+        # 한 줄: 출처 | 제목 | 프로젝트 | 날짜(MM-DD) | (원본 없음)
+        bw = paint_badge(p, self.t, self.small, x0, top, fm.height(), hit.source)
         right_parts = []
         if hit.project and hit.source != "claude-ai-project":
             right_parts.append(hit.project)
         if hit.updated:
-            right_parts.append(hit.updated.astimezone().strftime("%Y-%m-%d"))
+            right_parts.append(hit.updated.astimezone().strftime("%m-%d"))
         right = "  ·  ".join(right_parts)
         missing = "  (원본 없음)" if hit.status == "missing" else ""
         rw = fms.horizontalAdvance(right + missing)
@@ -307,26 +363,210 @@ class HitDelegate(QStyledItemDelegate):
         if missing:
             p.setPen(self.t.warn)
             p.drawText(max_x - fms.horizontalAdvance(missing), y1, missing)
-        # 2줄: 미리보기 [i/n]
-        y2 = y1 + fm.height() + 3
-        if hit.matches:
+        # 좁을 때 고른 줄만 두 번째 줄: 맞은 메시지 미리보기 + ← i/n →
+        if self.second_line(index):
+            y2 = y1 + fm.height() + 3
             m = hit.matches[min(idx, len(hit.matches) - 1)]
             total = hit.match_total or len(hit.matches)
-            tag = f"  [{idx + 1}/{total}]" if hit.match_total else ""
-            tw = fms.horizontalAdvance(tag)
+            tag = f"← {idx + 1}/{total} →" if total > 1 else ""
+            tw = fms.horizontalAdvance(tag) + 8 if tag else 0
             p.setFont(self.font)
-            _draw_runs(p, x0, y2, max_x - tw - 4, m.preview, m.highlights, fm, self.t.sub, self.t.mark_bg)
+            _draw_runs(p, x0 + bw + 8, y2, max_x - tw - 4, m.preview, m.highlights, fm, self.t.sub, self.t.mark_bg)
             if tag:
                 p.setFont(self.small)
                 p.setPen(self.t.sub)
-                p.drawText(max_x - tw, y2, tag)
+                p.drawText(max_x - tw + 8, y2, tag)
         p.restore()
+
+
+# ---- 미리보기 (넓을 때 오른쪽 칸) -----------------------------------------------
+class MdCache:
+    """md 경로 + 수정시각으로 읽은 결과를 기억한다 (고른 줄을 오가도 다시 읽지 않음)."""
+
+    def __init__(self, size: int = 8):
+        self.size = size
+        self._d: OrderedDict = OrderedDict()
+
+    def get(self, path) -> mdparse.ParsedDoc | None:
+        p = Path(path)
+        try:
+            key = (str(p), p.stat().st_mtime_ns)
+        except OSError:
+            return None
+        if key in self._d:
+            self._d.move_to_end(key)
+            return self._d[key]
+        doc = mdparse.parse_file(p)
+        self._d[key] = doc
+        while len(self._d) > self.size:
+            self._d.popitem(last=False)
+        return doc
+
+
+def match_regs(hit: Hit) -> list[re.Pattern]:
+    """맞은 낱말 정규식: 목록 미리보기에서 강조된 글자들(대소문자 무시)."""
+    words = {m.preview[s:e] for m in hit.matches for s, e in m.highlights if m.preview[s:e].strip()}
+    return [re.compile(re.escape(w), re.IGNORECASE) for w in sorted(words, key=len, reverse=True)]
+
+
+def pick_context(doc: mdparse.ParsedDoc, ordinal: int):
+    """(앞 메시지 또는 None, 맞은 메시지, 뒤 메시지 또는 None). 맞은 메시지가 없으면 None."""
+    for i, m in enumerate(doc.messages):
+        if m.ordinal == ordinal:
+            return (doc.messages[i - 1] if i > 0 else None, m,
+                    doc.messages[i + 1] if i + 1 < len(doc.messages) else None)
+    return None
+
+
+def crop(text: str, spans: list[tuple[int, int]], limit: int) -> tuple[str, list[tuple[int, int]]]:
+    """긴 글은 첫 맞은 곳 앞 조금부터 limit 글자만. 잘린 쪽에 '…'를 붙이고 강조 구간을 맞춰 옮긴다."""
+    if len(text) <= limit:
+        return text, spans
+    start = max(0, (spans[0][0] - min(200, limit // 4)) if spans else 0)
+    end = min(len(text), start + limit)
+    out = ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
+    shift = start - (1 if start else 0)
+    new = [(max(0, s - shift), min(len(out), e - shift)) for s, e in spans if e > start and s < end]
+    return out, new
+
+
+def to_html(text: str, spans: list[tuple[int, int]], mark: str) -> str:
+    out, pos = [], 0
+    for s, e in spans:
+        out.append(html.escape(text[pos:s]))
+        out.append(f'<span style="background-color:{mark}">{html.escape(text[s:e])}</span>')
+        pos = e
+    out.append(html.escape(text[pos:]))
+    return "".join(out).replace("\n", "<br>")
+
+
+class BadgeWidget(QWidget):
+    """미리보기 머리의 출처 배지 (목록 줄과 같은 모양)."""
+
+    def __init__(self, theme: Theme, font: QFont):
+        super().__init__()
+        self.t = theme
+        self.small = QFont(font)
+        self.small.setPointSizeF(font.pointSizeF() * 0.9)
+        self.source = ""
+
+    def set_source(self, source: str) -> None:
+        self.source = source
+        self.updateGeometry()
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        fms = QFontMetrics(self.small)
+        return QSize(fms.horizontalAdvance(BADGE.get(self.source, "MD")) + 10, fms.height() + 4)
+
+    def paintEvent(self, _e):
+        if self.source:
+            p = QPainter(self)
+            paint_badge(p, self.t, self.small, 0, 0, self.height(), self.source)
+
+
+def _wrap_label(text: str = "", name: str = "", rich: bool = False) -> QLabel:
+    lb = QLabel(text)
+    if name:
+        lb.setObjectName(name)
+    lb.setWordWrap(True)
+    lb.setTextFormat(Qt.RichText if rich else Qt.PlainText)
+    lb.setTextInteractionFlags(Qt.TextSelectableByMouse)
+    return lb
+
+
+class PreviewPane(QFrame):
+    """오른쪽 미리보기 칸: 배지+제목, 출처·프로젝트·날짜, 맞은 메시지 i / n, 본문 (또는 큐의 저장된 요약)."""
+
+    def __init__(self, theme: Theme, font: QFont):
+        super().__init__()
+        self.setObjectName("preview")
+        self.t = theme
+        self.setMinimumWidth(240)
+        v = QVBoxLayout(self)
+        v.setContentsMargins(18, 14, 14, 10)
+        v.setSpacing(4)
+        head = QHBoxLayout()
+        head.setSpacing(8)
+        self.badge = BadgeWidget(theme, font)
+        self.title = QLabel("")
+        self.title.setObjectName("pvTitle")
+        self.title.setWordWrap(True)
+        self.title.setTextFormat(Qt.PlainText)
+        head.addWidget(self.badge, 0, Qt.AlignTop)
+        head.addWidget(self.title, 1)
+        v.addLayout(head)
+        self.meta = QLabel("")
+        self.meta.setObjectName("pvMeta")
+        self.meta.setWordWrap(True)
+        self.meta.setTextFormat(Qt.PlainText)
+        v.addWidget(self.meta)
+        self.index = QLabel("")
+        self.index.setObjectName("pvIndex")
+        v.addWidget(self.index)
+        v.addSpacing(6)
+        self.scroll = QScrollArea()
+        self.scroll.setObjectName("previewScroll")
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.body = QWidget()
+        self.body.setObjectName("previewBody")
+        self.body_lay = QVBoxLayout(self.body)
+        self.body_lay.setContentsMargins(0, 0, 4, 0)
+        self.body_lay.setSpacing(8)
+        self.body_lay.setAlignment(Qt.AlignTop)
+        self.scroll.setWidget(self.body)
+        v.addWidget(self.scroll, 1)
+        self._keep: list[QWidget] = []        # 본문을 비울 때 지우지 않을 위젯 (큐의 요약 라벨)
+
+    def set_theme(self, t: Theme) -> None:
+        self.t = t
+        self.badge.t = t
+        self.badge.update()
+
+    def keep(self, w: QWidget) -> None:
+        self._keep = [w]
+
+    def clear_body(self) -> None:
+        while self.body_lay.count():
+            item = self.body_lay.takeAt(0)
+            w = item.widget()
+            if w is None:
+                continue
+            if w in self._keep:
+                w.hide()
+                w.setParent(self)          # 지우지 않고 잠시 맡아 둔다 (창이 다시 가져감)
+            else:
+                w.deleteLater()
+
+    def set_header(self, source: str, title: str, meta: str, index: str = "", sub: str = "") -> None:
+        self.badge.set_source(source)
+        self.title.setText(title or "(제목 없음)")
+        self.title.setToolTip(title)
+        self.meta.setText(meta + (f"\n{sub}" if sub else ""))
+        self.index.setText(index)
+        self.index.setVisible(bool(index))
+
+    def add_note(self, text: str) -> None:
+        if text:
+            self.body_lay.addWidget(_wrap_label(text, "pvEmpty"))
+
+    def add_block(self, hit_block: bool, role: str, text: str, spans: list[tuple[int, int]]) -> None:
+        frame = QFrame()
+        frame.setObjectName("pvHit" if hit_block else "pvCtx")
+        v = QVBoxLayout(frame)
+        v.setContentsMargins(12, 8, 10, 10)
+        v.setSpacing(3)
+        v.addWidget(_wrap_label(role, "pvRole"))
+        v.addWidget(_wrap_label(to_html(text, spans, self.t.mark_bg.name()), "", rich=True))
+        self.body_lay.addWidget(frame)
 
 
 class SearchWindow(QWidget):
     searchRequested = Signal(str)
     action = Signal(str, object, int)    # (종류, Hit, 맞은 메시지 순번)
-    settingsRequested = Signal()         # 상태 줄 ⚙
+    settingsRequested = Signal()         # 아래 막대 ⚙
 
     def __init__(self, theme: Theme | None = None, state_path=None):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -334,6 +574,8 @@ class SearchWindow(QWidget):
         self._state = ui_state.search_state(ui_state.load(state_path))
         self._saved = dict(self._state)
         self._user_dirty = False              # 사용자가 크기를 바꿨나 (화면에 맞춰 줄인 크기는 저장하지 않는다)
+        self._split = float(self._state.get("split", DEFAULT_SPLIT))
+        self._applying_split = False
         self.setAttribute(Qt.WA_ShowWithoutActivating, False)
         self.setWindowTitle("생각 검색기")
         self.t = theme or T.make()
@@ -344,16 +586,35 @@ class SearchWindow(QWidget):
         self.setMinimumSize(ui_state.MIN_W, ui_state.MIN_H)
         self.resize(self._state.get("w", WIN_W), self._state.get("h", WIN_H))
         self.ask_enabled = True
+        self.wide: bool | None = None         # 폭에 따른 배치 (처음에는 정하지 않음)
+        self.md_cache = MdCache()
         root = QWidget(self)
         root.setObjectName("root")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(root)
         inner = QVBoxLayout(root)
-        inner.setContentsMargins(10, 10, 10, 8)
-        inner.setSpacing(6)
+        inner.setContentsMargins(0, 0, 0, 0)
+        inner.setSpacing(0)
+        # 머리: 돋보기, 큰 검색칸, 결과 수
+        head = QFrame()
+        head.setObjectName("head")
+        hh = QHBoxLayout(head)
+        hh.setContentsMargins(18, 12, 18, 12)
+        hh.setSpacing(10)
+        self.search_icon = QLabel()
+        self.search_icon.setFixedSize(22, 22)
         self.edit = QueryEdit()
-        self.edit.setPlaceholderText("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
+        self.edit.setObjectName("query")
+        self.edit.setPlaceholderText(PLACEHOLDER)
+        self.edit.setToolTip(QUERY_TIP)
+        self.status = ElideLabel("")
+        self.status.setObjectName("count")
+        hh.addWidget(self.search_icon)
+        hh.addWidget(self.edit, 1)
+        hh.addWidget(self.status)
+        inner.addWidget(head)
+        # 가운데: 목록 | 미리보기
         self.list = QListWidget()
         self.delegate = HitDelegate(self.t, font, self.list)
         self.list.setItemDelegate(self.delegate)
@@ -361,21 +622,38 @@ class SearchWindow(QWidget):
         self.list.setFocusPolicy(Qt.NoFocus)
         self.list.itemDoubleClicked.connect(lambda _i: self._emit("open"))
         self.list.itemClicked.connect(self._on_clicked)
-        self.list.currentRowChanged.connect(lambda _r: self._update_detail())
+        self.list.currentRowChanged.connect(self._on_row_changed)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.list.customContextMenuRequested.connect(self._context_menu)
-        self.status = QLabel("")
         self.detail = QLabel("")          # 큐: 고른 일의 저장된 요약
         self.detail.setWordWrap(True)
         self.detail.setTextFormat(Qt.PlainText)
         self.detail.setObjectName("detail")
         self.detail.hide()
-        inner.addWidget(self.edit)
-        inner.addWidget(self.list, 1)
-        inner.addWidget(self.detail)
-        status_row = QHBoxLayout()
-        status_row.setContentsMargins(0, 0, 0, 0)
-        status_row.addWidget(self.status, 1)
+        self.left = QWidget()
+        self.left_lay = QVBoxLayout(self.left)
+        self.left_lay.setContentsMargins(EDGE, 4, EDGE, 6)
+        self.left_lay.setSpacing(6)
+        self.left_lay.addWidget(self.list, 1)
+        self.left_lay.addWidget(self.detail)
+        self.left.setMinimumWidth(260)
+        self.pane = PreviewPane(self.t, font)
+        self.pane.keep(self.detail)
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setHandleWidth(7)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.addWidget(self.left)
+        self.splitter.addWidget(self.pane)
+        self.splitter.setStretchFactor(0, 4)
+        self.splitter.setStretchFactor(1, 6)
+        self.splitter.splitterMoved.connect(self._on_split_moved)
+        inner.addWidget(self.splitter, 1)
+        # 아래 막대: 설정, 앱 이름, 키 안내
+        bar = QFrame()
+        bar.setObjectName("bottomBar")
+        bh = QHBoxLayout(bar)
+        bh.setContentsMargins(10, 6, 20, 6)
+        bh.setSpacing(8)
         self.gear = QToolButton()
         self.gear.setObjectName("gear")
         self.gear.setIconSize(QSize(16, 16))
@@ -383,13 +661,14 @@ class SearchWindow(QWidget):
         self.gear.setFocusPolicy(Qt.NoFocus)
         self.gear.setCursor(Qt.PointingHandCursor)
         self.gear.clicked.connect(self.settingsRequested.emit)
-        status_row.addWidget(self.gear)
-        inner.addLayout(status_row)
-        self.hint = QLabel(HINT_SEARCH)
-        f = QFont(font)
-        f.setPointSizeF(8.5)
-        self.hint.setFont(f)
-        inner.addWidget(self.hint)
+        bh.addWidget(self.gear)
+        bh.addWidget(self._plain_label("생각 검색기", "appName"))
+        bh.addStretch(1)
+        self.hint_box = QHBoxLayout()
+        self.hint_box.setSpacing(14)
+        bh.addLayout(self.hint_box)
+        inner.addWidget(bar)
+        self._hint_widgets: list[tuple[QWidget, bool]] = []
         self._grips = [EdgeGrip(self, edges, mark) for edges, mark in (
             (Qt.LeftEdge, False), (Qt.RightEdge, False), (Qt.TopEdge, False), (Qt.BottomEdge, False),
             (Qt.LeftEdge | Qt.TopEdge, False), (Qt.RightEdge | Qt.TopEdge, False),
@@ -398,11 +677,16 @@ class SearchWindow(QWidget):
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(SAVE_DELAY_MS)
         self._save_timer.timeout.connect(self.save_state)
+        self._pv_timer = QTimer(self)
+        self._pv_timer.setSingleShot(True)
+        self._pv_timer.setInterval(PREVIEW_DEBOUNCE_MS)
+        self._pv_timer.timeout.connect(self._refresh_preview)
         self.mode = "search"
         self._queue: QueueResult | None = None
         self._show_rest = False
         self._show_closed = False
         self.set_theme(self.t)
+        self._apply_mode()
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -416,7 +700,13 @@ class SearchWindow(QWidget):
         self.edit.itemKey.connect(self._item_key)
         self.edit.cancelled.connect(self.hide)
 
-    # ---- 표시 ---------------------------------------------------------
+    @staticmethod
+    def _plain_label(text: str, name: str) -> QLabel:
+        lb = QLabel(text)
+        lb.setObjectName(name)
+        return lb
+
+    # ---- 표시 ---------------------------------------------------------------
     def set_theme(self, t: Theme) -> None:
         """테마 바꾸기 (설정 저장, 시스템 모드 전환 때 main.py가 부른다)."""
         self.t = t
@@ -424,9 +714,12 @@ class SearchWindow(QWidget):
         self.setPalette(T.palette(t))
         self.setStyleSheet(T.search_qss(t))
         self.gear.setIcon(T.icon("settings", t.sub, 16))
+        self.search_icon.setPixmap(T.icon("search", t.sub, 20).pixmap(20, 20))
         for g in getattr(self, "_grips", []):
             g.color = t.placeholder
+        self.pane.set_theme(t)
         self.list.viewport().update()
+        self._refresh_preview()
 
     def popup(self) -> None:
         screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
@@ -476,7 +769,7 @@ class SearchWindow(QWidget):
         self._save_timer.start()
 
     def current_state(self) -> dict:
-        return {**self._state, "w": self.width(), "h": self.height()}
+        return {**self._state, "w": self.width(), "h": self.height(), "split": round(self._split, 3)}
 
     def save_state(self) -> None:
         """바뀐 것이 있을 때만 ui_state.json에 쓴다. 다른 키는 그대로 둔다."""
@@ -492,13 +785,86 @@ class SearchWindow(QWidget):
             self._state = cur
             self._user_dirty = False
 
+    def _on_split_moved(self, _pos: int, _index: int) -> None:
+        if self._applying_split:
+            return
+        sizes = self.splitter.sizes()
+        total = sum(sizes)
+        if total > 0:
+            self._split = min(ui_state.SPLIT_MAX, max(ui_state.SPLIT_MIN, sizes[0] / total))
+            self.user_resized()
+
+    def _apply_split(self) -> None:
+        total = max(self.splitter.width(), self.width() - 2)
+        if total <= 0:
+            return
+        left = int(total * self._split)
+        self._applying_split = True
+        self.splitter.setSizes([left, total - left])
+        self._applying_split = False
+
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._place_grips()
+        self._apply_mode()
+        if self.wide:
+            self._apply_split()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        T.round_corners(self)
 
     def hideEvent(self, e):
         self.save_state()
         super().hideEvent(e)
+
+    # ---- 좁음 / 넓음 -----------------------------------------------------------
+    def _apply_mode(self) -> None:
+        """창 폭이 WIDE_MIN_W 이상이면 넓은 배치. 바뀌었을 때만 다시 배치한다."""
+        wide = self.width() >= WIDE_MIN_W
+        if wide == self.wide:
+            return
+        self.wide = wide
+        self.delegate.compact = wide
+        self.pane.setVisible(wide)
+        self._set_hints()
+        self._place_detail()
+        self.list.doItemsLayout()
+        self.list.viewport().update()
+        if wide:
+            self._apply_split()
+            self._refresh_preview()
+
+    def _set_hints(self) -> None:
+        """아래 막대의 키 안내를 지금 모드에 맞게 다시 만든다. 대화 복사는 좁으면 숨긴다."""
+        while self.hint_box.count():
+            item = self.hint_box.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self._hint_widgets = []
+        specs = HINTS_QUEUE if self.mode == "queue" else HINTS_SEARCH
+        for action, keys, strong, narrow_hide in specs:
+            if action == "요약" and not self.ask_enabled:
+                continue
+            w = QWidget()
+            h = QHBoxLayout(w)
+            h.setContentsMargins(0, 0, 0, 0)
+            h.setSpacing(5)
+            h.addWidget(self._plain_label(action, "keyActionStrong" if strong else "keyAction"))
+            for k in keys:
+                cap = self._plain_label(k, "keycapStrong" if strong else "keycap")
+                h.addWidget(cap)
+            w.setVisible(not (narrow_hide and not self.wide))
+            self.hint_box.addWidget(w)
+            self._hint_widgets.append((w, narrow_hide))
+
+    def _place_detail(self) -> None:
+        """큐의 저장된 요약 칸(detail): 넓으면 미리보기 칸 안, 좁으면 목록 아래."""
+        if self.mode == "queue" and self.wide:
+            self.pane.body_lay.addWidget(self.detail)
+        else:
+            self.left_lay.addWidget(self.detail)
+        self._update_detail()           # 옮기면 숨겨지므로 보일 것인지 다시 정한다
 
     def changeEvent(self, e):
         if e.type() == QEvent.ActivationChange and not self.isActiveWindow() and self.isVisible():
@@ -514,9 +880,13 @@ class SearchWindow(QWidget):
         self._timer.start()
 
     def set_results(self, hits: list[Hit], status: str) -> None:
+        self._apply_mode()
+        was_queue = self.mode == "queue"
         self.mode = "search"
         self.detail.hide()
-        self.hint.setText(HINT_SEARCH)
+        if was_queue:
+            self._set_hints()
+        self._place_detail()
         self.list.clear()
         for h in hits:
             it = QListWidgetItem()
@@ -526,7 +896,9 @@ class SearchWindow(QWidget):
             self.list.addItem(it)
         if hits:
             self.list.setCurrentRow(0)
+        self.delegate.current_row = self.list.currentRow()
         self.status.setText(status)
+        self._refresh_preview()
 
     # ---- 큐 --------------------------------------------------------------
     def _add_row(self, kind: str, item: QueueItem | None = None, text: str = "") -> None:
@@ -539,11 +911,15 @@ class SearchWindow(QWidget):
 
     def set_queue(self, result: QueueResult, status: str, now: float, keep: str | None = None) -> None:
         """빈 검색어일 때의 열린 일 목록. keep: 다시 그린 뒤 고를 항목 id(없으면 같은 줄 번호)."""
+        self._apply_mode()
         old_row = self.list.currentRow()
+        was_search = self.mode != "queue"
         self.mode = "queue"
         self._queue = result
         self.delegate.now = now
-        self.hint.setText(HINT_QUEUE if self.ask_enabled else HINT_QUEUE_NO_ASK)
+        if was_search:
+            self._set_hints()
+        self._place_detail()
         self.list.clear()
         if not result.open_count:
             self._add_row(K_EMPTY, text=f"최근 {result.days}일 동안 흔적이 있는 일이 없습니다")
@@ -572,8 +948,10 @@ class SearchWindow(QWidget):
                 row = max(0, min(old_row, self.list.count() - 1))
         if self.list.count():
             self.list.setCurrentRow(row)
+        self.delegate.current_row = self.list.currentRow()
         self.status.setText(status)
         self._update_detail()
+        self._refresh_preview()
 
     def _update_detail(self) -> None:
         """고른 일의 요약 칸. 저장본만 보여 준다(AI 호출 없음)."""
@@ -604,7 +982,7 @@ class SearchWindow(QWidget):
         """요약 AI를 끄면 큐의 F2 안내 글자를 숨긴다."""
         self.ask_enabled = bool(enabled)
         if self.mode == "queue":
-            self.hint.setText(HINT_QUEUE if self.ask_enabled else HINT_QUEUE_NO_ASK)
+            self._set_hints()
             self._update_detail()
 
     def set_ask_state(self, item_id: str, text: str | None) -> None:
@@ -662,6 +1040,73 @@ class SearchWindow(QWidget):
         menu.exec(self.list.viewport().mapToGlobal(pos))
         self.edit.setFocus()
 
+    # ---- 미리보기 ----------------------------------------------------------
+    def _on_row_changed(self, row: int) -> None:
+        self.delegate.current_row = row
+        if not self.delegate.compact:
+            self.list.doItemsLayout()         # 좁을 때: 고른 줄만 두 줄
+        self.list.viewport().update()
+        self._update_detail()
+        if self.wide:
+            self._pv_timer.start()
+
+    def _refresh_preview(self) -> None:
+        """넓을 때만 오른쪽 칸을 다시 채운다."""
+        self._pv_timer.stop()
+        if not self.wide:
+            return
+        pane = self.pane
+        pane.clear_body()
+        it = self.list.currentItem()
+        kind = it.data(ROLE_KIND) if it else None
+        if kind == K_HIT:
+            self._fill_hit(it.data(ROLE_HIT), int(it.data(ROLE_IDX) or 0))
+        elif kind in (K_FOCUS, K_ROW):
+            q: QueueItem = it.data(ROLE_HIT)
+            when = datetime.fromtimestamp(q.trace_ts).strftime("%Y-%m-%d %H:%M")
+            meta = "  ·  ".join(s for s in (SOURCE_NAME.get(q.source, q.source), q.project, when) if s)
+            pane.set_header(q.source, q.title, meta, sub=q.subtitle)
+            self._update_detail()
+            if not self.detail.isHidden():
+                pane.body_lay.addWidget(self.detail)
+                self.detail.show()
+        else:
+            pane.set_header("", "", "")
+            if kind is None:
+                pane.add_note("결과가 없습니다" if self.mode == "search" else "")
+
+    def _fill_hit(self, hit: Hit, idx: int) -> None:
+        pane = self.pane
+        total = hit.match_total or len(hit.matches)
+        idx = min(idx, len(hit.matches) - 1) if hit.matches else 0
+        when = hit.updated.astimezone().strftime("%Y-%m-%d %H:%M") if hit.updated else ""
+        meta = "  ·  ".join(s for s in (SOURCE_NAME.get(hit.source, hit.source), hit.project, when) if s)
+        index = f"맞은 메시지 {idx + 1} / {total}" + ("    ← →" if total > 1 else "") if hit.matches else ""
+        pane.set_header(hit.source, hit.title, meta, index)
+        if hit.status == "missing":
+            pane.add_note("원본 없음")
+            return
+        m = hit.matches[idx] if hit.matches else None
+        doc = self.md_cache.get(hit.path)
+        ctx = pick_context(doc, m.ordinal) if (doc is not None and m is not None) else None
+        if ctx is None:
+            if m is not None:                 # md 형식이 아닌 원본(노트 등): 목록의 미리보기 한 줄만
+                pane.add_block(True, "", m.preview, m.highlights)
+            else:
+                pane.add_note("맞은 메시지가 없습니다")
+            return
+        prev, cur, nxt = ctx
+        regs = match_regs(hit)
+        if prev:
+            text, _ = crop(prev.text, [], CTX_CHARS)
+            pane.add_block(False, ROLE_NAME.get(prev.role, prev.role), text, [])
+        spans = find_spans(cur.text, regs) if regs else []
+        text, spans = crop(cur.text, spans, HIT_CHARS)
+        pane.add_block(True, ROLE_NAME.get(cur.role, cur.role), text, spans)
+        if nxt:
+            text, _ = crop(nxt.text, [], CTX_CHARS)
+            pane.add_block(False, ROLE_NAME.get(nxt.role, nxt.role), text, [])
+
     # ---- 키 --------------------------------------------------------------
     def _navigate(self, step: int) -> None:
         n = self.list.count()
@@ -680,6 +1125,7 @@ class SearchWindow(QWidget):
         idx = (int(it.data(ROLE_IDX) or 0) + step) % len(hit.matches)
         it.setData(ROLE_IDX, idx)
         self.list.viewport().update()
+        self._refresh_preview()
 
     def _emit(self, kind: str) -> None:
         it = self.list.currentItem()

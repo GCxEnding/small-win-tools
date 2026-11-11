@@ -58,7 +58,7 @@ def test_window_restores_and_saves_only_user_resize(qt, tmp_path):
     w.user_resized()                                 # 테두리를 끌어 바꾼 것으로 본다
     w.save_state()
     saved = json.loads(p.read_text(encoding="utf-8"))
-    assert saved == {"other": 1, "search_window": {"w": 700, "h": 500}}
+    assert saved == {"other": 1, "search_window": {"w": 700, "h": 500, "split": 0.4}}
     w.close()
 
 

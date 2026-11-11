@@ -398,8 +398,12 @@ def search_qss(t: Theme) -> str:
         QLabel {{ color:{c['sub']}; padding:2px 4px; }}
         QLabel#detail {{ color:{c['text']}; background:{c['sidebar']}; border:1px solid {c['line']};
                          border-radius:6px; padding:6px 10px; }}
-        QSplitter::handle {{ background:{c['line']}; }}
-        QSplitter::handle:hover {{ background:{c['input_border']}; }}
+        /* 나누기 막대: 잡기 쉽게 7px, 가운데에 얇은 선 */
+        QSplitter::handle:horizontal {{ background:qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c['bg']},
+            stop:0.4 {c['bg']}, stop:0.4 {c['line']}, stop:0.6 {c['line']}, stop:0.6 {c['bg']}, stop:1 {c['bg']}); }}
+        QSplitter::handle:horizontal:hover {{ background:qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 {c['bg']},
+            stop:0.4 {c['bg']}, stop:0.4 {c['input_border']}, stop:0.6 {c['input_border']}, stop:0.6 {c['bg']},
+            stop:1 {c['bg']}); }}
 
         QFrame#preview {{ background:{c['bg']}; border:none; }}
         QScrollArea#previewScroll {{ background:{c['bg']}; border:none; }}
@@ -447,3 +451,18 @@ def style_titlebar(widget, t: Theme) -> None:
             dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
     except (OSError, AttributeError):
         pass
+
+_DWMWA_WINDOW_CORNER_PREFERENCE, _DWMWCP_ROUND = 33, 2      # Windows 11
+
+
+def round_corners(widget) -> bool:
+    """창 모서리를 둥글게 (Windows 11). 안 되는 환경(Windows 10, 다른 OS, offscreen)은 사각형 그대로 두고 False."""
+    if sys.platform != "win32" or QGuiApplication.platformName() != "windows":
+        return False
+    try:
+        hwnd = ctypes.c_void_p(int(widget.winId()))
+        v = ctypes.c_int(_DWMWCP_ROUND)
+        return ctypes.windll.dwmapi.DwmSetWindowAttribute(
+            hwnd, _DWMWA_WINDOW_CORNER_PREFERENCE, ctypes.byref(v), ctypes.sizeof(v)) == 0
+    except (OSError, AttributeError):
+        return False
