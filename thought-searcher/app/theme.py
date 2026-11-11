@@ -47,6 +47,9 @@ BADGE_STYLE = {
     "note": (None, "neutral"), "journal": (None, "neutral"),
 }
 TINT_ALPHA = 0.24
+# 강조색을 옅게 깐 바탕 (설정 찾기 칸, 탭 맞은 수 배지). 새 색 값이 아니라 강조색과 바탕색의 섞음이다.
+ACCENT_SOFT_ALPHA = {"light": 0.07, "dark": 0.11}
+ACCENT_BADGE_ALPHA = {"light": 0.14, "dark": 0.2}
 MONO_FONTS = '"Consolas", "D2Coding", "Malgun Gothic", monospace'
 
 # 단색 선 아이콘 (24x24, stroke만). 색은 그릴 때 정한다.
@@ -60,6 +63,8 @@ ICONS = {
                 'M16.8 16.8l1.6 1.6M5.6 18.4l1.6-1.6M16.8 7.2l1.6-1.6"/>',
 }
 ICONS["settings"] = ICONS["advanced"]
+ICONS["search"] = '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'
+ICONS["info"] = '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.2"/>'
 # 스타일시트 url()로 쓰는 작은 그림 (콤보 화살표, 체크 표시). 색을 넣어 임시 폴더에 파일로 쓴다.
 _ASSETS = {
     "chevron": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" stroke="{a}" '
@@ -141,6 +146,21 @@ def accent_color(accent: str, dark: bool) -> QColor:
 def _blend(fg: QColor, bg: QColor, a: float) -> QColor:
     return QColor(round(fg.red() * a + bg.red() * (1 - a)), round(fg.green() * a + bg.green() * (1 - a)),
                   round(fg.blue() * a + bg.blue() * (1 - a)))
+
+
+def accent_soft(t: Theme) -> QColor:
+    """강조색을 옅게 깐 바탕 (설정 찾기 칸). 라이트 약 7%, 다크 약 11%."""
+    return _blend(t.accent, t.bg, ACCENT_SOFT_ALPHA["dark" if t.dark else "light"])
+
+
+def accent_badge(t: Theme) -> QColor:
+    """사이드바 탭의 맞은 수 배지 바탕."""
+    return _blend(t.accent, t.bg, ACCENT_BADGE_ALPHA["dark" if t.dark else "light"])
+
+
+def derived(t: Theme) -> dict[str, QColor]:
+    """테마 색을 섞어 만든 색 전부 (스타일시트에 들어갈 수 있는 값을 검사하는 테스트용)."""
+    return {"accent_soft": accent_soft(t), "accent_badge": accent_badge(t)}
 
 
 def badge_colors(t: Theme, source: str) -> tuple[QColor | None, QColor | None, QColor]:
@@ -246,7 +266,21 @@ def _asset(name: str, a: str, b: str = "") -> str:
 
 
 def _c(t: Theme) -> dict:
-    return {k: getattr(t, k).name() for k in (*BASE["light"], "accent", "on_accent")}
+    c = {k: getattr(t, k).name() for k in (*BASE["light"], "accent", "on_accent")}
+    c.update({k: v.name() for k, v in derived(t).items()})
+    return c
+
+
+def _keycap_qss(c: dict) -> str:
+    """키캡: 작은 글자, 둥근 테두리, 아래쪽이 조금 두꺼운 선."""
+    return f"""
+        QLabel#keycap {{ background:{c['input_bg']}; color:{c['sub']}; border:1px solid {c['input_border']};
+                         border-bottom:2px solid {c['input_border']}; border-radius:4px; padding:0 5px;
+                         font-size:8.5pt; }}
+        QLabel#keycapStrong {{ background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']};
+                               border-bottom:2px solid {c['input_border']}; border-radius:4px; padding:0 5px;
+                               font-size:8.5pt; font-weight:700; }}
+    """
 
 
 def dialog_qss(t: Theme) -> str:
@@ -281,14 +315,39 @@ def dialog_qss(t: Theme) -> str:
         QPushButton#secondary {{ padding:7px 18px; }}
         QPushButton#link {{ background:transparent; border:none; color:{c['accent']}; padding:2px 4px; }}
         QPushButton#link:hover {{ text-decoration:underline; }}
-        QPushButton#nav {{ background:transparent; border:none; border-radius:6px; text-align:left;
-                           padding:9px 12px; font-size:10.5pt; color:{c['text']}; }}
+        QPushButton#nav {{ background:transparent; border:none; border-left:3px solid transparent; border-radius:6px;
+                           border-top-left-radius:2px; border-bottom-left-radius:2px; text-align:left;
+                           padding:9px 12px 9px 9px; font-size:10.5pt; color:{c['text']}; }}
         QPushButton#nav:hover {{ background:{c['button']}; }}
-        QPushButton#nav:checked {{ background:{c['nav_sel']}; font-weight:700; }}
+        QPushButton#nav:checked {{ background:{c['nav_sel']}; font-weight:700; border-left-color:{c['accent']}; }}
+        QPushButton#nav[dim="true"] {{ color:{c['placeholder']}; }}
+        QLabel#navBadge {{ background:{c['accent_badge']}; color:{c['accent']}; border-radius:8px; padding:0 6px;
+                           font-size:8.5pt; font-weight:700; }}
         QPushButton#chip {{ background:transparent; border:1px solid {c['input_border']}; border-radius:6px;
                             padding:6px 12px; }}
         QPushButton#chip:hover {{ background:{c['button']}; }}
         QPushButton#chip:checked {{ background:{c['nav_sel']}; font-weight:700; }}
+        /* 붙은 버튼(세그먼트): 위치는 pos 속성 (first, mid, last) */
+        QPushButton#seg {{ background:transparent; border:1px solid {c['input_border']}; border-radius:0;
+                           padding:6px 14px; }}
+        QPushButton#seg:hover {{ background:{c['button']}; }}
+        QPushButton#seg:checked {{ background:{c['nav_sel']}; font-weight:700; }}
+        QPushButton#seg[pos="first"] {{ border-top-left-radius:6px; border-bottom-left-radius:6px; }}
+        QPushButton#seg[pos="mid"] {{ border-left-width:0; }}
+        QPushButton#seg[pos="last"] {{ border-left-width:0; border-top-right-radius:6px;
+                                       border-bottom-right-radius:6px; }}
+        QToolButton#info {{ background:transparent; border:none; border-radius:8px; padding:1px; }}
+        QToolButton#info:hover {{ background:{c['button']}; }}
+
+        /* 설정 찾기 칸: 강조색 테두리 1.5px + 옅은 강조색 바탕 */
+        QFrame#searchBox {{ background:{c['accent_soft']}; border:1.5px solid {c['accent']}; border-radius:9px; }}
+        QFrame#searchBox QLineEdit {{ background:transparent; border:none; padding:6px 4px; font-size:11pt; }}
+        QLabel#searchCount {{ color:{c['accent']}; font-weight:700; font-size:9.4pt; }}
+        QLabel#changedDot {{ background:{c['accent']}; border-radius:4px; }}
+        QLabel#changedText {{ color:{c['text']}; font-size:9.75pt; }}
+
+        /* 카드: 섹션의 줄이 들어가는 상자 */
+        QFrame#card {{ background:{c['sidebar']}; border:1px solid {c['line']}; border-radius:9px; }}
 
         QLineEdit, QPlainTextEdit, QComboBox, QListWidget {{
             background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']};
@@ -314,7 +373,7 @@ def dialog_qss(t: Theme) -> str:
         QFrame#numBox QLineEdit, QComboBox QLineEdit {{ background:transparent; border:none; padding:0;
             border-radius:0; }}
 
-        QCheckBox, QRadioButton {{ color:{c['text']}; spacing:6px; font-size:10.5pt; }}
+        QCheckBox, QRadioButton {{ color:{c['text']}; spacing:6px; font-size:10.5pt; background:transparent; }}
         QCheckBox:disabled, QRadioButton:disabled {{ color:{c['placeholder']}; }}
         QCheckBox::indicator, QRadioButton::indicator {{ width:14px; height:14px; background:{c['input_bg']};
             border:1px solid {c['sub']}; }}
@@ -324,25 +383,44 @@ def dialog_qss(t: Theme) -> str:
         QRadioButton::indicator {{ border-radius:8px; }}
         QRadioButton::indicator:checked {{ border:4px solid {c['text']}; width:8px; height:8px; }}
         QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{ border-color:{c['input_border']}; }}
-    """ + _scrollbar_qss(c)
+    """ + _keycap_qss(c) + _scrollbar_qss(c)
 
 
 def search_qss(t: Theme) -> str:
     c = _c(t)
     return f"""
         QWidget#root {{ background:{c['bg']}; border:1px solid {c['input_border']}; }}
-        QLineEdit {{ background:{c['input_bg']}; color:{c['text']}; border:1px solid {c['input_border']};
-                     border-radius:6px; padding:8px 10px; font-size:13pt;
-                     selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
-        QLineEdit:focus {{ border-color:{c['accent']}; }}
+        QFrame#head {{ background:{c['bg']}; border:none; border-bottom:1px solid {c['line']}; }}
+        QLineEdit#query {{ background:transparent; color:{c['text']}; border:none; padding:6px 4px;
+                           font-size:15pt; selection-background-color:{c['nav_sel']}; selection-color:{c['text']}; }}
+        QLabel#count {{ color:{c['sub']}; font-size:9.4pt; padding:0 4px; }}
         QListWidget {{ background:{c['bg']}; border:none; outline:none; }}
         QLabel {{ color:{c['sub']}; padding:2px 4px; }}
         QLabel#detail {{ color:{c['text']}; background:{c['sidebar']}; border:1px solid {c['line']};
                          border-radius:6px; padding:6px 10px; }}
+        QSplitter::handle {{ background:{c['line']}; }}
+        QSplitter::handle:hover {{ background:{c['input_border']}; }}
+
+        QFrame#preview {{ background:{c['bg']}; border:none; }}
+        QScrollArea#previewScroll {{ background:{c['bg']}; border:none; }}
+        QWidget#previewBody {{ background:{c['bg']}; }}
+        QLabel#pvTitle {{ color:{c['text']}; font-size:12pt; font-weight:700; padding:0; }}
+        QLabel#pvMeta, QLabel#pvIndex {{ color:{c['sub']}; font-size:9.4pt; padding:0; }}
+        QLabel#pvEmpty {{ color:{c['sub']}; padding:12px 14px; }}
+        QFrame#pvHit {{ background:{c['sidebar']}; border:none; border-left:3px solid {c['accent']}; }}
+        QFrame#pvCtx {{ background:transparent; border:none; border-left:3px solid transparent; }}
+        QFrame#pvHit QLabel, QFrame#pvCtx QLabel {{ padding:0; color:{c['text']}; }}
+        QFrame#pvCtx QLabel {{ color:{c['sub']}; }}
+        QLabel#pvRole {{ color:{c['sub']}; font-size:8.5pt; padding:0; }}
+
+        QFrame#bottomBar {{ background:{c['sidebar']}; border:none; border-top:1px solid {c['line']}; }}
+        QFrame#bottomBar QLabel {{ padding:0; font-size:8.5pt; }}
+        QLabel#appName {{ color:{c['sub']}; font-size:9pt; }}
+        QLabel#keyAction {{ color:{c['sub']}; }}
+        QLabel#keyActionStrong {{ color:{c['text']}; font-weight:700; }}
         QToolButton#gear {{ background:transparent; border:none; border-radius:4px; padding:2px; }}
         QToolButton#gear:hover {{ background:{c['button']}; }}
-    """ + _scrollbar_qss(c)
-
+    """ + _keycap_qss(c).replace("QLabel#keycap", "QFrame#bottomBar QLabel#keycap") + _scrollbar_qss(c)
 
 # ---- Windows 제목 표시줄 -------------------------------------------------------------
 _DWMWA_DARK = (20, 19)        # DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 10 20H1 이전은 19)

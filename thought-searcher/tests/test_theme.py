@@ -70,6 +70,7 @@ def test_stylesheets_use_only_theme_values(T):
         for acc in S.THEME_ACCENTS:
             t = T.make(mode, acc)
             allowed = {getattr(t, k).name() for k in (*T.BASE["light"], "accent", "on_accent")}
+            allowed |= {c.name() for c in T.derived(t).values()}      # 섞어 만든 색(옅은 강조색)은 허용
             for qss in (T.dialog_qss(t), T.search_qss(t)):
                 used = {c.lower() for c in re.findall(r"#[0-9A-Fa-f]{6}\b", qss)}
                 assert used <= allowed, used - allowed
@@ -81,3 +82,15 @@ def test_search_window_set_theme(T):
     w.set_theme(T.make("dark", "deep_teal"))
     assert w.t.dark and "#7cc6c0" in w.styleSheet().lower() and w.delegate.t is w.t
     w.close()
+
+
+def test_accent_soft_is_a_blend_of_accent_and_bg(T):
+    light, dark = T.make("light", "ink_blue"), T.make("dark", "ink_blue")
+    for t, a in ((light, 0.07), (dark, 0.11)):
+        soft = T.accent_soft(t)
+        for ch in ("red", "green", "blue"):
+            lo, hi = sorted((getattr(t.bg, ch)(), getattr(t.accent, ch)()))
+            assert lo <= getattr(soft, ch)() <= hi
+            assert abs(getattr(soft, ch)() - (getattr(t.accent, ch)() * a + getattr(t.bg, ch)() * (1 - a))) <= 1
+        assert T.accent_badge(t) != soft and T.accent_badge(t).name() != t.accent.name()
+    assert T.icon("search", light.sub, 16).availableSizes() and T.icon("info", light.sub, 14).availableSizes()
