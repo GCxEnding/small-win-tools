@@ -18,6 +18,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QColor, QGuiApplication, QIcon, QPainter, QPalette, QPixmap
+from PySide6.QtWidgets import QProxyStyle, QStyle
 from PySide6.QtSvg import QSvgRenderer
 
 from . import settings as S
@@ -238,6 +239,26 @@ def palette(t: Theme) -> QPalette:
 def apply_app(app, t: Theme) -> None:
     """앱 전체(트레이 메뉴, 메시지 상자 포함)의 기본 팔레트."""
     app.setPalette(palette(t))
+
+
+TIP_DELAY_MS = 200        # 툴팁이 뜨기까지 (Qt 기본 700ms)
+
+
+class FastTipStyle(QProxyStyle):
+    """툴팁을 마우스를 올리자마자(0.2초) 띄운다. 나머지는 기본 스타일 그대로."""
+
+    def styleHint(self, hint, option=None, widget=None, ret=None):
+        if hint == QStyle.SH_ToolTip_WakeUpDelay:
+            return TIP_DELAY_MS
+        if hint == QStyle.SH_ToolTip_FallAsleepDelay:
+            return 0
+        return super().styleHint(hint, option, widget, ret)
+
+
+def install_fast_tips(app) -> None:
+    """앱 스타일을 FastTipStyle로 감싼다. 팔레트를 되돌리므로 apply_app보다 먼저 부른다."""
+    base = app.style().name() if hasattr(app.style(), "name") else ""
+    app.setStyle(FastTipStyle(base) if base else FastTipStyle())
 
 
 def _scrollbar_qss(c: dict) -> str:

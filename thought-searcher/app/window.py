@@ -47,9 +47,9 @@ SOURCE_NAME = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "claude-a
 PLACEHOLDER = "기억나는 단어 몇 개"
 # 검색 옵션 칩: (글자, src: 값). 회사별로 모아 둔 순서
 SOURCE_CHIPS = [("AI", "ai"), ("프로젝트", "project"), ("메모리", "memory"), ("Code", "code"), ("GPT", "gpt"),
-                ("Codex", "codex"), ("노트", "note")]
+                ("Codex", "codex"), ("노트", "note"), ("일지", "journal")]
 _SRC_VALUE = {"claude-ai": "ai", "claude-ai-project": "project", "claude-ai-memory": "memory", "claude-code": "code",
-              "chatgpt": "gpt", "codex": "codex", "note": "note"}
+              "chatgpt": "gpt", "codex": "codex", "note": "note", "journal": "journal"}
 # 기간 칩: (글자, 며칠 전부터 / "year" / None=전체)
 PERIOD_CHIPS = [("전체", None), ("1주", 7), ("1달", 30), ("3달", 90), ("올해", "year")]
 PROJECT_LABEL_MAX = 12   # 최소 폭(560)에서도 둘째 줄이 넘치지 않게. 전체 이름은 툴팁
@@ -206,7 +206,8 @@ class ElideLabel(QLabel):
     def _elide(self) -> None:
         w = max(10, self.width() - 8)
         shown = self.fontMetrics().elidedText(self._full, Qt.ElideRight, w) if self.width() > 8 else self._full
-        self.setToolTip(self._full if shown != self._full else "")
+        # 줄여 보인 때만 전체 글자 (줄바꿈되는 표로 감싸 긴 설명도 한눈에)
+        self.setToolTip(tip_wrap(self._full, 340) if shown != self._full else "")
         spans = term_spans(shown, self._terms) if self._terms and self._mark else []
         if spans:
             self.setTextFormat(Qt.RichText)

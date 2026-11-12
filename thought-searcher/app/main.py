@@ -25,7 +25,9 @@ from .ask import OFF_MESSAGE, AskError
 from .core import Core, setup_logging
 from .hotkey import HotkeyManager
 from .index import connect, fts5_available
-from .queue import QueueItem
+from .query import parse as parse_query
+from .queue import QueueItem, QueueResult
+from .tokenize import normalize
 from .search import DEFAULT_WEIGHTS, Hit, Searcher
 from .settings_window import Hooks, SettingsWindow
 from .store import Store
@@ -90,6 +92,27 @@ def swap_hotkey(mgr: HotkeyManager, text: str) -> tuple[bool, str]:
 
 
 PROJECT_MENU_MAX = 40
+
+
+def filter_queue(res, q, focus: int):
+    """큐 결과를 검색어의 필터(src:, after:, before:, proj:)로 거른다. 일지 항목은 src:journal."""
+    srcs = set(q.sources)
+    after = datetime.combine(q.after, datetime.min.time()).timestamp() if q.after else None
+    before = datetime.combine(q.before, datetime.min.time()).timestamp() if q.before else None
+
+    def keep(it) -> bool:
+        if srcs and it.source not in srcs:
+            return False
+        if after is not None and it.trace_ts < after:
+            return False
+        if before is not None and it.trace_ts >= before:
+            return False
+        proj = normalize(it.project or "")
+        return all(p in proj for p in q.projects)
+
+    items = [it for it in (*res.focus, *res.rest) if keep(it)]
+    n = max(0, focus)
+    return QueueResult(items[:n], items[n:], [it for it in res.closed if keep(it)], res.days)
 
 
 def project_names(conn, limit: int = PROJECT_MENU_MAX) -> list[str]:
@@ -626,7 +649,14 @@ class App:
         if not text.strip():
             self.show_queue()
             return
+        q = parse_query(text)
+        if not q.has_text and not q.excludes and not q.title_excludes:
+            # 단어 없이 칩(필터)만: 열린 일 큐를 그 조건으로 거른다 (일지 항목도 남는다).
+            # 거른 큐가 비면(메모리, 프로젝트 문서처럼 큐에 오르지 않는 출처 등) 아래 검색으로 넘어간다
+            if self.show_queue(filters=q):
+                return
         try:
+            self.searcher.journal_dir = str(self.core.journal_dir or "")
             hits = self.searcher.search(text)
         except Exception as e:  # noqa: BLE001
             log.exception("검색 실패")
@@ -651,22 +681,35 @@ class App:
             status += "   ⚠ 보관 폴더 없음"
         return status
 
-    def show_queue(self, keep: str | None = None):
+    def show_queue(self, keep: str | None = None, filters=None) -> bool:
+        """열린 일 큐. filters(검색어 Query)가 있으면 출처, 기간, 프로젝트로 거른다.
+        거른 결과가 비면 그리지 않고 False (호출한 쪽이 검색으로 넘어간다)."""
         now = time.time()
         t0 = time.perf_counter()
+        days = None
+        if filters is not None and filters.after:
+            after_ts = datetime.combine(filters.after, datetime.min.time()).timestamp()
+            days = int((now - after_ts) // 86400) + 1
         try:
-            res = self.core.compute_queue(self.search_conn, now)
+            res = self.core.compute_queue(self.search_conn, now, days)
         except Exception as e:  # noqa: BLE001
             log.exception("큐 계산 실패")
             self.window.set_results([], f"열린 일 계산 오류: {e}")
-            return
+            return True
+        if filters is not None:
+            res = filter_queue(res, filters, self.core._int_cfg("queue_focus", 5, lo=0))
+            if not res.open_count and not res.closed:
+                return False
         ms = (time.perf_counter() - t0) * 1000
         status = f"열린 일 {res.open_count}개 · 최근 {res.days}일 · {ms:.0f}ms"
+        if filters is not None:
+            status += f"   필터: {' '.join(filters.filter_labels())}"
         if self._busy:
             status = f"⏳ {self._busy}   ·   {status}"
         if not self.core.archive_ok():
             status += "   ⚠ 보관 폴더 없음"
         self.window.set_queue(res, status, now, keep)
+        return True
 
     def on_queue_action(self, kind: str, item: QueueItem):
         if kind == "open":
@@ -799,6 +842,7 @@ def main() -> int:
     if mutex is None:
         return 0
     qapp = QApplication(sys.argv)
+    T.install_fast_tips(qapp)          # 툴팁 0.2초 (App이 팔레트를 그 뒤에 입힌다)
     qapp.setApplicationName(APP_NAME)
     qapp.setQuitOnLastWindowClosed(False)
     qapp.setStyle("Fusion")       # Windows 기본 스타일은 입력칸 테두리 등 스타일시트 일부를 무시한다 (theme.py)

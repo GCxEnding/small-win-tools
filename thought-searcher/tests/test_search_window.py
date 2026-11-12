@@ -321,3 +321,64 @@ def QFrameType():
 def QLabelType():
     from PySide6.QtWidgets import QLabel
     return QLabel
+
+
+# ---- 일지 칩, 칩만 켰을 때 큐 거르기 -----------------------------------------------------
+def test_journal_source_alias_and_filter_sql(tmp_path):
+    from app.query import parse
+    from app.search import journal_prefix
+    q = parse("src:journal 배포")
+    assert q.sources == ["journal"] and "src:journal" in q.filter_labels()
+    assert parse("src:일지").sources == ["journal"]
+    root = tmp_path / "vault"
+    assert journal_prefix(root).endswith("vault\\") and journal_prefix("") == ""
+    idx = Index(tmp_path / "index.db")
+    idx.open().close()
+    conn = connect(tmp_path / "index.db")
+    with conn:
+        for cid, src, path in [("j", "note", str(root / "2026" / "11" / "2026-11-11.md")),
+                               ("n", "note", str(tmp_path / "other" / "a.md")), ("c", "claude-code", str(tmp_path / "c.md"))]:
+            conn.execute("INSERT INTO docs(conv_id, path, title, source, updated_ts) VALUES(?,?,?,?,?)",
+                         (cid, path, cid, src, 1))
+    s = Searcher(conn)
+    assert [h.conv_id for h in s.search("src:journal")] == []            # 일지 폴더 설정 없음
+    s.journal_dir = str(root)
+    assert [h.conv_id for h in s.search("src:journal")] == ["j"]
+    assert sorted(h.conv_id for h in s.search("src:journal src:code")) == ["c", "j"]
+    conn.close()
+
+
+def test_filter_queue_keeps_journal_and_period():
+    from datetime import date, datetime as dt
+    from app.main import filter_queue
+    from app.query import parse
+    from app.queue import QueueItem, QueueResult
+    now = dt(2026, 11, 12, 9, 0).timestamp()
+    items = [QueueItem("journal:a", "journal", "a", "", "j.md", 1, now - 3600),
+             QueueItem("claude-ai:b", "claude-ai", "b", "데모", "b.md", 1, now - 10 * 86400),
+             QueueItem("claude-code:c", "claude-code", "c", "small-win-tools", "c.md", 1, now - 3600)]
+    res = QueueResult(items[:2], items[2:], [], 14)
+    one_week = parse(f"after:{date(2026, 11, 5).isoformat()}")
+    got = filter_queue(res, one_week, 5)
+    assert [i.id for i in got.focus] == ["journal:a", "claude-code:c"]       # 일지도 남는다
+    assert [i.id for i in filter_queue(res, parse("src:journal"), 5).focus] == ["journal:a"]
+    assert [i.id for i in filter_queue(res, parse("proj:small"), 1).rest] == []
+    assert [i.id for i in filter_queue(res, parse("src:ai src:code"), 1).rest] == ["claude-code:c"]
+
+
+def test_elided_label_tooltip_wraps_full_text(qt):
+    from app.window import ElideLabel
+    lb = ElideLabel("가" * 200)
+    lb.resize(80, 20)
+    lb._elide()
+    assert "<table" in lb.toolTip() and "가" * 200 in lb.toolTip()
+    lb.resize(4000, 20)
+    lb._elide()
+    assert lb.toolTip() == ""
+
+
+def test_fast_tooltip_style(qt):
+    from PySide6.QtWidgets import QStyle
+    from app import theme as T
+    st = T.FastTipStyle()
+    assert st.styleHint(QStyle.SH_ToolTip_WakeUpDelay) == T.TIP_DELAY_MS == 200

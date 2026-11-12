@@ -926,7 +926,7 @@ class SettingsWindow(QDialog):
         name_lb = None
         if title:
             if plain:
-                name_lb = _label(title, "name")
+                name_lb = _label(title, "rowName")      # 굵게, 줄바꿈하며 전부
                 head.addWidget(name_lb, 1)
             else:
                 name_lb = ElideLabel(title)
@@ -1227,23 +1227,43 @@ class SettingsWindow(QDialog):
                 return
             copy_text(text, f"{SCRIPTS[site]} 내용")
 
+        # (제목, 자세한 설명 여러 줄, 버튼, 동작). 설명은 줄바꿈하며 전부 보인다(plain 줄)
         steps = [
-            ("1. 브라우저에 Tampermonkey 확장을 설치합니다.", "링크 열기", lambda: self.hooks.open_url(TAMPERMONKEY_URL)),
-            ("2. Tampermonkey 설정 > 일반 > 설정 모드: 고급", None, None),
-            ("3. 다운로드 BETA > 다운로드 모드: 브라우저 API, 허용 확장자에 .json 추가", None, None),
-            ("4. 크롬 설정 > 다운로드 > '다운로드 전에 각 파일의 저장 위치 확인' 끄기", "주소 복사",
-             lambda: copy_text(CHROME_DOWNLOADS, f"{CHROME_DOWNLOADS} (크롬 주소창에 붙여 넣으세요)")),
-            (f"5. 크롬 메모리 절약 모드를 쓰면 {host}를 '항상 활성 상태로 유지할 사이트'에 추가", "주소 복사",
-             lambda: copy_text(CHROME_PERFORMANCE, f"{CHROME_PERFORMANCE} (크롬 주소창에 붙여 넣으세요)")),
-            ("6. Tampermonkey 대시보드 > 새 스크립트에 붙여 넣고 저장", "스크립트 복사", copy_script),
+            ("1. Tampermonkey 확장 설치",
+             "'링크 열기'로 Tampermonkey 누리집을 열고, 쓰는 브라우저(크롬, 엣지)용을 받아 '추가'를 누릅니다.\n"
+             "설치한 뒤 주소창 오른쪽 퍼즐 모양 아이콘에서 Tampermonkey를 고정(핀)해 두면 다음 단계가 쉽습니다.",
+             "링크 열기", lambda: self.hooks.open_url(TAMPERMONKEY_URL)),
+            ("2. 설정 모드를 '고급'으로",
+             "Tampermonkey 아이콘 > '대시보드' > 위쪽 '설정' 탭을 엽니다.\n"
+             "'일반' 묶음의 '설정 모드'를 '초보자'에서 '고급'으로 바꿉니다. 그래야 3번의 다운로드 설정이 보입니다.",
+             None, None),
+            ("3. 다운로드 설정",
+             "같은 '설정' 탭을 아래로 내려 '다운로드 BETA' 묶음을 찾습니다.\n"
+             "- 다운로드 모드: '브라우저 API'\n"
+             "- 허용 확장자(화이트리스트) 칸에 새 줄로 .json 추가\n"
+             "맨 아래 '저장'을 누릅니다. 처음 저장할 때 브라우저가 다운로드 권한을 물으면 '허용'.",
+             None, None),
+            ("4. 브라우저의 '저장 위치 묻기' 끄기",
+             "'주소 복사'를 누르고 크롬 주소창에 붙여 넣어 엽니다(chrome:// 주소는 앱이 직접 열 수 없습니다).\n"
+             "'다운로드 전에 각 파일의 저장 위치 확인'을 끕니다. 켜 두면 수집할 때마다 저장 창이 뜹니다.",
+             "주소 복사", lambda: copy_text(CHROME_DOWNLOADS, f"{CHROME_DOWNLOADS} (크롬 주소창에 붙여 넣으세요)")),
+            ("5. 메모리 절약 예외 (쓰는 경우만)",
+             "크롬 메모리 절약 모드를 켜 두었다면 '주소 복사' 후 주소창에 붙여 넣어 엽니다.\n"
+             f"'항상 활성 상태로 유지할 사이트' > '추가'에 {host}를 넣습니다. 탭이 잠들면 수집이 멈춥니다.",
+             "주소 복사", lambda: copy_text(CHROME_PERFORMANCE, f"{CHROME_PERFORMANCE} (크롬 주소창에 붙여 넣으세요)")),
+            ("6. 스크립트 붙여 넣기",
+             "'스크립트 복사'를 누릅니다.\n"
+             "Tampermonkey 아이콘 > '새 스크립트 만들기'를 누르고, 미리 들어 있는 글을 모두 지운 뒤 붙여 넣고 Ctrl+S로 저장합니다.\n"
+             f"{host}를 열거나 새로고침하면 15초 뒤 첫 수집이 돕니다. 아래 '상태'에 마지막 성공 시각이 나오면 끝입니다.",
+             "스크립트 복사", copy_script),
         ]
-        for text, btn, fn in steps:
+        for title, desc, btn, fn in steps:
             b = None
             if btn:
                 b = _button(btn)
                 b.setAutoDefault(False)
                 b.clicked.connect(fn)
-            self._row(sec, text, b)
+            self._row(sec, title, b, desc, plain=True)
         self._row(sec, "상태", None, self.core.capture_site_status(site),
                   after="회사 크롬 정책으로 확장 설치가 막혀 있으면 zip 내보내기로 가져오세요.", extras=(copied,))
         return sec

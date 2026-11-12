@@ -19,6 +19,7 @@ SOURCE_ALIASES = {
     "gpt": "chatgpt", "chatgpt": "chatgpt",
     "note": "note", "노트": "note", "n": "note",
     "codex": "codex", "cx": "codex",
+    "journal": "journal", "일지": "journal", "j": "journal",   # 업무 일지: journal_dir 안의 노트 (Searcher.journal_dir)
 }
 
 _DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$")
@@ -60,7 +61,7 @@ class Query:
     def filter_labels(self) -> list[str]:
         out = []
         rev = {"claude-ai": "ai", "claude-code": "code", "claude-ai-project": "project",
-               "claude-ai-memory": "memory", "chatgpt": "gpt", "note": "note", "codex": "codex"}
+               "claude-ai-memory": "memory", "chatgpt": "gpt", "note": "note", "codex": "codex", "journal": "journal"}
         out += [f"src:{rev.get(s, s)}" for s in self.sources]
         out += [f"proj:{p}" for p in self.projects]
         if self.after:

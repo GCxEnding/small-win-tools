@@ -740,9 +740,9 @@ class Core:
             return []
         return self._journal.read_recent(root, datetime.fromtimestamp(now).date(), days)
 
-    def compute_queue(self, conn, now: float | None = None) -> queue.QueueResult:
+    def compute_queue(self, conn, now: float | None = None, days: int | None = None) -> queue.QueueResult:
         now = datetime.now().timestamp() if now is None else now
-        days = self._int_cfg("queue_days", 14)
+        days = max(days or 0, self._int_cfg("queue_days", 14))     # 기간 칩이 더 길면 그만큼 본다
         entries = self.read_journal(now, days)
         extra = [i for e in entries for i in e.sessions]
         srcs = settings.read_queue_sources(self.config)

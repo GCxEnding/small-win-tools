@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 from bisect import bisect_left, bisect_right
 import re
 import sqlite3
@@ -125,6 +126,14 @@ def _any_in(sorted_ids: list[int], lo: int, hi: int) -> bool:
     return i < len(sorted_ids) and sorted_ids[i] <= hi
 
 
+def journal_prefix(path) -> str:
+    """일지 폴더 -> 색인 path와 비교할 앞부분 (소문자, \\ 구분, 끝에 \\)."""
+    p = str(path or "").strip()
+    if not p:
+        return ""
+    return os.path.abspath(p).replace("/", "\\").rstrip("\\").lower() + "\\"
+
+
 class Searcher:
     def __init__(self, conn: sqlite3.Connection, weights: dict | None = None, max_results: int = 50,
                  now=None):
@@ -134,6 +143,7 @@ class Searcher:
         self._now = now
         self.last_ms = 0.0
         self.last_query: Query | None = None
+        self.journal_dir: str = ""        # src:journal(일지)이 찾는 폴더. main.py가 설정에서 넣는다
         self._cache: dict[str, list[int]] = {}
         self._cache_ver = None
 
@@ -144,8 +154,16 @@ class Searcher:
     def _filters(self, q: Query) -> tuple[str, list]:
         sql, args = [], []
         if q.sources:
-            sql.append(f"d.source IN ({','.join('?' * len(q.sources))})")
-            args += q.sources
+            srcs = [s for s in q.sources if s != "journal"]
+            parts = [f"d.source IN ({','.join('?' * len(srcs))})"] if srcs else []
+            args += srcs
+            if "journal" in q.sources:
+                # 일지는 따로 색인하지 않는다: 일지 폴더 안의 노트 문서로 찾는다 (일지 폴더가 노트 폴더에 들어 있을 때)
+                root = journal_prefix(self.journal_dir)
+                if root:
+                    parts.append("(d.source = 'note' AND instr(lower(replace(d.path, '/', '\\')), ?) = 1)")
+                    args.append(root)
+            sql.append("(" + " OR ".join(parts) + ")" if parts else "0")
         for p in q.projects:
             sql.append("instr(d.project_norm, ?) > 0")
             args.append(p)
