@@ -950,9 +950,10 @@ class SettingsWindow(QDialog):
             # ⓘ: 툴팁 글이 있으면 늘, 없으면 설명이 '…'로 줄어 보일 때만 (그때는 설명 전체를 보인다)
             info = InfoButton(tip or desc)
             info.setIcon(T.icon("info", self.t.accent, INFO_ICON))
-            info.setVisible(bool(tip))
             self._info_buttons.append(info)
             head.addWidget(info, 0, Qt.AlignVCenter)
+            if not tip:
+                info.hide()                       # 숨기기만 한다 (부모 없을 때 보이게 하면 작은 창으로 뜬다)
         desc_lb = None
         if desc and not plain:
             desc_lb = ElideLabel(desc)

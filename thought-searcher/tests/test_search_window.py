@@ -382,3 +382,53 @@ def test_fast_tooltip_style(qt):
     from app import theme as T
     st = T.FastTipStyle()
     assert st.styleHint(QStyle.SH_ToolTip_WakeUpDelay) == T.TIP_DELAY_MS == 300
+
+
+# ---- 작은 창이 깜빡이지 않음 -----------------------------------------------------------
+def _stray_windows(app, run):
+    """run() 동안 Show 된 최상위 창 중 SearchWindow/SettingsWindow가 아닌 것 (부모 없이 보이게 된 위젯)."""
+    from PySide6.QtCore import QEvent, QObject
+    from PySide6.QtWidgets import QWidget
+    got = []
+
+    class F(QObject):
+        def eventFilter(self, o, e):
+            if e.type() == QEvent.Show and isinstance(o, QWidget) and o.isWindow() and \
+                    type(o).__name__ not in ("SearchWindow", "SettingsWindow"):
+                got.append(type(o).__name__)
+            return False
+    f = F()
+    app.installEventFilter(f)
+    try:
+        run()
+        app.processEvents()
+    finally:
+        app.removeEventFilter(f)
+    return got
+
+
+def test_no_stray_windows_when_opening(qt, core_env):
+    from app.settings_window import Hooks, SettingsWindow
+    from app.window import SearchWindow
+    from app.queue import QueueResult
+    holder = {}
+
+    def search():
+        w = SearchWindow()
+        w.searchRequested.connect(lambda t: w.set_queue(QueueResult(), "s", 0) if not t.strip() else w.set_results([], "x"))
+        w.popup()
+        w.edit.setText("abc")
+        w._timer.timeout.emit()
+        w.edit.setText("")
+        w.refresh()
+        holder["w"] = w
+
+    def settings():
+        s = SettingsWindow(core_env, Hooks())
+        s.show()
+        holder["s"] = s
+    assert _stray_windows(qt, search) == []
+    assert _stray_windows(qt, settings) == []
+    holder["w"].hide()
+    holder["s"]._done = True
+    holder["s"].close()

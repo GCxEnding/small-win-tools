@@ -1183,8 +1183,8 @@ class SearchWindow(QWidget):
             for k in keys:
                 cap = self._plain_label(k, "keycapStrong" if strong else "keycap")
                 h.addWidget(cap)
+            self.hint_box.addWidget(w)            # 먼저 넣고 (부모 없는 위젯을 보이게 하면 작은 창으로 뜬다)
             w.setVisible(not (narrow_hide and not self.wide))
-            self.hint_box.addWidget(w)
             self._hint_widgets.append((w, narrow_hide))
 
     def _place_detail(self) -> None:
