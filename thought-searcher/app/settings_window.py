@@ -1115,7 +1115,7 @@ class SettingsWindow(QDialog):
 
         sec = self._section(lay, "열린 일 큐", "검색어가 비었을 때 보이는 최근 일 목록")
         self._row(sec, "열린 일 기간", self._spin("queue_days", "일"), "이 기간 안에 흔적이 있는 일만 올라옵니다.", "queue_days")
-        self._row(sec, "크게 보여 줄 개수", self._spin("queue_focus", "개"),
+        self._row(sec, "기본 노출 개수", self._spin("queue_focus", "개"),
                   "위쪽에 먼저 보여 줍니다.", "queue_focus",
                   tip="이 개수를 넘는 일은 '나머지 N개' 줄에 접혀 있습니다.")
         qrow, self.queue_checks = self._checks(S.QUEUE_LABEL)
