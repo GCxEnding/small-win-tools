@@ -115,6 +115,7 @@ class QueryEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._pre = ""
+        self.copy_other = None    # Ctrl+C 때 다른 곳(요약 칸)의 고른 글을 먼저 복사하는 함수. True면 처리됨
         self.textChanged.connect(lambda _t: self.queryChanged.emit(self.full_text()))
 
     def full_text(self) -> str:
@@ -152,6 +153,8 @@ class QueryEdit(QLineEdit):
             self.itemKey.emit("summary")
         elif k == Qt.Key_Escape:
             self.cancelled.emit()
+        elif k == Qt.Key_C and mods == Qt.ControlModifier and self.copy_other and self.copy_other(self.hasSelectedText()):
+            pass                           # 요약 칸에서 고른 글을 복사했다
         else:
             super().keyPressEvent(e)
 
@@ -942,6 +945,14 @@ class SearchWindow(QWidget):
         self.detail.setWordWrap(True)
         self.detail.setTextFormat(Qt.PlainText)
         self.detail.setObjectName("detail")
+        # 끌어서 고른 뒤 Ctrl+C 또는 오른쪽 클릭으로 복사. 초점은 검색칸에 남긴다(키 조작이 그대로 되게)
+        self.detail.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.detail.setFocusPolicy(Qt.NoFocus)
+        self.detail.setCursor(Qt.IBeamCursor)
+        self.detail.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.detail.customContextMenuRequested.connect(self._detail_menu)
+        self._menu_open = False
+        self.edit.copy_other = lambda edit_has_sel: bool(self.detail.selectedText()) and self.copy_summary()
         self.detail.hide()
         self.left = QWidget()
         self.left_lay = QVBoxLayout(self.left)
@@ -1200,8 +1211,45 @@ class SearchWindow(QWidget):
             QTimer.singleShot(0, self._hide_if_inactive)
         super().changeEvent(e)
 
+    # ---- 요약 복사 ----------------------------------------------------------------
+    def summary_text(self) -> str:
+        """복사할 요약 글: 고른 부분이 있으면 그것, 없으면 요약 전체 (모델 표시 줄은 뺀다)."""
+        if self.detail.isHidden():
+            return ""
+        sel = self.detail.selectedText()
+        if sel:
+            return sel
+        q = self._current_queue_item()
+        return q.summary_text if q is not None and q.summary_text else ""
+
+    def copy_summary(self) -> bool:
+        text = self.summary_text()
+        if text:
+            QGuiApplication.clipboard().setText(text)
+            self.status.setText("요약을 복사했습니다")
+        return bool(text)
+
+    def _detail_menu(self, pos) -> None:
+        q = self._current_queue_item()
+        menu = QMenu(self)
+        sel = self.detail.selectedText()
+        if sel:
+            menu.addAction("고른 글 복사\tCtrl+C").triggered.connect(lambda: self.copy_summary())
+        if q is not None and q.summary_text:
+            menu.addAction("요약 전체 복사").triggered.connect(
+                lambda: (QGuiApplication.clipboard().setText(q.summary_text), self.status.setText("요약을 복사했습니다")))
+        if menu.isEmpty():
+            return
+        self._menu_open = True
+        try:
+            menu.exec(self.detail.mapToGlobal(pos))
+        finally:
+            self._menu_open = False
+            self.activateWindow()
+            self.edit.setFocus()
+
     def _hide_if_inactive(self):
-        if self.chips.menu_open:
+        if self.chips.menu_open or self._menu_open:
             return                         # 프로젝트 칩 메뉴가 떠 있는 동안은 숨기지 않는다
         if not self.isActiveWindow():
             self.hide()
@@ -1307,7 +1355,8 @@ class SearchWindow(QWidget):
         else:
             self.detail.hide()            # 요약 AI 끔: F2 안내를 보이지 않는다
             return
-        self.detail.setText(text)
+        if self.detail.text() != text:        # 같은 글이면 그대로 둔다 (다시 넣으면 끌어서 고른 부분이 풀린다)
+            self.detail.setText(text)
         self.detail.show()
 
     def set_ask_enabled(self, enabled: bool) -> None:

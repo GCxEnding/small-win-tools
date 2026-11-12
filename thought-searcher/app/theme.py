@@ -242,6 +242,39 @@ def apply_app(app, t: Theme) -> None:
     app.setPalette(palette(t))
 
 
+class BusyNote:
+    """오래 걸리는 일 동안 커서 근처 모니터 가운데에 작은 '여는 중…' 상자와 모래시계 커서를 보인다.
+    만들 때 바로 그려 두고(이벤트 루프가 막혀도 보이게), done()에서 닫는다."""
+
+    def __init__(self, t: Theme, text: str):
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QCursor
+        from PySide6.QtWidgets import QApplication, QLabel
+        self.label = QLabel(text)
+        self.label.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.label.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.label.setStyleSheet(f"QLabel {{ background:{t.bg.name()}; color:{t.text.name()}; "
+                                 f"border:1px solid {t.input_border.name()}; border-radius:8px; "
+                                 f"padding:14px 26px; font-size:11pt; }}")
+        self.label.adjustSize()
+        screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
+        g = screen.availableGeometry()
+        self.label.move(g.center() - QPoint(self.label.width() // 2, self.label.height() // 2))
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.label.show()
+        self.label.repaint()
+        QApplication.processEvents()
+        self._open = True
+
+    def done(self) -> None:
+        from PySide6.QtWidgets import QApplication
+        if self._open:
+            self._open = False
+            QApplication.restoreOverrideCursor()
+            self.label.hide()
+            self.label.deleteLater()
+
+
 def show_without_flash(widget) -> None:
     """처음 그리기 전 빈 창(Windows가 칠한 회색 바탕)이 잠깐 보이지 않게, 투명하게 띄워 다 그린 뒤 보인다."""
     from PySide6.QtCore import QTimer

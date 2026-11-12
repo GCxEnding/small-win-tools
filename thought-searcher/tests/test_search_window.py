@@ -432,3 +432,39 @@ def test_no_stray_windows_when_opening(qt, core_env):
     holder["w"].hide()
     holder["s"]._done = True
     holder["s"].close()
+
+
+# ---- 요약 복사, 여는 중 표시 ---------------------------------------------------------
+def test_summary_selectable_and_copy(qt):
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QGuiApplication, QKeyEvent
+    from app.queue import QueueItem, QueueResult
+    from app.window import SearchWindow
+    w = SearchWindow()
+    w.resize(980, 560)
+    w.show()
+    it = QueueItem("claude-code:s1", "claude-code", "t", "", "x.md", 1, 1.8e9)
+    it.summary_text = "어디까지 했나\n1. 설정 창 완료"
+    it.summary = "설정 창 완료"
+    w.set_queue(QueueResult(focus=[it]), "s", 1.8e9)
+    d = w.detail
+    assert d.textInteractionFlags() & Qt.TextSelectableByMouse and d.focusPolicy() == Qt.NoFocus
+    assert w.copy_summary() and QGuiApplication.clipboard().text() == it.summary_text   # 고른 것 없으면 전체
+    d.setSelection(0, 7)
+    w._update_detail()                                     # 같은 글로 다시 그려도 고른 부분이 남는다
+    assert d.selectedText() == "어디까지 했나"
+    w.edit.setText("")
+    w.edit.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_C, Qt.ControlModifier))
+    assert QGuiApplication.clipboard().text() == "어디까지 했나"
+    w.hide()
+    w.deleteLater()
+
+
+def test_busy_note_shows_and_closes(qt):
+    from PySide6.QtWidgets import QApplication
+    from app import theme as T
+    b = T.BusyNote(T.make("light"), "설정 창 여는 중…")
+    assert b.label.isVisible() and QApplication.overrideCursor() is not None
+    b.done()
+    b.done()                                               # 두 번 불러도 괜찮다
+    assert not b.label.isVisible() and QApplication.overrideCursor() is None

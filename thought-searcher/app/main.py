@@ -546,7 +546,11 @@ class App:
         hooks = Hooks(open_url=lambda url: QDesktopServices.openUrl(QUrl(url)), try_hotkey=self._try_hotkey,
                       recording=self._hotkey_recording, applied=self.apply_settings,
                       setup_finished=self._setup_finished)
-        w = SettingsWindow(self.core, hooks, setup=setup, tab=tab or "general")
+        busy = T.BusyNote(self.theme, "설정 창 여는 중…")    # 만드는 데 몇 초 걸린다
+        try:
+            w = SettingsWindow(self.core, hooks, setup=setup, tab=tab or "general")
+        finally:
+            busy.done()
         w.finished.connect(lambda _r: setattr(self, "settings_win", None))
         self.settings_win = w
         T.show_without_flash(w)            # 처음 그리기 전 빈 회색 창이 보이지 않게
