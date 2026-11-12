@@ -1,3 +1,42 @@
+## 검색 개선 2단계: 정렬, 채팅 시각 표시, 날짜 묶음 줄 (2026-11-13)
+기준 문서는 `docs/search-plan.md` 3, 4, 8절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다(모든 단계 뒤 따로 확인).
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/search.py` | `Searcher.search(text, limit, sort="relevance"\|"recent")`. 최신순은 후보를 채팅 시각 늦은 순(같으면 점수 높은 쪽)으로 정렬한 뒤 limit로 자름(`_rank`는 건드리지 않음, 최신순에서는 부르지 않음). `_matched_times`가 {대화: 맞은 메시지 중 가장 늦은 시각}을 SQL 한 번으로 구해 기간 거르기(`_in_period`)와 정렬이 같이 씀. `MatchedMessage.time` 추가. 최신순이면 `matches`가 늦은 메시지부터 |
+| `app/window.py` | 칩 줄 오른쪽 끝 `정확도 \| 최신` 단추(`ChipBar.sort`, `sort_buttons`, NoFocus), `Ctrl+R`(`QueryEdit.toggleSort`), `popup()`에서 기본값으로 복귀, `SearchWindow.sort`/`set_default_sort`, `set_results(..., grouped=)`와 날짜 묶음 줄(`K_GROUP`, 고를 수 없는 항목 + `_navigate`가 건너뜀), 결과 줄 날짜(`row_when`), 미리보기 머리/메시지 이름표(`msg_stamp`, `role_label`), 아래 막대 키 안내 `정렬 Ctrl R`(좁으면 숨김) |
+| `app/theme.py` | `#qseg`(정렬 단추) 스타일 |
+| `app/settings.py`, `app/store.py` | `search_sort`(기본 `recent`), `SEARCH_SORTS`/`SEARCH_SORT_LABEL`, `read_search_sort`, 칸 종류 `search_sort` |
+| `app/settings_window.py` | `설정 > 일반 > 검색 창 > 기본 정렬` 세그먼트(최신 / 정확도) |
+| `app/main.py` | 검색에 `sort=window.sort`, 묶음 줄은 `최신순 and q.has_text`일 때만, 시작과 설정 저장 때 `set_default_sort` |
+| `tests/test_search_sort.py`(새), `test_search_window.py`, `test_settings_search.py` | 새 테스트 13개. 키 안내 4개, 세그먼트 5개로 기대값 수정 |
+| `README.md` | 검색 문법(기간이 메시지 기준, 정렬), 검색 창 화면, 검색 창 키 `Ctrl+R`, 설정 창 일반 행 |
+
+### 정한 것 (계획에 없던 부분)
+- `search()` 기본 인자는 `sort="relevance"`라 CLI와 예전 테스트는 그대로입니다. 창이 `window.sort`를 넘깁니다.
+- 묶음 줄은 `최신순 + 단어(또는 한 글자) 검색`일 때만 만듭니다. 칩만 켠 목록, 큐, 정확도순에는 없습니다. 기준 날짜는 `SearchWindow.today`(시험에서 바꿈), 묶음 이름은 `window.date_group`.
+- `모두 지우기`는 칩만 끄고 정렬은 그대로 둡니다(`ChipBar.reset(keep_sort=True)`). 창을 열 때(`popup`)만 기본값으로 돌아갑니다. 설정을 바꿔도 열려 있는 검색의 정렬은 그대로이고 다음에 열 때부터 적용됩니다.
+- 설정의 세그먼트 순서는 `최신 | 정확도`, 창 안 단추는 계획대로 `정확도 | 최신`.
+- `· 마지막 MM-DD`는 `Hit.updated`(대화 마지막 시각)와 `Hit.chat_time`의 로컬 날짜가 다를 때만 붙고 흐리게(sub 색 알파 150) 그립니다.
+- 키 안내 `정렬 Ctrl R`을 아래 막대에 넣었고 좁은 창에서는 `대화 복사`처럼 숨깁니다.
+
+### 함정
+- 칩 줄의 최소 폭: 정렬 단추를 달아도 칩을 안 켰을 때는 첫째 줄(590px)이 기준 그대로입니다. 그러나 칩을 켜서 `모두 지우기`가 보이면 둘째 줄이 약 650px 이상이 되어, 창 최소 폭이 그만큼 커집니다(예전 약 590). 좁게 줄여 둔 창에서 칩을 켜면 창이 조금 넓어집니다. 문제가 되면 `모두 지우기`를 첫째 줄로 옮기거나 칩 여백을 줄일 것.
+- 날짜 묶음 줄은 항목 플래그를 비워(`Qt.NoItemFlags`) 고를 수 없게 했습니다. 키 이동은 `_step_row`로 건너뛰고, 위 방향으로 첫 결과에 닿으면 `_on_row_changed`가 바로 위 묶음 줄이 보이게 스크롤합니다.
+- 최신순에서는 영어 앞부분 일치(`log` -> `logpick`)로 약하게 맞은 대화가 위로 올 수 있습니다(계획에서 일단 두기로 함).
+- 화면 확인용 Qt는 `offscreen` 플랫폼에서 글꼴이 없어 글자가 네모로 나옵니다. 화면 캡처는 기본(windows) 플랫폼으로 해야 읽힙니다.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 통과.
+- 화면 캡처 2장(`$KIROCREW_SCRATCH\png7\search-wide-recent-light.png` 980px 라이트, 묶음 4개와 `· 마지막` 한 줄 / `settings-general-dark.png`). 눈에 띄는 결함 없음.
+
+### 남은 일
+- 3단계: `by:me` + `내 질문` 칩(정렬 단추 앞), 한영 자동 보정, 0건 안내.
+- 모든 단계 뒤 `tests/test_perf.py` 확인(최신순은 `_rank`를 안 부르므로 따로 느려지지 않지만, 기간 질의 `_matched_times`는 흔한 단어에서 비용이 있음).
+
+---
+
 ## 검색 개선 1단계: 메시지 시각 색인, 메시지 기준 기간 검색, 채팅 시각 (2026-11-12 밤)
 기준 문서는 `docs/search-plan.md`입니다. 이번에는 검색 엔진만 바꿨고 창, 정렬, 칩, 설정은 건드리지 않았습니다. push는 하지 않았습니다.
 

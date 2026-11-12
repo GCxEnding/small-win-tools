@@ -83,10 +83,10 @@ def test_narrow_vs_wide_layout(qt, hits):
     assert 980 >= WIDE_MIN_W
     # 키 안내: 좁으면 '대화 복사'를 숨김
     shown = [w._hint_widgets[i][0].isHidden() for i in range(len(w._hint_widgets))]
-    assert shown == [False, False, False]
+    assert shown == [False, False, False, False]
     w.resize(620, 500)
     qt.processEvents()
-    assert [wd.isHidden() for wd, _n in w._hint_widgets] == [False, False, True]
+    assert [wd.isHidden() for wd, _n in w._hint_widgets] == [False, False, True, True]
     assert r0 is not None
     w.close()
 

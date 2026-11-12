@@ -1084,6 +1084,10 @@ class SettingsWindow(QDialog):
                   "칸을 누르고 새 조합을 누릅니다.", "hotkey",
                   tip=f"저장할 때 바로 등록해 봅니다. Backspace를 누르면 기본값({S.display_hotkey(S.DEFAULT_HOTKEY)})으로 "
                       "돌아갑니다.")
+        self._row(sec, "기본 정렬", self._chips("search_sort", S.SEARCH_SORT_LABEL, "recent", segment=True),
+                  "검색 결과를 어떤 순서로 보일지 정합니다.", "search_sort",
+                  tip="최신은 맞은 메시지가 가장 늦은 대화부터, 정확도는 단어가 잘 맞는 대화부터 보입니다. "
+                      "검색 창에서 Ctrl+R로 그 검색만 바꿀 수 있고, 창을 열 때마다 이 값으로 돌아갑니다.")
 
         sec = self._section(lay, "모양", "검색 창, 설정 창, 시작 안내에 같이 씁니다")
         self._row(sec, "모드", self._chips("theme_mode", S.THEME_MODE_LABEL, "system", segment=True),

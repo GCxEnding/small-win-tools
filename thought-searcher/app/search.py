@@ -30,6 +30,7 @@ class MatchedMessage:
     highlights: list[tuple[int, int]]
     message_id: int = 0
     hits: int = 0
+    time: datetime | None = None      # 이 메시지의 시각 (로컬 시간대). 모르면 None
 
 
 @dataclass
@@ -208,8 +209,11 @@ class Searcher:
             args.append(q.exclude_expr())
         return (" AND ".join(sql), args)
 
-    def search(self, text: str, limit: int | None = None) -> list[Hit]:
+    def search(self, text: str, limit: int | None = None, sort: str = "relevance") -> list[Hit]:
+        """sort: "relevance"(순위) | "recent"(채팅 시각 늦은 순). 후보는 같고 자르기 전에 정렬만 다르다.
+        단어 없는 검색은 sort와 상관없이 대화 마지막 시각 순."""
         t0 = time.perf_counter()
+        recent = sort == "recent"
         q = parse(text)
         self.last_query = q
         limit = limit or self.max_results
@@ -228,9 +232,15 @@ class Searcher:
                     FROM conv_fts JOIN docs d ON d.id = conv_fts.rowid
                     WHERE conv_fts MATCH ?{where}""",
                 [self.w["title"], self.w["body"], *dargs, q.fts_expr(), *fargs]).fetchall()
+            mt = self._matched_times(q, period or (None, None)) if (per_msg or recent) else {}
             if per_msg:
-                slim = self._in_period(slim, q, period)
-            ranked = self._rank(slim, q, limit)
+                slim = self._in_period(slim, q, mt)
+            if recent:
+                # 채팅 시각 늦은 순 (맞은 메시지가 없는 대화는 마지막 시각). 같으면 점수 높은 쪽
+                ranked = sorted(((r, r[4]) for r in slim), key=lambda x: (-mt.get(x[0][0], x[0][1] or 0.0), -x[1]))
+                ranked = ranked[:limit]
+            else:
+                ranked = self._rank(slim, q, limit)
             full = {r[0]: r for r in self.conn.execute(
                 f"""SELECT d.id, d.conv_id, d.path, d.title, d.source, d.project, d.updated, d.status,
                            d.updated_ts, d.msg_first, d.msg_last FROM docs d
@@ -244,13 +254,13 @@ class Searcher:
                     FROM docs d WHERE 1=1{where} ORDER BY d.updated_ts DESC LIMIT ?""",
                 [*fargs, limit]).fetchall()
             hits = [(r, 0.0) for r in rows]
-        out = [self._make_hit(r, score, q, times, period) for r, score in hits]
+        out = [self._make_hit(r, score, q, times, period, recent) for r, score in hits]
         self.last_ms = (time.perf_counter() - t0) * 1000
         return out
 
-    def _in_period(self, rows, q: Query, period) -> list:
-        """맞은 메시지(검색어 중 하나라도 들어 있는 메시지) 중 하나 이상이 기간 안인 대화만 남긴다.
-        맞은 메시지가 하나도 없는 대화(단어가 제목에만 맞음)는 대화 단위 조건(rows[5])으로 판단한다."""
+    def _matched_times(self, q: Query, period) -> dict[int, float]:
+        """{대화 id: 맞은 메시지(검색어 중 하나라도 들어 있는 메시지) 중 가장 늦은 시각}.
+        period=(시작, 끝)이 있으면 그 안의 메시지만 센다. 맞은 메시지가 없는 대화는 들어 있지 않다."""
         lo, hi = period
         sql = ["m.id IN (SELECT rowid FROM msg_fts WHERE msg_fts MATCH ?)"]
         args: list = [" OR ".join(t.fts() for t in q.terms)]
@@ -260,8 +270,13 @@ class Searcher:
         if hi is not None:
             sql.append("m.created_ts < ?")
             args.append(hi)
-        ok = {r[0] for r in self.conn.execute(
-            f"SELECT DISTINCT m.doc_id FROM messages m WHERE {' AND '.join(sql)}", args)}
+        return {d: ts for d, ts in self.conn.execute(
+            f"SELECT m.doc_id, max(m.created_ts) FROM messages m WHERE {' AND '.join(sql)} GROUP BY m.doc_id", args)
+            if ts is not None}
+
+    def _in_period(self, rows, q: Query, ok: dict[int, float]) -> list:
+        """맞은 메시지 중 하나 이상이 기간 안인 대화만 남긴다 (ok: _matched_times의 결과).
+        맞은 메시지가 하나도 없는 대화(단어가 제목에만 맞음)는 대화 단위 조건(rows[5])으로 판단한다."""
         todo = [r for r in rows if r[0] not in ok and r[5]]
         have: set[int] = set()
         if todo:
@@ -306,7 +321,7 @@ class Searcher:
 
     # ---- 결과 만들기 ----------------------------------------------------
     def _make_hit(self, r, score: float, q: Query, times: dict[int, float] | None = None,
-                  period: tuple[float | None, float | None] | None = None) -> Hit:
+                  period: tuple[float | None, float | None] | None = None, recent: bool = False) -> Hit:
         """times: 이 대화들의 {메시지 id: 시각} (단어 검색일 때). period: 기간이 있으면 (시작, 끝)."""
         regs = [x for x in (term_regex(t.text, t.prefix) for t in q.terms) if x]
         regs += [re.compile(re.escape(t), re.IGNORECASE) for t in q.title_terms]
@@ -337,7 +352,10 @@ class Searcher:
             counts = {mid: c for mid, c in counts.items() if inside(mid)}
         hit.match_total = len(counts)
         if counts:
-            order = sorted(counts, key=lambda mid: (-counts[mid], mid))[:MAX_MATCHES]
+            if recent:       # 최신순: 늦은 메시지부터 (같은 시각이면 뒤에 있는 것부터)
+                order = sorted(counts, key=lambda mid: (-at(mid), -mid))[:MAX_MATCHES]
+            else:
+                order = sorted(counts, key=lambda mid: (-counts[mid], mid))[:MAX_MATCHES]
             chat_ts = max(at(mid) for mid in counts)
         elif period and times:
             # 제목에만 맞은 대화: 맞은 메시지가 없으니 기간 안의 첫 메시지를 보여 준다 (없으면 첫 메시지)
@@ -354,8 +372,10 @@ class Searcher:
             if not m:
                 continue
             preview, hl, line = make_preview(m[4], m[3], regs)
+            ts = at(mid)
             hit.matches.append(MatchedMessage(ordinal=m[1], line_no=line, preview=preview, highlights=hl,
-                                              message_id=mid, hits=counts.get(mid, 0)))
+                                              message_id=mid, hits=counts.get(mid, 0),
+                                              time=datetime.fromtimestamp(ts, local_tz()) if ts > 0 else None))
         return hit
 
     def _rowids(self, expr: str) -> list[int]:

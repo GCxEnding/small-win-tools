@@ -25,6 +25,7 @@ from .query import parse as parse_query
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit, find_spans
 from .theme import Theme
+from .timeutil import parse_iso
 
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
 ROLE_HIT = Qt.UserRole + 1
@@ -33,10 +34,14 @@ ROLE_KIND = Qt.UserRole + 3
 ROLE_TEXT = Qt.UserRole + 4
 # 목록 항목 종류: 검색 결과, 큐(첫 줄들/나머지 줄), 접기 줄, 빈 큐 안내
 K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus", "row", "rest", "closed", "empty"
+K_GROUP = "group"      # 날짜 묶음 줄 (최신순 검색 결과에만, 고를 수 없음)
+DATE_GROUPS = ("오늘", "이번 주", "이번 달", "그 전")
+SORTS = (("정확도", "relevance"), ("최신", "recent"))      # 칩 줄 오른쪽 끝 버튼 (글자, 값)
+DEFAULT_SORT = "recent"
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
 # 아래 막대의 키 안내: (동작, 키들, 굵게, 좁으면 숨김)
 HINTS_SEARCH = [("열기", ("Enter",), True, False), ("메시지 복사", ("Ctrl", "Enter"), False, False),
-                ("대화 복사", ("Shift", "Enter"), False, True)]
+                ("대화 복사", ("Shift", "Enter"), False, True), ("정렬", ("Ctrl", "R"), False, True)]
 HINTS_QUEUE = [("열기", ("Enter",), True, False), ("요약", ("F2",), False, False), ("완료", ("F4",), False, False),
                ("버림", ("Shift", "F4"), False, False), ("대화 복사", ("Shift", "Enter"), False, True)]
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
@@ -111,6 +116,7 @@ class QueryEdit(QLineEdit):
     accepted = Signal(str)        # "open" | "copy_msg" | "copy_conv"
     itemKey = Signal(str)         # 큐: "done"(F4) | "drop"(Shift+F4) | "summary"(F2)
     cancelled = Signal()
+    toggleSort = Signal()         # Ctrl+R
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -153,6 +159,8 @@ class QueryEdit(QLineEdit):
             self.itemKey.emit("summary")
         elif k == Qt.Key_Escape:
             self.cancelled.emit()
+        elif k == Qt.Key_R and mods == Qt.ControlModifier:
+            self.toggleSort.emit()
         elif k == Qt.Key_C and mods == Qt.ControlModifier and self.copy_other and self.copy_other(self.hasSelectedText()):
             pass                           # 요약 칸에서 고른 글을 복사했다
         else:
@@ -177,6 +185,43 @@ def term_spans(text: str, terms: list[str]) -> list[tuple[int, int]]:
         else:
             merged.append((s, e))
     return merged
+
+
+def row_when(hit: Hit) -> tuple[str, str]:
+    """결과 줄 오른쪽 날짜: (채팅 시각 MM-DD, 마지막 채팅 날짜가 다르면 '· 마지막 MM-DD'). 같으면 뒤쪽은 빈 글자."""
+    last = hit.updated.astimezone() if hit.updated else None
+    chat = hit.chat_time.astimezone() if hit.chat_time else last
+    if chat is None:
+        return "", ""
+    extra = f"· 마지막 {last:%m-%d}" if last is not None and last.date() != chat.date() else ""
+    return f"{chat:%m-%d}", extra
+
+
+def date_group(when: datetime | None, today: date) -> str:
+    """채팅 시각 -> 묶음 이름. 오늘 / 이번 주(월요일부터, 오늘 제외) / 이번 달(앞 둘 제외) / 그 전. 로컬 시간 기준."""
+    if when is None:
+        return DATE_GROUPS[3]
+    d = when.astimezone().date()
+    if d >= today:
+        return DATE_GROUPS[0]
+    if d >= today - timedelta(days=today.weekday()):
+        return DATE_GROUPS[1]
+    if (d.year, d.month) == (today.year, today.month):
+        return DATE_GROUPS[2]
+    return DATE_GROUPS[3]
+
+
+def msg_stamp(created) -> str:
+    """메시지 시각 -> 'MM-DD HH:MM' (로컬). datetime 또는 ISO 글자. 모르면 빈 글자."""
+    dt = created if isinstance(created, datetime) else parse_iso(created)
+    return f"{dt.astimezone():%m-%d %H:%M}" if dt else ""
+
+
+def role_label(role: str, created) -> str:
+    """미리보기 메시지 이름표: '나 · MM-DD HH:MM'."""
+    name = ROLE_NAME.get(role, role)
+    stamp = msg_stamp(created)
+    return f"{name} · {stamp}" if stamp and name else name
 
 
 class ElideLabel(QLabel):
@@ -326,6 +371,8 @@ class HitDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         fm = QFontMetrics(self.font)
+        if (index.data(ROLE_KIND) or K_HIT) == K_GROUP:
+            return QSize(option.rect.width(), QFontMetrics(self.small).height() + 14)
         h = fm.height() + 14
         if self.second_line(index):
             h += fm.height() + 3
@@ -348,6 +395,22 @@ class HitDelegate(QStyledItemDelegate):
         p.setPen(self.t.sub)
         p.drawText(QRect(x0, r.top() + 2, max_x - x0, r.height() - 2), Qt.AlignVCenter | Qt.AlignLeft,
                    index.data(ROLE_TEXT) or "")
+        p.restore()
+
+    def _paint_group(self, p: QPainter, option, index) -> None:
+        """날짜 묶음 줄: 작은 sub 색 글자 + 오른쪽으로 이어지는 가는 선. 고를 수 없다."""
+        r = option.rect
+        p.save()
+        fms = QFontMetrics(self.small)
+        x0, max_x = r.left() + 14, r.right() - 12
+        text = index.data(ROLE_TEXT) or ""
+        y = r.top() + 6 + fms.ascent()
+        p.setFont(self.small)
+        p.setPen(self.t.sub)
+        p.drawText(x0, y, text)
+        mid = r.top() + 6 + fms.height() // 2 + 1
+        p.setPen(QPen(self.t.line))
+        p.drawLine(x0 + fms.horizontalAdvance(text) + 8, mid, max_x, mid)
         p.restore()
 
     def _paint_queue(self, p: QPainter, option, index) -> None:
@@ -380,6 +443,9 @@ class HitDelegate(QStyledItemDelegate):
 
     def paint(self, p: QPainter, option, index):
         kind = index.data(ROLE_KIND) or K_HIT
+        if kind == K_GROUP:
+            self._paint_group(p, option, index)
+            return
         if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY):
             self._paint_plain(p, option, index, kind)
             return
@@ -405,17 +471,24 @@ class HitDelegate(QStyledItemDelegate):
         right_parts = []
         if hit.project and hit.source != "claude-ai-project":
             right_parts.append(hit.project)
-        if hit.updated:
-            right_parts.append(hit.updated.astimezone().strftime("%m-%d"))
+        when, extra = row_when(hit)
+        if when:
+            right_parts.append(when)
         right = "  ·  ".join(right_parts)
+        extra_s = f"  {extra}" if extra else ""
         missing = "  (원본 없음)" if hit.status == "missing" else ""
-        rw = fms.horizontalAdvance(right + missing)
+        rw = fms.horizontalAdvance(right + extra_s + missing)
         p.setFont(self.bold)
         _draw_runs(p, x0 + bw + 8, y1, max_x - rw - 12, hit.title, hit.title_highlights, fmb, self.t.text,
                    self.t.mark_bg)
         p.setFont(self.small)
         p.setPen(self.t.sub)
         p.drawText(max_x - rw, y1, right)
+        if extra_s:
+            faded = QColor(self.t.sub)
+            faded.setAlpha(150)
+            p.setPen(faded)
+            p.drawText(max_x - rw + fms.horizontalAdvance(right), y1, extra_s)
         if missing:
             p.setPen(self.t.warn)
             p.drawText(max_x - fms.horizontalAdvance(missing), y1, missing)
@@ -709,6 +782,8 @@ class ChipBar(QFrame):
         self._typed_proj: list[str] = []
         self.period = None
         self.project = ""
+        self.default_sort = DEFAULT_SORT          # 설정의 기본 정렬 (창을 열 때 이 값으로 돌아간다)
+        self.sort = DEFAULT_SORT
         v = QVBoxLayout(self)
         v.setContentsMargins(18, 0, 18, 10)
         v.setSpacing(6)
@@ -746,6 +821,23 @@ class ChipBar(QFrame):
         self.clear_button.setCursor(Qt.PointingHandCursor)
         self.clear_button.clicked.connect(self.clear)
         row2.addWidget(self.clear_button)
+        row2.addSpacing(10)
+        seg = QHBoxLayout()
+        seg.setSpacing(0)
+        self.sort_buttons: dict[str, QPushButton] = {}
+        for i, (label, value) in enumerate(SORTS):
+            b = QPushButton(label)
+            b.setObjectName("qseg")
+            b.setProperty("segpos", "first" if i == 0 else "last")
+            b.setCheckable(True)
+            b.setFocusPolicy(Qt.NoFocus)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            b.setToolTip("정렬  Ctrl+R")
+            b.clicked.connect(lambda _c=False, val=value: self._set_sort(val))
+            seg.addWidget(b)
+            self.sort_buttons[value] = b
+        row2.addLayout(seg)
         self._render()
 
     def _row(self, v: QVBoxLayout, caption: str) -> QHBoxLayout:
@@ -813,17 +905,34 @@ class ChipBar(QFrame):
         self._render()
         self.changed.emit()
 
+    def _set_sort(self, value: str) -> None:
+        if value != self.sort:
+            self.sort = value
+            self._render()
+            self.changed.emit()
+        else:
+            self._render()
+
+    def toggle_sort(self) -> None:
+        """Ctrl+R: 정확도 <-> 최신."""
+        self._set_sort("relevance" if self.sort == "recent" else "recent")
+
+    def set_default_sort(self, value: str) -> None:
+        self.default_sort = value if value in dict((v, 0) for _l, v in SORTS) else DEFAULT_SORT
+
     def clear(self) -> None:
         had = self.active()
-        self.reset()
+        self.reset(keep_sort=True)           # '모두 지우기'는 칩만 끈다 (정렬은 그대로)
         if had:
             self.changed.emit()
 
-    def reset(self) -> None:
-        """창을 열 때마다 모두 끈다."""
+    def reset(self, keep_sort: bool = False) -> None:
+        """창을 열 때마다 모두 끈다. 정렬도 설정의 기본값으로 돌아간다."""
         self._clicked.clear()
         self.period = None
         self.project = ""
+        if not keep_sort:
+            self.sort = self.default_sort
         self._render()
 
     def active(self) -> bool:
@@ -852,6 +961,8 @@ class ChipBar(QFrame):
             self.proj_button.setToolTip("")
         self.proj_button.setChecked(bool(self.project or self._typed_proj))
         self.clear_button.setVisible(self.active())
+        for value, b in self.sort_buttons.items():
+            b.setChecked(value == self.sort)
 
     # ---- 토큰 -----------------------------------------------------------------
     def tokens(self, today: date | None = None) -> list[str]:
@@ -895,6 +1006,7 @@ class SearchWindow(QWidget):
         self.setMinimumSize(ui_state.MIN_W, ui_state.MIN_H)
         self.resize(self._state.get("w", WIN_W), self._state.get("h", WIN_H))
         self.ask_enabled = True
+        self.today: Callable[[], date] = date.today      # 날짜 묶음 기준 (시험에서 바꾼다)
         self.wide: bool | None = None         # 폭에 따른 배치 (처음에는 정하지 않음)
         self.md_cache = MdCache()
         root = QWidget(self)
@@ -1023,6 +1135,7 @@ class SearchWindow(QWidget):
         self.edit.accepted.connect(self._emit)
         self.edit.itemKey.connect(self._item_key)
         self.edit.cancelled.connect(self.hide)
+        self.edit.toggleSort.connect(self.chips.toggle_sort)
 
     @staticmethod
     def _plain_label(text: str, name: str) -> QLabel:
@@ -1062,6 +1175,15 @@ class SearchWindow(QWidget):
         self.activateWindow()
         self.edit.setFocus()
         self.edit.selectAll()
+
+    @property
+    def sort(self) -> str:
+        """지금 정렬: "recent" | "relevance"."""
+        return self.chips.sort
+
+    def set_default_sort(self, value: str) -> None:
+        """설정의 기본 정렬. 열려 있는 검색은 그대로 두고 다음에 열 때부터 쓴다."""
+        self.chips.set_default_sort(value)
 
     def query_text(self) -> str:
         """검색에 넘기는 글자: 검색칸 + 켜진 칩 토큰."""
@@ -1259,7 +1381,8 @@ class SearchWindow(QWidget):
         self.chips.sync_from_text(text)
         self._timer.start()
 
-    def set_results(self, hits: list[Hit], status: str) -> None:
+    def set_results(self, hits: list[Hit], status: str, grouped: bool = False) -> None:
+        """grouped: 최신순 검색 결과라 날짜 묶음 줄(오늘/이번 주/이번 달/그 전)을 넣는다."""
         self._apply_mode()
         was_queue = self.mode == "queue"
         self.mode = "search"
@@ -1268,14 +1391,26 @@ class SearchWindow(QWidget):
             self._set_hints()
         self._place_detail()
         self.list.clear()
+        last = ""
+        today = self.today()
         for h in hits:
+            if grouped:
+                g = date_group(h.chat_time or h.updated, today)
+                if g != last:
+                    last = g
+                    gi = QListWidgetItem()
+                    gi.setData(ROLE_KIND, K_GROUP)
+                    gi.setData(ROLE_TEXT, g)
+                    gi.setFlags(Qt.NoItemFlags)           # 고를 수 없고 키도 건너뛴다
+                    self.list.addItem(gi)
             it = QListWidgetItem()
             it.setData(ROLE_KIND, K_HIT)
             it.setData(ROLE_HIT, h)
             it.setData(ROLE_IDX, 0)
             self.list.addItem(it)
-        if hits:
-            self.list.setCurrentRow(0)
+        first = self._step_row(-1, 1)
+        if first >= 0:
+            self.list.setCurrentRow(first)
         self.delegate.current_row = self.list.currentRow()
         self.status.setText(status)
         self._refresh_preview()
@@ -1428,6 +1563,10 @@ class SearchWindow(QWidget):
             self.list.doItemsLayout()         # 좁을 때: 고른 줄만 두 줄
         self.list.viewport().update()
         self._update_detail()
+        above = self.list.item(row - 1) if row > 0 else None
+        if above is not None and above.data(ROLE_KIND) == K_GROUP:
+            self.list.scrollToItem(above)                    # 묶음 줄이 바로 위에 보이게
+            self.list.scrollToItem(self.list.item(row))
         if self.wide:
             self._pv_timer.start()
 
@@ -1486,8 +1625,12 @@ class SearchWindow(QWidget):
         total = hit.match_total or len(hit.matches)
         idx = min(idx, len(hit.matches) - 1) if hit.matches else 0
         when = hit.updated.astimezone().strftime("%Y-%m-%d %H:%M") if hit.updated else ""
-        meta = "  ·  ".join(s for s in (SOURCE_NAME.get(hit.source, hit.source), hit.project, when) if s)
-        index = f"맞은 메시지 {idx + 1} / {total}" + ("    ← →" if total > 1 else "") if hit.matches else ""
+        meta = "  ·  ".join(s for s in (SOURCE_NAME.get(hit.source, hit.source), hit.project,
+                                         f"마지막 {when}" if when else "") if s)
+        shown = hit.matches[idx] if hit.matches else None
+        stamp = msg_stamp(shown.time) if shown is not None and shown.time else ""
+        index = (f"맞은 메시지 {idx + 1} / {total}" + (f" · {stamp}" if stamp else "")
+                 + ("    ← →" if total > 1 else "")) if hit.matches else ""
         pane.set_header(hit.source, hit.title, meta, index)
         if hit.status == "missing":
             pane.add_note("원본 없음")
@@ -1505,21 +1648,43 @@ class SearchWindow(QWidget):
         regs = match_regs(hit)
         if prev:
             text, _ = crop(prev.text, [], CTX_CHARS)
-            pane.add_block(False, ROLE_NAME.get(prev.role, prev.role), text, [])
+            pane.add_block(False, role_label(prev.role, prev.created), text, [])
         spans = find_spans(cur.text, regs) if regs else []
         text, spans = crop(cur.text, spans, HIT_CHARS)
-        pane.add_block(True, ROLE_NAME.get(cur.role, cur.role), text, spans)
+        pane.add_block(True, role_label(cur.role, cur.created), text, spans)
         if nxt:
             text, _ = crop(nxt.text, [], CTX_CHARS)
-            pane.add_block(False, ROLE_NAME.get(nxt.role, nxt.role), text, [])
+            pane.add_block(False, role_label(nxt.role, nxt.created), text, [])
 
     # ---- 키 --------------------------------------------------------------
+    def _selectable(self, row: int) -> bool:
+        it = self.list.item(row)
+        return bool(it is not None and it.flags() & Qt.ItemIsSelectable)
+
+    def _step_row(self, start: int, direction: int) -> int:
+        """start 다음(direction 방향)에서 처음 고를 수 있는 줄. 없으면 -1 (날짜 묶음 줄은 건너뛴다)."""
+        r = start + direction
+        while 0 <= r < self.list.count():
+            if self._selectable(r):
+                return r
+            r += direction
+        return -1
+
     def _navigate(self, step: int) -> None:
-        n = self.list.count()
-        if not n:
+        """위/아래, PageUp/PageDown. 고를 수 없는 줄(날짜 묶음)은 세지 않고 건너뛴다."""
+        if not self.list.count():
             return
-        row = max(0, min(n - 1, self.list.currentRow() + step))
-        self.list.setCurrentRow(row)
+        cur = self.list.currentRow()
+        row, d = cur, (1 if step > 0 else -1)
+        for _ in range(abs(step)):
+            nxt = self._step_row(row, d)
+            if nxt < 0:
+                break
+            row = nxt
+        if row < 0:
+            row = self._step_row(-1, 1)
+        if row >= 0 and row != cur:
+            self.list.setCurrentRow(row)
 
     def _switch(self, step: int) -> None:
         it = self.list.currentItem()
@@ -1540,6 +1705,6 @@ class SearchWindow(QWidget):
         k = it.data(ROLE_KIND)
         if self._toggle(k):
             return
-        if k == K_EMPTY or (k != K_HIT and kind == "copy_msg"):
+        if k in (K_EMPTY, K_GROUP) or (k != K_HIT and kind == "copy_msg"):
             return
         self.action.emit(kind, it.data(ROLE_HIT), int(it.data(ROLE_IDX) or 0))
