@@ -381,4 +381,4 @@ def test_fast_tooltip_style(qt):
     from PySide6.QtWidgets import QStyle
     from app import theme as T
     st = T.FastTipStyle()
-    assert st.styleHint(QStyle.SH_ToolTip_WakeUpDelay) == T.TIP_DELAY_MS == 200
+    assert st.styleHint(QStyle.SH_ToolTip_WakeUpDelay) == T.TIP_DELAY_MS == 300

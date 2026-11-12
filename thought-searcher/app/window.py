@@ -181,10 +181,12 @@ class ElideLabel(QLabel):
     줄여진 때만 툴팁에 전체 글자를 보인다. set_marks로 낱말을 칠할 수 있다 (설정 찾기)."""
 
     MAX_W = 300
+    elidedChanged = Signal(bool)          # '…'로 줄어 보이는지가 바뀌었다 (설정 줄의 ⓘ를 켜고 끈다)
 
     def __init__(self, text: str = ""):
         super().__init__("")
         self._full = ""
+        self.elided = False
         self._terms: list[str] = []
         self._mark = ""
         self.setTextFormat(Qt.PlainText)
@@ -208,6 +210,9 @@ class ElideLabel(QLabel):
         shown = self.fontMetrics().elidedText(self._full, Qt.ElideRight, w) if self.width() > 8 else self._full
         # 줄여 보인 때만 전체 글자 (줄바꿈되는 표로 감싸 긴 설명도 한눈에)
         self.setToolTip(tip_wrap(self._full, 340) if shown != self._full else "")
+        if (shown != self._full) != self.elided:
+            self.elided = shown != self._full
+            self.elidedChanged.emit(self.elided)
         spans = term_spans(shown, self._terms) if self._terms and self._mark else []
         if spans:
             self.setTextFormat(Qt.RichText)

@@ -85,8 +85,17 @@ def test_search_respects_values_hiding_rows_and_marks_text(qt, core_env):
 def test_info_button_and_two_line_rows(qt, core_env):
     app, sw = qt
     w = make(sw, core_env)
-    long_row = next(r for r in w._rows if len(r.desc) > sw.AUTO_TIP_LEN and r.name)
-    assert long_row.tip == long_row.desc and long_row.desc_lb.text() == long_row.desc   # 전체는 툴팁, 줄에는 한 줄
+    # 줄인 설명은 줄에, 긴 설명은 ⓘ에 (문구표 적용)
+    row = next(r for r in w._rows if r.key == "archive_dir")
+    assert row.desc == "대화 md를 쌓는 폴더입니다." and "검색 색인 다시 만들기" in row.tip
+    assert w._info_buttons and len([r for r in w._rows if r.tip]) >= 20
+    # 툴팁 글이 없는 줄의 ⓘ는 설명이 '…'로 줄어 보일 때만 켜진다
+    plain = next(r for r in w._rows if r.name and r.desc and not r.tip)
+    info = next(b for b in w._info_buttons if b.tip == plain.desc)
+    plain.desc_lb.elidedChanged.emit(True)
+    assert info.isVisibleTo(info.parentWidget())
+    plain.desc_lb.elidedChanged.emit(False)
+    assert not info.isVisibleTo(info.parentWidget())
     infos = w._info_buttons
     assert infos and all("<table" in b.toolTip() for b in infos)
     assert all(not b.icon().isNull() for b in infos)

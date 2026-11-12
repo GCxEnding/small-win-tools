@@ -49,6 +49,20 @@ SIDEBAR_W = 208
 SECTION_GAP = 36
 PATH_W = 380          # 경로 칸(입력 + 찾아보기 + 열기) 폭
 NUM_W = 118           # 숫자 칸 폭
+# 순위 가중치 줄: 키 -> (한 줄 설명, ⓘ 툴팁)
+WEIGHT_HELP = {
+    "title": ("제목에 단어가 있으면 얼마나 앞에 둘지", "단어가 대화 제목에 나올 때의 무게입니다. 본문보다 크게 두면 "
+              "제목에 단어가 든 대화가 먼저 나옵니다. 기본 10은 제목 한 번이 본문 열 번쯤의 무게라는 뜻입니다."),
+    "body": ("본문에 단어가 나올 때의 무게", "대화 본문에 단어가 나올 때의 무게입니다. 보통 1로 두고 제목 값과 비율로 조절합니다."),
+    "same_message_bonus": ("단어들이 한 메시지에 같이 있으면 더하는 몫",
+                           "단어를 두 개 이상 넣었을 때, 모두 한 메시지 안에 같이 나오는 대화의 점수를 이만큼 올립니다. "
+                           "0.3이면 30% 올립니다. 대화 이곳저곳에 흩어져 있는 것보다 한곳에 모여 있는 쪽을 앞에 둡니다."),
+    "recency": ("최근 대화를 얼마나 앞에 둘지", "최근 대화일수록 점수를 이만큼까지 올립니다. 0.2면 오늘 대화가 최대 20% "
+                "올라가고, 오래될수록 아래 반감기에 따라 줄어듭니다. 0이면 날짜를 보지 않습니다."),
+    "recency_half_life_days": ("최근 가산이 절반이 되는 날 수", "이 날 수가 지난 대화는 최근 가산을 절반만 받습니다. "
+                               "짧게 두면 요즘 대화만, 길게 두면 오래된 대화도 비슷하게 대접합니다."),
+}
+INFO_ICON = 16        # ⓘ 크기 (강조색으로 그린다)
 AUTO_TIP_LEN = 46     # 설명이 이보다 길면 한 줄에 줄여 보이고 전체는 ⓘ 툴팁에 둔다 (문구 확정 전 임시 규칙)
 TIP_W = 340           # ⓘ 툴팁 폭
 ROW_PAD_X, ROW_PAD_Y = 16, 12
@@ -504,7 +518,7 @@ class InfoButton(QToolButton):
         self.setObjectName("info")
         self.setFocusPolicy(Qt.NoFocus)
         self.setCursor(Qt.WhatsThisCursor)
-        self.setIconSize(QSize(14, 14))
+        self.setIconSize(QSize(INFO_ICON, INFO_ICON))
         self.setAutoRaise(True)
         self.tip = tip
         self.setToolTip(tip_html(tip))
@@ -789,7 +803,7 @@ class SettingsWindow(QDialog):
         for acc, b in self._swatches.items():
             b.setIcon(T.swatch(T.accent_color(acc, t.dark)))
         for b in self._info_buttons:
-            b.setIcon(T.icon("info", t.sub, 14))
+            b.setIcon(T.icon("info", t.accent, INFO_ICON))
         if self.search is not None:
             self.search.icon.setPixmap(T.icon("search", t.accent, 18).pixmap(18, 18))
         if hasattr(self, "hotkey"):
@@ -918,8 +932,6 @@ class SettingsWindow(QDialog):
         line.setObjectName("hline")
         line.setFixedHeight(1)
         v.addWidget(line)
-        if not tip and not plain and len(desc) > AUTO_TIP_LEN:
-            tip = desc
         head = QHBoxLayout()
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(6)
@@ -933,9 +945,12 @@ class SettingsWindow(QDialog):
                 name_lb.setObjectName("rowName")
                 name_lb.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
                 head.addWidget(name_lb, 0)
-        if tip and title and not plain:
-            info = InfoButton(tip)
-            info.setIcon(T.icon("info", self.t.sub, 14))
+        info = None
+        if title and not plain and (tip or desc):
+            # ⓘ: 툴팁 글이 있으면 늘, 없으면 설명이 '…'로 줄어 보일 때만 (그때는 설명 전체를 보인다)
+            info = InfoButton(tip or desc)
+            info.setIcon(T.icon("info", self.t.accent, INFO_ICON))
+            info.setVisible(bool(tip))
             self._info_buttons.append(info)
             head.addWidget(info, 0, Qt.AlignVCenter)
         desc_lb = None
@@ -943,6 +958,8 @@ class SettingsWindow(QDialog):
             desc_lb = ElideLabel(desc)
             desc_lb.setObjectName("desc")
             desc_lb.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            if info is not None and not tip:
+                desc_lb.elidedChanged.connect(info.setVisible)
         elif desc:
             desc_lb = _label(desc, "desc")           # plain 줄: 줄바꿈하며 전부 보인다
         tail: list[QWidget] = []
@@ -1063,48 +1080,55 @@ class SettingsWindow(QDialog):
         self.hotkey.recording.connect(self.hooks.recording)
         self._bind("hotkey", self.hotkey.set_value, self.hotkey.value)
         self._row(sec, "검색 창 단축키", self.hotkey,
-                  f"칸을 누르고 새 조합을 누릅니다. 저장할 때 바로 등록해 봅니다. Backspace는 기본값"
-                  f"({S.display_hotkey(S.DEFAULT_HOTKEY)}).", "hotkey")
+                  "칸을 누르고 새 조합을 누릅니다.", "hotkey",
+                  tip=f"저장할 때 바로 등록해 봅니다. Backspace를 누르면 기본값({S.display_hotkey(S.DEFAULT_HOTKEY)})으로 "
+                      "돌아갑니다.")
 
         sec = self._section(lay, "모양", "검색 창, 설정 창, 시작 안내에 같이 씁니다")
         self._row(sec, "모드", self._chips("theme_mode", S.THEME_MODE_LABEL, "system", segment=True),
-                  "시스템은 Windows 앱 모드(라이트/다크)를 따라갑니다.", "theme_mode")
+                  "시스템은 Windows 앱 모드를 따릅니다.", "theme_mode",
+                  tip="시스템을 고르면 Windows 앱 모드(라이트/다크)가 바뀔 때 같이 바뀝니다.")
         self._row(sec, "강조색", self._chips("theme_accent", S.THEME_ACCENT_LABEL, "ink_blue", swatch=True),
                   "저장 버튼, 링크, 입력 중인 칸 테두리에 씁니다.", "theme_accent", stacked=True)
 
         sec = self._section(lay, "폴더")
         self.archive = self._path("archive_dir", "보관 폴더 선택 (대화 md를 저장할 곳)", str(self.core.default_archive))
         self._row(sec, "대화 보관 폴더", self.archive,
-                  "비면 기본 위치를 씁니다. 기존 md는 옮기지 않습니다. 필요하면 직접 옮긴 뒤 트레이 '고급 > 검색 색인 다시 만들기'.",
-                  "archive_dir", warn=CLOUD_WARNING)
+                  "대화 md를 쌓는 폴더입니다.", "archive_dir", warn=CLOUD_WARNING,
+                  tip="비워 두면 기본 위치를 씁니다. 폴더를 바꿔도 기존 md는 옮기지 않으므로, 필요하면 직접 옮긴 뒤 "
+                      "트레이 '고급 > 검색 색인 다시 만들기'를 실행합니다.")
         self.notes = ListEdit("노트 폴더 선택 (md를 그대로 읽어 검색에 넣을 곳)")
         self.notes.changed.connect(self._on_changed)
         self._bind("note_dirs", self.notes.set_values, self.notes.values)
-        self._row(sec, "노트 폴더", self.notes, "내 md 폴더(Obsidian 볼트 등)를 그대로 검색에 넣습니다. 파일은 읽기만 합니다.",
-                  "note_dirs", stacked=True)
+        self._row(sec, "노트 폴더", self.notes, "내 md 폴더를 그대로 검색에 넣습니다.", "note_dirs", stacked=True,
+                  tip="Obsidian 볼트 같은 폴더를 지정합니다. 파일은 읽기만 하고 고치지 않습니다.")
         self.journal = self._path("journal_dir", "업무 일지 보관함 루트 선택")
         off = _button("끄기")
         off.clicked.connect(lambda: self.journal.set_value(""))
         self.journal.layout().addWidget(off)
         self._row(sec, "업무 일지 폴더", self.journal,
-                  "YYYY/MM/YYYY-MM-DD.md 형식의 '## 업무' 구역을 읽습니다. 형식이 다르면 비워 두고 노트 폴더로만 넣으세요.",
-                  "journal_dir")
+                  "일지 보관함의 '## 업무' 구역을 읽습니다.", "journal_dir",
+                  tip="폴더 안 파일이 YYYY/MM/YYYY-MM-DD.md 형식이어야 읽습니다. 형식이 다르면 이 칸은 비워 두고 "
+                      "노트 폴더로만 넣으세요.",
+                  empty_desc="보관함 루트를 고르세요. 파일은 YYYY/MM/YYYY-MM-DD.md 형식이어야 합니다.")
 
         sec = self._section(lay, "열린 일 큐", "검색어가 비었을 때 보이는 최근 일 목록")
         self._row(sec, "열린 일 기간", self._spin("queue_days", "일"), "이 기간 안에 흔적이 있는 일만 올라옵니다.", "queue_days")
         self._row(sec, "크게 보여 줄 개수", self._spin("queue_focus", "개"),
-                  "위쪽에 크게 보여 줍니다. 넘는 일은 '나머지 N개' 줄에 접혀 있습니다.", "queue_focus")
+                  "위쪽에 먼저 보여 줍니다.", "queue_focus",
+                  tip="이 개수를 넘는 일은 '나머지 N개' 줄에 접혀 있습니다.")
         qrow, self.queue_checks = self._checks(S.QUEUE_LABEL)
         self._bind("queue_sources", self._set_queue_sources,
                    lambda: [s for s in S.QUEUE_CHOICES if self.queue_checks[s].isChecked()])
         self._row(sec, "큐에 올릴 출처", qrow,
-                  "프로젝트 문서, 메모리, imported 폴더는 올리지 않습니다. 업무 일지 항목은 일지 폴더가 있으면 늘 올라옵니다.",
-                  "queue_sources", stacked=True)
+                  "열린 일 큐에 올릴 출처를 고릅니다.", "queue_sources", stacked=True,
+                  tip="프로젝트 문서, 메모리, imported 폴더는 올리지 않습니다. 업무 일지 항목은 일지 폴더가 있으면 항상 올라옵니다.")
         self.queue_ex = ListEdit(pick=self._pick_note_subdir)
         self.queue_ex.changed.connect(self._on_changed)
         self._bind("queue_note_exclude", self.queue_ex.set_values, self.queue_ex.values)
-        self._row(sec, "큐에서 뺄 노트 폴더", self.queue_ex, "노트 폴더 안의 폴더만 고를 수 있습니다(노트 폴더 기준 상대 경로로 저장).",
-                  "queue_note_exclude", stacked=True)
+        self._row(sec, "큐에서 뺄 노트 폴더", self.queue_ex, "노트 폴더 안에서 큐에 올리지 않을 폴더입니다.",
+                  "queue_note_exclude", stacked=True,
+                  tip="노트 폴더 안의 폴더만 고를 수 있습니다. 노트 폴더 기준 상대 경로로 저장합니다.")
 
     def _set_queue_sources(self, v) -> None:
         for s, cb in self.queue_checks.items():
@@ -1150,16 +1174,17 @@ class SettingsWindow(QDialog):
         sec = self._section(lay, "서비스")
         row, self.source_checks = self._checks(S.SERVICE_LABEL)
         self._bind("sources", self._set_sources, self._get_sources)
-        self._row(sec, "쓰는 서비스", row, "끈 서비스는 수집도 알림도 하지 않습니다. 이미 보관된 md는 그대로 검색됩니다.",
-                  "sources", stacked=True)
+        self._row(sec, "쓰는 서비스", row, "끈 서비스는 수집도 알림도 하지 않습니다.", "sources", stacked=True,
+                  tip="이미 보관된 md는 서비스를 꺼도 그대로 검색됩니다.")
 
         sec = self._section(lay, "폴더")
         self.watch = self._path("watch_dir", "다운로드(감시) 폴더 선택", str(downloads_dir()))
         self.watch.changed.connect(self._update_capture_placeholder)
-        self._row(sec, "다운로드(감시) 폴더", self.watch, "내보내기 zip이 들어오는 곳입니다. 비면 시스템 다운로드 폴더.", "watch_dir")
+        self._row(sec, "다운로드(감시) 폴더", self.watch, "내보내기 zip이 들어오는 폴더입니다.", "watch_dir",
+                  tip="비워 두면 시스템 다운로드 폴더를 씁니다.")
         self.capture = self._path("capture_dir", "자동 수집 파일 폴더 선택")
-        self._row(sec, "자동 수집 파일 폴더", self.capture, "수집 스크립트가 대화 파일을 저장하는 곳입니다. 비면 <감시 폴더>\\claude-sync.",
-                  "capture_dir")
+        self._row(sec, "자동 수집 파일 폴더", self.capture, "수집 스크립트가 대화 파일을 저장하는 폴더입니다.", "capture_dir",
+                  tip="비워 두면 <감시 폴더>\\claude-sync를 씁니다.")
         self.projects = self._path("code_projects_dir", "Claude Code 세션 폴더 선택",
                                    expand(str(S.default_of("code_projects_dir"))))
         self._row(sec, "Claude Code 세션 폴더", self.projects, "Claude Code를 켰을 때만 씁니다.", "code_projects_dir")
@@ -1168,7 +1193,7 @@ class SettingsWindow(QDialog):
 
         sec = self._section(lay, "주기와 알림")
         self._row(sec, "수집 주기", self._spin("code_collect_minutes", "분"),
-                  "Claude Code, Codex 대화와 노트 폴더를 이 간격으로 모읍니다.", "code_collect_minutes")
+                  "Claude Code, Codex 대화와 노트 폴더를 모으는 간격입니다.", "code_collect_minutes")
         self.reminder = QSpinBox()
         self.reminder.setRange(1, 60)
         self.reminder.valueChanged.connect(self._on_changed)
@@ -1180,10 +1205,10 @@ class SettingsWindow(QDialog):
         rrow.addWidget(self.reminder_off)
         rrow.addWidget(self.reminder_box)
         self._bind("reminder_days", self._set_reminder, lambda: 0 if self.reminder_off.isChecked() else self.reminder.value())
-        self._row(sec, "claude.ai 내보내기 알림", rrow, "마지막 zip 가져오기 뒤 이만큼 지나면 하루 한 번 알려 드립니다.",
-                  "reminder_days")
+        self._row(sec, "claude.ai 내보내기 알림", rrow, "마지막 zip 가져오기 뒤 이만큼 지나면 알려 드립니다.",
+                  "reminder_days", tip="알림은 하루 한 번만 합니다. 끄기를 체크하면 알리지 않습니다.")
         self._row(sec, "자동 수집 멈춤 알림", self._spin("capture_stale_hours", "시간"),
-                  "수집 스크립트가 이만큼 멈추면 하루 한 번 알려 드립니다.", "capture_stale_hours")
+                  "수집 스크립트가 이만큼 멈추면 알려 드립니다.", "capture_stale_hours", tip="알림은 하루 한 번만 합니다.")
         for site in SCRIPTS:
             self._guides.append((site, self._script_guide(lay, site)))
 
@@ -1285,13 +1310,12 @@ class SettingsWindow(QDialog):
         self._bind("ask_provider", lambda v: self.provider_radios.get(v, self.provider_radios["claude"]).setChecked(True),
                    lambda: next((p for p, rb in self.provider_radios.items() if rb.isChecked()), "claude"))
         self.off_note = self._help("F2를 누르면 '요약 AI가 꺼져 있습니다' 한 줄만 보여 줍니다. 큐의 F2 안내도 숨깁니다.")
-        self._row(sec, "쓰는 AI", row, "F2를 눌렀을 때만 이 PC의 CLI를 실행합니다. CLI 설치와 로그인은 직접 합니다.",
-                  "ask_provider", extras=(self.off_note,))
+        self._row(sec, "쓰는 AI", row, "F2를 눌렀을 때만 이 PC의 CLI를 실행합니다.",
+                  "ask_provider", extras=(self.off_note,), tip="CLI 설치와 로그인은 직접 합니다.")
         # Claude
         self.claude_box = self._section(lay, "Claude", "Claude Code CLI")
         self.claude_model = self._model_combo("ask_model", cli_check.CLAUDE_MODELS, "claude")
-        self._row(self.claude_box, "모델", self.claude_model, "목록에 없는 이름(전체 모델 이름)도 직접 넣을 수 있습니다.",
-                  "ask_model")
+        self._row(self.claude_box, "모델", self.claude_model, "목록에 없는 전체 모델 이름도 넣을 수 있습니다.", "ask_model")
         self._status_row(self.claude_box, "claude")
         self.claude_cmd = PathEdit("claude 실행 파일 선택", self._found("claude", ["claude"]), file=True, open_button=False)
         self.claude_cmd.setFixedWidth(PATH_W)
@@ -1299,22 +1323,22 @@ class SettingsWindow(QDialog):
         self._bind("ask_command",
                    lambda v: self.claude_cmd.set_value("" if S.as_command(v) in ([], ["claude"]) else S.join_command(v)),
                    lambda: S.split_command(self.claude_cmd.value()) or ["claude"])
-        self._row(self.claude_box, "CLI 경로", self.claude_cmd, "비면 PATH에서 claude를 찾습니다.", "ask_command")
+        self._row(self.claude_box, "CLI 경로", self.claude_cmd, "비워 두면 PATH에서 claude를 찾습니다.", "ask_command")
         # GPT (Codex)
         self.codex_box = self._section(lay, "GPT", "Codex CLI")
         self.codex_model = self._model_combo("ask_model_codex", cli_check.codex_models(self.core.codex_dir), "codex")
         self.codex_desc = self._help("")
         self.codex_model.currentTextChanged.connect(self._update_codex_desc)
         self._row(self.codex_box, "모델", self.codex_model,
-                  "목록은 이 PC의 Codex가 받아 둔 models_cache.json에서 읽습니다(앱이 네트워크로 받지 않음).",
-                  "ask_model_codex", extras=(self.codex_desc,))
+                  "이 PC의 Codex가 받아 둔 목록에서 고릅니다.", "ask_model_codex", extras=(self.codex_desc,),
+                  tip="목록은 models_cache.json에서 읽습니다. 앱이 네트워크로 받지 않습니다.")
         self.effort = QComboBox()
         self.effort.addItems(list(cli_check.CODEX_EFFORTS))
         self.effort.setFixedWidth(160)
         self.effort.currentTextChanged.connect(self._on_changed)
         self._bind("ask_codex_effort", self._set_effort, lambda: self.effort.currentText())
-        self._row(self.codex_box, "추론 정도", self.effort, "low가 가장 빠르고 적게 씁니다. 요약에는 low로 충분합니다.",
-                  "ask_codex_effort")
+        self._row(self.codex_box, "추론 정도", self.effort, "low가 가장 빠르고 적게 씁니다.", "ask_codex_effort",
+                  tip="요약에는 low로 충분합니다.")
         self._status_row(self.codex_box, "codex")
         self.codex_cmd = PathEdit("codex 실행 파일 선택", self._found("codex", []), file=True, open_button=False)
         self.codex_cmd.setFixedWidth(PATH_W)
@@ -1322,8 +1346,9 @@ class SettingsWindow(QDialog):
         self._bind("ask_command_codex", lambda v: self.codex_cmd.set_value(S.join_command(v)),
                    lambda: S.split_command(self.codex_cmd.value()))
         self._row(self.codex_box, "CLI 경로", self.codex_cmd,
-                  "비면 PATH의 codex, 그다음 Codex 데스크톱 앱 폴더(%LOCALAPPDATA%\\OpenAI\\Codex\\bin)에서 찾습니다.",
-                  "ask_command_codex")
+                  "비워 두면 PATH의 codex를 찾습니다.",
+                  "ask_command_codex",
+                  tip="PATH에 없으면 Codex 데스크톱 앱 폴더(%LOCALAPPDATA%\\OpenAI\\Codex\\bin)에서 찾습니다.")
 
     def _found(self, provider: str, configured) -> str:
         cmd = cli_check.resolve(provider, configured)
@@ -1436,11 +1461,14 @@ class SettingsWindow(QDialog):
         self._bind("open_command", lambda v: self.open_cmd.setText(S.join_command(v)),
                    lambda: S.split_command(self.open_cmd.text()))
         self._row(sec, "md 여는 명령", row,
-                  "{path}는 md 경로, {line}은 줄 번호로 바뀝니다. 공백이 든 경로는 큰따옴표로 묶습니다. "
-                  "실행에 실패하면 기본 연결 프로그램으로 엽니다.", "open_command")
+                  "{path}는 md 경로, {line}은 줄 번호로 바뀝니다.", "open_command",
+                  tip="공백이 든 경로는 큰따옴표로 묶습니다. 실행에 실패하면 기본 연결 프로그램으로 엽니다.")
         self._row(sec, "검색 결과 최대 개수", self._spin("max_results", "개"), "", "max_results")
 
-        sec = self._section(lay, "순위 가중치", "BM25 관련도에 더하는 값",
+        sec = self._section(lay, "순위 가중치", "검색 결과를 어떤 순서로 보일지 정하는 값",
+                            intro="기본 점수는 BM25입니다. 찾는 단어가 대화에 자주 나올수록, 흔하지 않은 단어일수록 높고, "
+                                  "긴 대화는 조금 깎습니다. 아래 값은 그 점수에 곱하거나 더하는 정도입니다. "
+                                  "값이 클수록 그 기준이 순서에 크게 작용합니다.",
                             link=("기본값으로", lambda: self._set_weights(S.default_of("weights"))))
         self.weight_spins = {}
         for wk, name, lo, hi in S.WEIGHTS:
@@ -1451,8 +1479,8 @@ class SettingsWindow(QDialog):
             sp.setSingleStep(1.0 if hi > 10 else 0.1)
             sp.valueChanged.connect(self._on_changed)
             self.weight_spins[wk] = sp
-            self._row(sec, name, NumEdit(sp, "일" if half_life else ""),
-                      "최근 가산이 절반이 되는 날 수" if half_life else "")
+            desc, tip = WEIGHT_HELP[wk]
+            self._row(sec, name, NumEdit(sp, "일" if half_life else ""), desc, tip=tip)
         self._bind("weights", self._set_weights, lambda: {wk: float(sp.value()) for wk, sp in self.weight_spins.items()})
         n = Note()
         self._notes["weights"] = n
@@ -1464,12 +1492,16 @@ class SettingsWindow(QDialog):
         self.redact.changed.connect(self._on_changed)
         self._bind("extra_redact_patterns", self.redact.set_values, self.redact.values)
         self._row(sec, "추가 가림 정규식", self.redact, key="extra_redact_patterns", stacked=True,
-                  after="다음에 쓰는 md부터 가립니다. 이미 만든 md를 다시 만들려면 트레이 메뉴의 "
-                        "고급 › 대화 md 전부 다시 만들기를 쓰세요.")
+                  desc="한 줄에 정규식 하나씩 적습니다.",
+                  tip="다음에 쓰는 md부터 가립니다. 이미 만든 md를 다시 만들려면 트레이 메뉴의 "
+                      "고급 › 대화 md 전부 다시 만들기를 쓰세요.")
 
         sec = self._section(lay, "F2 요약", "요약에 넘기는 재료와 시간")
-        self._row(sec, "마지막 메시지 수", self._spin("ask_tail_messages", "개"), "", "ask_tail_messages")
-        self._row(sec, "글자 수 상한", self._spin("ask_max_chars", "자", NUM_W + 16), "", "ask_max_chars")
+        self._row(sec, "마지막 메시지 수", self._spin("ask_tail_messages", "개"), "요약에 넘기는 마지막 메시지 수입니다.",
+                  "ask_tail_messages", tip="대화 끝에서부터 이 개수만큼 AI에게 넘깁니다. 많을수록 앞 맥락을 알지만 "
+                                         "느려지고 사용량이 늘어납니다.")
+        self._row(sec, "글자 수 상한", self._spin("ask_max_chars", "자", NUM_W + 16), "넘기는 재료의 최대 글자 수입니다.",
+                  "ask_max_chars", tip="넘치면 오래된 메시지부터 잘라 냅니다. 제목과 연결된 일지는 남깁니다.")
         self._row(sec, "제한 시간", self._spin("ask_timeout_seconds", "초"), "CLI가 이 시간 안에 답하지 않으면 멈춥니다.",
                   "ask_timeout_seconds")
 

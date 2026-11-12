@@ -65,7 +65,8 @@ ICONS = {
 }
 ICONS["settings"] = ICONS["advanced"]
 ICONS["search"] = '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'
-ICONS["info"] = '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.2"/>'
+ICONS["info"] = ('<g stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/></g>'
+                 '<path d="M12 7.4v.4" stroke-width="2.6"/>')     # 작게 그려도 잘 보이게 굵게
 # 스타일시트 url()로 쓰는 작은 그림 (콤보 화살표, 체크 표시). 색을 넣어 임시 폴더에 파일로 쓴다.
 _ASSETS = {
     "chevron": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12" fill="none" stroke="{a}" '
@@ -241,7 +242,7 @@ def apply_app(app, t: Theme) -> None:
     app.setPalette(palette(t))
 
 
-TIP_DELAY_MS = 200        # 툴팁이 뜨기까지 (Qt 기본 700ms)
+TIP_DELAY_MS = 300        # 툴팁이 뜨기까지 (Qt 기본 700ms)
 
 
 class FastTipStyle(QProxyStyle):
