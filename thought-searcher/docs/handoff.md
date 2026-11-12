@@ -1,6 +1,48 @@
+## 검색 개선 1단계: 메시지 시각 색인, 메시지 기준 기간 검색, 채팅 시각 (2026-11-12 밤)
+기준 문서는 `docs/search-plan.md`입니다. 이번에는 검색 엔진만 바꿨고 창, 정렬, 칩, 설정은 건드리지 않았습니다. push는 하지 않았습니다.
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/index.py` | `SCHEMA_VERSION` 2. `messages.created_ts REAL`(UTC 초)와 `messages_created` 색인 추가. 메시지 시각을 못 읽거나 없으면 문서 `updated_ts` |
+| `app/search.py` | `Hit.chat_time` 추가. 단어가 있는 검색의 `after:`/`before:`를 맞은 메시지 시각 기준으로 거름(`_in_period`). 메시지 시각 일괄 조회(`_msg_times`). `_make_hit`이 기간 안의 메시지만 `matches`/`match_total`에 담고 `chat_time` 계산 |
+| `tests/test_message_time.py` (새) | 11개 |
+| `tests/test_index_search.py` | 스키마 버전 단언을 `SCHEMA_VERSION`으로 |
+| `docs/search-plan.md` | 이번 커밋에서 처음 추가. 1단계 보충 설명 한 절 덧붙임 |
+
+### 정한 것 (계획에 없던 부분)
+- **맞은 메시지** = 검색어 중 하나라도 들어 있는 메시지(`msg_fts`의 OR). 미리보기가 맞은 메시지를 고르는 방식(`_rowids`를 단어별로 합침)과 같습니다. 대화 전체는 지금처럼 모든 단어가 AND로 맞아야 후보가 됩니다. 그래서 `레디스 캐시`처럼 단어가 서로 다른 메시지에 나뉘어도, 그중 하나가 기간 안이면 남습니다.
+- **제목에만 맞은 대화**(맞은 메시지가 하나도 없음): 예전 대화 단위 조건(`updated_ts >= after`, `created < before`)으로 판단하고 `chat_time`은 `updated_ts`입니다. 미리보기는 기간 안의 첫 메시지(없으면 첫 메시지). 본문에도 맞은 메시지가 있는데 모두 기간 밖이면 이 예외로 살리지 않습니다.
+- 한 글자 검색어만 있는 질의(`title_terms`뿐)와 단어 없는 질의는 예전 그대로입니다. `chat_time`은 `updated_ts`로 채웁니다(마지막 메시지 시각과 같음).
+- `before:`는 로컬 시간대 0시 미만(그날은 제외). `after:`는 0시 이상. 단어가 있을 때만 메시지 시각 `created_ts`로 비교합니다.
+- `chat_time`은 로컬 시간대 aware `datetime`. 기간이 있으면 기간 안의 맞은 메시지 중 가장 늦은 시각.
+- `_rank`는 그대로입니다. 기간 거르기는 `_rank` 앞에서 하므로 상위 N개를 자른 뒤 기간 밖이 섞이지 않습니다.
+- 노트는 구역마다 시각이 없어서 `parse_note`가 문서 시각을 `created`에 넣고 있으므로 결과적으로 문서 `updated_ts`와 같습니다.
+
+### 함정
+- `messages.id`가 대화 안에서 이어지는 번호라는 기존 전제(`msg_first`..`msg_last`)를 그대로 씁니다. 제목에만 맞은 대화의 미리보기 선택도 이 범위를 돕니다.
+- 메시지 시각 일괄 조회는 결과로 나갈 대화(최대 `limit`개)의 메시지 (id, created_ts)를 400개 대화씩 한 번에 읽습니다. 메시지가 아주 많은 대화가 섞이면 이 양이 늘어납니다.
+- 기간 거르기 SQL은 `messages WHERE id IN (msg_fts MATCH ...) AND created_ts 범위`입니다. 흔한 단어 + 넓은 기간이면 `_rowids`와 비슷한 비용이 듭니다.
+- 앱이 시작할 때 `main.py`가 `index.open()`으로 옛 버전 색인을 비우고, 이어서 `start_jobs`의 `sync_index`가 md에서 다시 채웁니다(대화가 많으면 처음에 부분 결과만 보임. 기존 재색인과 같음).
+- `tests/test_queue.py`의 `_fill`은 `created_ts` 없이 `messages`에 넣습니다(NULL 허용). 기간 검색은 NULL 메시지를 기간 밖으로 봅니다.
+- 작업 폴더 파일의 줄 끝이 CRLF인 것과 LF인 것이 섞여 있습니다(`core.autocrlf=true`). 저장소에는 LF로 들어갑니다.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 401개 통과(새 테스트 11개 포함).
+- 스키마 1 -> 2 자동 재생성: 옛 스키마 파일을 직접 만들어 `open()`이 비우고 `sync()`가 md로 채우는 것을 `test_schema_v1_index_is_rebuilt_from_md`로 확인.
+- **속도 테스트(`tests/test_perf.py`)는 CG 지시로 이번 단계에서 건너뜀.** 모든 단계 끝난 뒤 따로 확인할 것. 참고로 변경 전에 한 번 돌렸을 때 `docker 컨테이너 네트워크` 한 질의가 327ms로 한도(300ms)를 넘겨 실패했고(나머지 통과), 변경 후 전체 실행은 21개 모두 통과했습니다. 중간에 따로 잰 `after:2025-06 검색`은 312ms(3회 중 최소)였으니, 기간 질의가 한도 근처인지 마지막에 확인해야 합니다.
+
+### 남은 일
+- 2단계: 정렬(`정확도`/`최신`, `Ctrl+R`, 설정 `search_sort`), 화면의 채팅 시각 표시, 날짜 구분 줄. `Hit.chat_time`을 쓰면 됩니다.
+- 3단계: `by:me`, 한영 자동 보정, 0건 안내.
+- 모든 단계가 끝난 뒤 `tests/test_perf.py`를 돌려 기간 질의 속도를 확인.
+- README와 `docs/copy-table.md` 갱신은 3단계 뒤.
+
+---
+
 # 인수인계: 검색창, 설정창 새 디자인 (2026-11-12)
 
-> 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
+> 이 절은 검색 개선 1단계 이전의 기록입니다(맨 위 절이 최신). 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
 ## 큐 미리보기에 최근 대화 (2026-11-12 아침, CG 요청)

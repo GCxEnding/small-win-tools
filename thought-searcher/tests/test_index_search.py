@@ -9,7 +9,7 @@ from conftest import FIXTURES, KST, TODAY, make_export_zips
 from app.archive import Archive
 from app.importers.claude_code import parse_session
 from app.importers.claude_export import ClaudeExportImporter
-from app.index import Index, connect
+from app.index import SCHEMA_VERSION, Index, connect
 from app.model import Conversation, Message
 from app.redact import Redactor
 from app.search import Searcher
@@ -281,7 +281,7 @@ def test_schema_version_mismatch_rebuilt(tmp_path):
     c.close()
     conn = idx.open()
     assert conn.execute("SELECT count(*) FROM docs").fetchone()[0] == 0
-    assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == "1"
+    assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == str(SCHEMA_VERSION)
     conn.close()
     idx.sync(root)
     assert len(Searcher(connect(idx.db_path)).search("")) == 1
