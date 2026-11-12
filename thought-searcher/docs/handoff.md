@@ -1,3 +1,46 @@
+## 검색 개선 3단계: by:me, 한영 자동 보정, 0건 안내 + 정렬 순서와 `모두 지우기` 위치 (2026-11-13)
+기준 문서는 `docs/search-plan.md` 5, 6, 7절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다.
+
+### 먼저 고친 것 (CG 결정)
+- 정렬 단추 순서를 어디서나 `최신 | 정확도`(기본값이 앞)로. 창 안 단추(`window.SORTS`)를 뒤집었고 설정 세그먼트는 이미 그 순서였습니다.
+- `모두 지우기`를 칩 첫째 줄 끝(`일지` 뒤)으로 옮기고 둘째 줄은 `기간, 프로젝트, 내 질문, 정렬`. 칩 여백(`#qchip` 7px, `#qseg` 6px), 줄 간격 4px, 줄 이름 칸 28px, `모두 지우기` 8.5pt, 프로젝트 칩 이름 8자(`PROJECT_LABEL_MAX`)로 줄여 폭을 맞췄습니다.
+- 칩 줄 최소 폭(실제 Windows 글꼴, 창을 띄운 상태, 출처 칩 8개 + 기간 + 프로젝트 이름 15자 + `모두 지우기` 켬): 예전(30c4b43) 칩 끔 528px / 전부 켬 626px -> 지금 칩 끔 519px / 전부 켬(내 질문 포함) 521px. 창 최소 폭(560px) 안에 들어갑니다.
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/query.py` | `Query.by_me`, `by:me`/`by:나`, `filter_labels`에 `by:me`. `token_kind`, `strip_tokens`(검색칸에서 해당 종류의 조건 조각 지우기: source/period/project/mine/exclude) |
+| `app/search.py` | 후보 계산을 `_term_rows`로 뺌(검색과 개수 세기가 같이 씀). `by:me`: 단어마다 사용자 메시지에 있는 대화만(`_in_user_messages`), 노트 제외(노트 구역이 `role=user`로 저장되기 때문), 맞은 메시지/채팅 시각/미리보기는 사용자 메시지만. `Searcher.count`/`count_query`(Hit를 만들지 않음). `_msg_times`가 (시각, 사용자 메시지 id)를 돌려줌 |
+| `app/hangul.py` (새) | emoji-searcher `hangul.py`의 두벌식 표와 `is_keyboard_latin`, `latin_to_hangul` 복사(출처를 주석에 적음) + `hangul_to_latin`, `latin_word_to_hangul`, `fix_layout`, `found_message` |
+| `app/zero.py` (새) | `present`, `without`, `zero_hint`, `ZeroHint`(`text`: `출처를 제외하면 12건입니다`, `eul_reul`), `search_all`(검색 -> 0건이면 한영 보정 -> 그래도 0건이면 안내) |
+| `app/window.py` | `내 질문` 칩(`ChipBar.mine`, `mine_button`), 칩 `clear_kinds`, 0건 안내 줄(`K_HINT`, 선택 가능, 클릭/Enter -> `remove_condition`), `set_results(..., hint=)`, 정렬 순서, 칩 줄 배치, 미리보기 제목 비움(항목 없을 때 `(제목 없음)` 안 보임) |
+| `app/main.py` | `on_query`가 `search_all` 사용, 보정으로 찾으면 상태에 `nginx로 찾았습니다  ·  N건 · Xms` |
+| `app/theme.py` | 칩/정렬/모두 지우기 여백 |
+| `tests/test_by_me_zero.py` (새) | 17개. `test_search_sort.py`는 옛 최소 폭 시험 한 개를 뺌 |
+| `README.md`, `docs/search-plan.md` | 검색 문법 표 `by:me`, 칩, 한영 보정, 0건 안내, 정렬 순서 |
+
+### 정한 것 (계획에 없던 부분)
+- 맞은 메시지/후보: `by:me`는 단어마다 "사용자 메시지에 그 단어가 있다"를 따로 보고 교집합. 제목에만 있는 단어는 인정하지 않습니다. 단어 없이 `by:me`만 있는 질의는 큐 거르기 길(예전과 같음)이라 `by:me`가 큐에는 영향이 없습니다(큐가 비어 검색으로 넘어가면 노트를 뺀 최근 대화 목록).
+- 한영 보정 대상: `-제외어`, 따옴표 구문, `:`가 든 조각은 건드리지 않습니다. 영문 -> 한글은 소문자 영문 2자 이상이고 결과가 완성된 음절뿐일 때만(`nginx`, `docker`는 낱자가 남아 제외). 한글 -> 영문은 낱자 자모가 하나라도 있는 낱말만(완성된 한글 낱말은 그대로).
+- 상태 글자는 `nginx로 찾았습니다  ·  3건 · 12ms`. 조사는 `로`/`으로`(한글 받침 없음/ㄹ이면 `로`).
+- 0건 안내의 "가장 많이 나오는 조건"이 같으면 순서(출처, 기간, 프로젝트, 내 질문, 제외어) 앞쪽. 조건이 하나뿐이고 그것을 빼도 0건이면 안내 없음. 칩과 손으로 친 조각이 같이 있으면 둘 다 한 조건으로 보고 둘 다 끕니다.
+- 안내 줄 클릭 직후 0.5초 안의 더블클릭은 새 목록의 항목을 열지 않게 무시합니다.
+
+### 함정
+- 칩 줄 폭 수치는 글꼴이 있는 실제 Windows 렌더링 기준입니다. offscreen 시험은 글꼴이 없어 글자가 넓게 잡혀(약 600px) 시험 기준을 `MIN_W + 60`으로 두었습니다.
+- 칩 레이아웃은 창을 띄우기 전과 후의 `minimumSizeHint`가 다릅니다(스타일 적용 전엔 더 큼). 폭을 잴 때는 창을 띄우고 `layout().activate()` 뒤에 재야 합니다.
+- `Searcher.search()`가 `by:me`에서 후보를 줄이는 쿼리는 단어마다 `messages` + `msg_fts` 조인입니다. 흔한 단어에서는 비용이 있으니 마지막 속도 확인 때 같이 보세요.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 통과.
+- 화면 캡처 2장(`$KIROCREW_SCRATCH\png8\`): `search-narrow-chips-light.png`(창 최소 폭 560px, 칩 전부 켬, 모두 지우기 보임), `search-zero-dark.png`(0건 안내 줄). 안내 화면에서 미리보기 칸 제목이 `(제목 없음)`으로 나오는 결함을 고쳐 한 번 다시 찍었습니다.
+
+### 남은 일
+- 모든 단계 뒤 `tests/test_perf.py`를 돌려 `89a7794`와 비교(기간 질의, `by:me`, 최신순 포함).
+- README 설정 창 표와 `docs/copy-table.md` 문구 정리는 CG 확인 후.
+
+---
+
 ## 검색 개선 2단계: 정렬, 채팅 시각 표시, 날짜 묶음 줄 (2026-11-13)
 기준 문서는 `docs/search-plan.md` 3, 4, 8절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다(모든 단계 뒤 따로 확인).
 

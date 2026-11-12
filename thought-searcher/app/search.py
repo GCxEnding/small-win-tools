@@ -194,6 +194,8 @@ class Searcher:
         for p in q.projects:
             sql.append("instr(d.project_norm, ?) > 0")
             args.append(p)
+        if q.by_me:
+            sql.append("d.source != 'note'")      # 노트 구역은 사용자 메시지로 저장되지만 내가 한 질문이 아니다
         if doc_period:
             psql, pargs = self._doc_period(q)
             sql += psql
@@ -209,6 +211,50 @@ class Searcher:
             args.append(q.exclude_expr())
         return (" AND ".join(sql), args)
 
+    def _term_rows(self, q: Query, per_msg: bool, period, need_times: bool):
+        """단어가 있는 검색의 후보 대화 행들과 {대화 id: 맞은 메시지 중 가장 늦은 시각}.
+        행: (id, updated_ts, msg_first, msg_last, 점수[, 대화 단위 기간 통과])."""
+        fsql, fargs = self._filters(q, doc_period=not per_msg)
+        where = f" AND {fsql}" if fsql else ""
+        dsql, dargs = self._doc_period(q) if per_msg else ([], [])
+        # doc_ok: 대화 단위 기간 조건을 통과하나 (제목에만 맞은 대화를 거를 때만 쓴다)
+        doc_ok = f", ({' AND '.join(dsql)})" if dsql else ""
+        slim = self.conn.execute(
+            f"""SELECT d.id, d.updated_ts, d.msg_first, d.msg_last, -bm25(conv_fts, ?, ?){doc_ok}
+                FROM conv_fts JOIN docs d ON d.id = conv_fts.rowid
+                WHERE conv_fts MATCH ?{where}""",
+            [self.w["title"], self.w["body"], *dargs, q.fts_expr(), *fargs]).fetchall()
+        if q.by_me:
+            slim = self._in_user_messages(slim, q)
+        mt = self._matched_times(q, period or (None, None)) if (per_msg or need_times) else {}
+        if per_msg:
+            slim = self._in_period(slim, q, mt)
+        return slim, mt
+
+    def _in_user_messages(self, rows, q: Query) -> list:
+        """by:me: 모든 검색 단어가 그 대화의 사용자 메시지에 있어야 한다 (같은 메시지일 필요 없음, 제목은 세지 않음)."""
+        keep: set[int] | None = None
+        for t in q.terms:
+            ids = {d for (d,) in self.conn.execute(
+                "SELECT DISTINCT m.doc_id FROM messages m WHERE m.role = 'user' "
+                "AND m.id IN (SELECT rowid FROM msg_fts WHERE msg_fts MATCH ?)", (t.fts(),))}
+            keep = ids if keep is None else keep & ids
+        keep = keep or set()
+        return [r for r in rows if r[0] in keep]
+
+    def count(self, text: str) -> int:
+        """조건에 맞는 대화 수만 센다 (Hit를 만들지 않음). 0건 안내가 조건을 하나씩 빼 보는 데 쓴다."""
+        return self.count_query(parse(text))
+
+    def count_query(self, q: Query) -> int:
+        per_msg = bool(q.terms and (q.after or q.before))
+        if q.terms:
+            rows, _mt = self._term_rows(q, per_msg, self._bounds(q) if per_msg else None, False)
+            return len(rows)
+        fsql, fargs = self._filters(q)
+        where = f" AND {fsql}" if fsql else ""
+        return self.conn.execute(f"SELECT count(*) FROM docs d WHERE 1=1{where}", fargs).fetchone()[0]
+
     def search(self, text: str, limit: int | None = None, sort: str = "relevance") -> list[Hit]:
         """sort: "relevance"(순위) | "recent"(채팅 시각 늦은 순). 후보는 같고 자르기 전에 정렬만 다르다.
         단어 없는 검색은 sort와 상관없이 대화 마지막 시각 순."""
@@ -220,21 +266,10 @@ class Searcher:
         # 단어가 있고 기간 조건이 있으면 대화 마지막 시각 대신 맞은 메시지의 시각으로 거른다
         per_msg = bool(q.terms and (q.after or q.before))
         period = self._bounds(q) if per_msg else None
-        fsql, fargs = self._filters(q, doc_period=not per_msg)
-        where = f" AND {fsql}" if fsql else ""
         times: dict[int, float] | None = None
+        users: set[int] | None = None
         if q.terms:
-            dsql, dargs = self._doc_period(q) if per_msg else ([], [])
-            # doc_ok: 대화 단위 기간 조건을 통과하나 (제목에만 맞은 대화를 거를 때만 쓴다)
-            doc_ok = f", ({' AND '.join(dsql)})" if dsql else ""
-            slim = self.conn.execute(
-                f"""SELECT d.id, d.updated_ts, d.msg_first, d.msg_last, -bm25(conv_fts, ?, ?){doc_ok}
-                    FROM conv_fts JOIN docs d ON d.id = conv_fts.rowid
-                    WHERE conv_fts MATCH ?{where}""",
-                [self.w["title"], self.w["body"], *dargs, q.fts_expr(), *fargs]).fetchall()
-            mt = self._matched_times(q, period or (None, None)) if (per_msg or recent) else {}
-            if per_msg:
-                slim = self._in_period(slim, q, mt)
+            slim, mt = self._term_rows(q, per_msg, period, recent)
             if recent:
                 # 채팅 시각 늦은 순 (맞은 메시지가 없는 대화는 마지막 시각). 같으면 점수 높은 쪽
                 ranked = sorted(((r, r[4]) for r in slim), key=lambda x: (-mt.get(x[0][0], x[0][1] or 0.0), -x[1]))
@@ -246,15 +281,18 @@ class Searcher:
                            d.updated_ts, d.msg_first, d.msg_last FROM docs d
                     WHERE d.id IN ({",".join("?" * len(ranked))})""", [r[0] for r, _s in ranked])}
             hits = [(full[r[0]], sc) for r, sc in ranked if r[0] in full]
-            times = self._msg_times([r[0] for r, _s in hits])
+            times, user_ids = self._msg_times([r[0] for r, _s in hits])
+            users = user_ids if q.by_me else None
         else:
+            fsql, fargs = self._filters(q)
+            where = f" AND {fsql}" if fsql else ""
             rows = self.conn.execute(
                 f"""SELECT d.id, d.conv_id, d.path, d.title, d.source, d.project, d.updated, d.status,
                            d.updated_ts, d.msg_first, d.msg_last, 0.0
                     FROM docs d WHERE 1=1{where} ORDER BY d.updated_ts DESC LIMIT ?""",
                 [*fargs, limit]).fetchall()
             hits = [(r, 0.0) for r in rows]
-        out = [self._make_hit(r, score, q, times, period, recent) for r, score in hits]
+        out = [self._make_hit(r, score, q, times, period, recent, users) for r, score in hits]
         self.last_ms = (time.perf_counter() - t0) * 1000
         return out
 
@@ -264,6 +302,8 @@ class Searcher:
         lo, hi = period
         sql = ["m.id IN (SELECT rowid FROM msg_fts WHERE msg_fts MATCH ?)"]
         args: list = [" OR ".join(t.fts() for t in q.terms)]
+        if q.by_me:
+            sql.append("m.role = 'user'")
         if lo is not None:
             sql.append("m.created_ts >= ?")
             args.append(lo)
@@ -283,16 +323,19 @@ class Searcher:
             lists = [self._rowids(t.fts()) for t in q.terms]
             have = {r[0] for r in todo if r[2] is not None and any(_any_in(ids, r[2], r[3]) for ids in lists)}
         return [r for r in rows if r[0] in ok or (r[5] and r[0] not in have)]
-    def _msg_times(self, doc_ids: list[int]) -> dict[int, float]:
-        """결과로 나갈 대화들의 메시지 시각 (한 번에 가져온다). {message id: created_ts}"""
+    def _msg_times(self, doc_ids: list[int]) -> tuple[dict[int, float], set[int]]:
+        """결과로 나갈 대화들의 메시지 시각을 한 번에 가져온다. ({메시지 id: created_ts}, 사용자 메시지 id 집합)"""
         out: dict[int, float] = {}
+        users: set[int] = set()
         for i in range(0, len(doc_ids), 400):
             part = doc_ids[i:i + 400]
-            for mid, ts in self.conn.execute(
-                    f"SELECT id, created_ts FROM messages WHERE doc_id IN ({','.join('?' * len(part))})", part):
+            for mid, ts, role in self.conn.execute(
+                    f"SELECT id, created_ts, role FROM messages WHERE doc_id IN ({','.join('?' * len(part))})", part):
                 if ts is not None:
                     out[mid] = ts
-        return out
+                if role == "user":
+                    users.add(mid)
+        return out, users
 
     def _rank(self, rows, q: Query, limit: int):
         if not rows:
@@ -321,8 +364,10 @@ class Searcher:
 
     # ---- 결과 만들기 ----------------------------------------------------
     def _make_hit(self, r, score: float, q: Query, times: dict[int, float] | None = None,
-                  period: tuple[float | None, float | None] | None = None, recent: bool = False) -> Hit:
-        """times: 이 대화들의 {메시지 id: 시각} (단어 검색일 때). period: 기간이 있으면 (시작, 끝)."""
+                  period: tuple[float | None, float | None] | None = None, recent: bool = False,
+                  users: set[int] | None = None) -> Hit:
+        """times: 이 대화들의 {메시지 id: 시각} (단어 검색일 때). period: 기간이 있으면 (시작, 끝).
+        users: by:me면 사용자 메시지 id 집합 (맞은 메시지를 사용자 메시지로 한정)."""
         regs = [x for x in (term_regex(t.text, t.prefix) for t in q.terms) if x]
         regs += [re.compile(re.escape(t), re.IGNORECASE) for t in q.title_terms]
         hit = Hit(conv_id=r[1], path=Path(r[2]), title=r[3], source=r[4], project=r[5],
@@ -348,6 +393,8 @@ class Searcher:
             ids = self._rowids(t.fts())
             for mid in ids[bisect_left(ids, first):bisect_right(ids, last)]:
                 counts[mid] = counts.get(mid, 0) + 1
+        if users is not None:
+            counts = {mid: c for mid, c in counts.items() if mid in users}
         if period:
             counts = {mid: c for mid, c in counts.items() if inside(mid)}
         hit.match_total = len(counts)

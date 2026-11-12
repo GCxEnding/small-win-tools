@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 import re
+import time
 from collections import OrderedDict
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -21,11 +22,12 @@ from PySide6.QtWidgets import (QButtonGroup, QFrame, QGridLayout, QHBoxLayout, Q
 from . import mdparse
 from . import theme as T
 from . import ui_state
-from .query import parse as parse_query
+from .query import parse as parse_query, strip_tokens
 from .queue import QueueItem, QueueResult, relative_time
 from .search import Hit, find_spans
 from .theme import Theme
 from .timeutil import parse_iso
+from .zero import ORDER as ZERO_KINDS
 
 TEXT_FONTS = ["Segoe UI", "Malgun Gothic", "Segoe UI Emoji"]
 ROLE_HIT = Qt.UserRole + 1
@@ -35,8 +37,9 @@ ROLE_TEXT = Qt.UserRole + 4
 # 목록 항목 종류: 검색 결과, 큐(첫 줄들/나머지 줄), 접기 줄, 빈 큐 안내
 K_HIT, K_FOCUS, K_ROW, K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY = "hit", "focus", "row", "rest", "closed", "empty"
 K_GROUP = "group"      # 날짜 묶음 줄 (최신순 검색 결과에만, 고를 수 없음)
+K_HINT = "hint"        # 0건 안내 줄 ('출처를 제외하면 12건입니다', 고르면 그 조건을 끈다)
 DATE_GROUPS = ("오늘", "이번 주", "이번 달", "그 전")
-SORTS = (("정확도", "relevance"), ("최신", "recent"))      # 칩 줄 오른쪽 끝 버튼 (글자, 값)
+SORTS = (("최신", "recent"), ("정확도", "relevance"))      # 칩 줄 오른쪽 끝 버튼 (글자, 값). 기본값이 앞
 DEFAULT_SORT = "recent"
 CLOSE_LABEL = {"done": "완료", "drop": "버림"}
 # 아래 막대의 키 안내: (동작, 키들, 굵게, 좁으면 숨김)
@@ -57,8 +60,8 @@ _SRC_VALUE = {"claude-ai": "ai", "claude-ai-project": "project", "claude-ai-memo
               "chatgpt": "gpt", "codex": "codex", "note": "note", "journal": "journal"}
 # 기간 칩: (글자, 며칠 전부터 / "year" / None=전체)
 PERIOD_CHIPS = [("전체", None), ("1주", 7), ("1달", 30), ("3달", 90), ("올해", "year")]
-PROJECT_LABEL_MAX = 12   # 최소 폭(560)에서도 둘째 줄이 넘치지 않게. 전체 이름은 툴팁
-QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10)")
+PROJECT_LABEL_MAX = 8    # 칩을 다 켜도 칩 줄이 좁아지게(최소 폭 약 600). 전체 이름은 툴팁
+QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10  by:me)")
 DEBOUNCE_MS = 150
 PREVIEW_DEBOUNCE_MS = 60
 WIN_W, WIN_H = 820, 560
@@ -388,11 +391,11 @@ class HitDelegate(QStyledItemDelegate):
         p.save()
         self._bar(p, r, bool(option.state & QStyle.State_Selected))
         x0, max_x = r.left() + 14, r.right() - 12
-        if kind != K_EMPTY:
+        if kind not in (K_EMPTY, K_HINT):
             p.setPen(QPen(self.t.line))
             p.drawLine(r.left() + 6, r.top() + 1, r.right() - 6, r.top() + 1)
-        p.setFont(self.font)
-        p.setPen(self.t.sub)
+        p.setFont(self.bold if kind == K_HINT else self.font)
+        p.setPen(self.t.accent if kind == K_HINT else self.t.sub)
         p.drawText(QRect(x0, r.top() + 2, max_x - x0, r.height() - 2), Qt.AlignVCenter | Qt.AlignLeft,
                    index.data(ROLE_TEXT) or "")
         p.restore()
@@ -446,7 +449,7 @@ class HitDelegate(QStyledItemDelegate):
         if kind == K_GROUP:
             self._paint_group(p, option, index)
             return
-        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY):
+        if kind in (K_TOGGLE_REST, K_TOGGLE_CLOSED, K_EMPTY, K_HINT):
             self._paint_plain(p, option, index, kind)
             return
         if kind in (K_FOCUS, K_ROW):
@@ -676,7 +679,7 @@ class PreviewPane(QFrame):
 
     def set_header(self, source: str, title: str, meta: str, index: str = "", sub: str = "") -> None:
         self.badge.set_source(source)
-        self.title.setText(title or "(제목 없음)")
+        self.title.setText(title or ("(제목 없음)" if source else ""))      # 0건 안내처럼 항목이 없을 때는 비운다
         self.title.setToolTip(title)
         self.meta.setText(meta + (f"\n{sub}" if sub else ""))
         self.index.setText(index)
@@ -782,6 +785,8 @@ class ChipBar(QFrame):
         self._typed_proj: list[str] = []
         self.period = None
         self.project = ""
+        self.mine = False                         # '내 질문' 칩 (by:me)
+        self._typed_mine = False                  # 검색칸에 손으로 친 by:me (표시만)
         self.default_sort = DEFAULT_SORT          # 설정의 기본 정렬 (창을 열 때 이 값으로 돌아간다)
         self.sort = DEFAULT_SORT
         v = QVBoxLayout(self)
@@ -795,6 +800,12 @@ class ChipBar(QFrame):
             row1.addWidget(b)
             self.src_buttons[value] = b
         row1.addStretch(1)
+        self.clear_button = QPushButton("모두 지우기")
+        self.clear_button.setObjectName("chipClear")
+        self.clear_button.setFocusPolicy(Qt.NoFocus)
+        self.clear_button.setCursor(Qt.PointingHandCursor)
+        self.clear_button.clicked.connect(self.clear)
+        row1.addWidget(self.clear_button)
         row2 = self._row(v, "기간")
         self.period_group = QButtonGroup(self)
         self.period_group.setExclusive(True)
@@ -815,13 +826,11 @@ class ChipBar(QFrame):
         self.proj_button.clicked.connect(self._pick_project)
         row2.addWidget(self.proj_button)
         row2.addStretch(1)
-        self.clear_button = QPushButton("모두 지우기")
-        self.clear_button.setObjectName("chipClear")
-        self.clear_button.setFocusPolicy(Qt.NoFocus)
-        self.clear_button.setCursor(Qt.PointingHandCursor)
-        self.clear_button.clicked.connect(self.clear)
-        row2.addWidget(self.clear_button)
-        row2.addSpacing(10)
+        self.mine_button = self._chip("내 질문")
+        self.mine_button.setToolTip("내가 쓴 메시지에서만 찾습니다  by:me")
+        self.mine_button.clicked.connect(self._toggle_mine)
+        row2.addWidget(self.mine_button)
+        row2.addSpacing(4)
         seg = QHBoxLayout()
         seg.setSpacing(0)
         self.sort_buttons: dict[str, QPushButton] = {}
@@ -842,10 +851,10 @@ class ChipBar(QFrame):
 
     def _row(self, v: QVBoxLayout, caption: str) -> QHBoxLayout:
         h = QHBoxLayout()
-        h.setSpacing(6)
+        h.setSpacing(4)
         cap = QLabel(caption)
         cap.setObjectName("chipCaption")
-        cap.setFixedWidth(30)
+        cap.setFixedWidth(28)
         h.addWidget(cap)
         v.addLayout(h)
         return h
@@ -905,6 +914,23 @@ class ChipBar(QFrame):
         self._render()
         self.changed.emit()
 
+    def _toggle_mine(self) -> None:
+        self.mine = not self.mine
+        self._render()
+        self.changed.emit()
+
+    def clear_kinds(self, kinds: set[str]) -> None:
+        """0건 안내가 조건을 끌 때: 해당 종류의 칩만 끈다 (다시 찾는 것은 부른 쪽이 한다)."""
+        if "source" in kinds:
+            self._clicked.clear()
+        if "period" in kinds:
+            self.period = None
+        if "project" in kinds:
+            self.project = ""
+        if "mine" in kinds:
+            self.mine = False
+        self._render()
+
     def _set_sort(self, value: str) -> None:
         if value != self.sort:
             self.sort = value
@@ -931,18 +957,20 @@ class ChipBar(QFrame):
         self._clicked.clear()
         self.period = None
         self.project = ""
+        self.mine = False
         if not keep_sort:
             self.sort = self.default_sort
         self._render()
 
     def active(self) -> bool:
-        return bool(self._clicked or self.period is not None or self.project)
+        return bool(self._clicked or self.period is not None or self.project or self.mine)
 
     def sync_from_text(self, text: str) -> None:
         """손으로 친 src:, proj:는 해당 칩을 켜진 것으로만 보인다(토큰을 더 붙이지 않는다)."""
         q = parse_query(text or "")
         self._typed = {_SRC_VALUE[s] for s in q.sources if s in _SRC_VALUE}
         self._typed_proj = list(q.projects)
+        self._typed_mine = q.by_me
         self._render()
 
     def _render(self) -> None:
@@ -960,6 +988,7 @@ class ChipBar(QFrame):
             self.proj_button.setText("프로젝트 ▾")
             self.proj_button.setToolTip("")
         self.proj_button.setChecked(bool(self.project or self._typed_proj))
+        self.mine_button.setChecked(self.mine or self._typed_mine)
         self.clear_button.setVisible(self.active())
         for value, b in self.sort_buttons.items():
             b.setChecked(value == self.sort)
@@ -973,6 +1002,8 @@ class ChipBar(QFrame):
         tok = project_token(self.project)
         if tok:
             out.append(f"proj:{tok}")
+        if self.mine:
+            out.append("by:me")
         return out
 
     def compose(self, text: str, today: date | None = None) -> str:
@@ -1006,6 +1037,7 @@ class SearchWindow(QWidget):
         self.setMinimumSize(ui_state.MIN_W, ui_state.MIN_H)
         self.resize(self._state.get("w", WIN_W), self._state.get("h", WIN_H))
         self.ask_enabled = True
+        self._hint_used_at = -10.0
         self.today: Callable[[], date] = date.today      # 날짜 묶음 기준 (시험에서 바꾼다)
         self.wide: bool | None = None         # 폭에 따른 배치 (처음에는 정하지 않음)
         self.md_cache = MdCache()
@@ -1048,7 +1080,7 @@ class SearchWindow(QWidget):
         self.list.setItemDelegate(self.delegate)
         self.list.setVerticalScrollMode(QListWidget.ScrollPerPixel)
         self.list.setFocusPolicy(Qt.NoFocus)
-        self.list.itemDoubleClicked.connect(lambda _i: self._emit("open"))
+        self.list.itemDoubleClicked.connect(self._on_double_clicked)
         self.list.itemClicked.connect(self._on_clicked)
         self.list.currentRowChanged.connect(self._on_row_changed)
         self.list.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -1381,8 +1413,9 @@ class SearchWindow(QWidget):
         self.chips.sync_from_text(text)
         self._timer.start()
 
-    def set_results(self, hits: list[Hit], status: str, grouped: bool = False) -> None:
-        """grouped: 최신순 검색 결과라 날짜 묶음 줄(오늘/이번 주/이번 달/그 전)을 넣는다."""
+    def set_results(self, hits: list[Hit], status: str, grouped: bool = False, hint=None) -> None:
+        """grouped: 최신순 검색 결과라 날짜 묶음 줄(오늘/이번 주/이번 달/그 전)을 넣는다.
+        hint: 결과가 없을 때 보일 0건 안내 (zero.ZeroHint). 고르면 그 조건을 끄고 다시 찾는다."""
         self._apply_mode()
         was_queue = self.mode == "queue"
         self.mode = "search"
@@ -1408,6 +1441,13 @@ class SearchWindow(QWidget):
             it.setData(ROLE_HIT, h)
             it.setData(ROLE_IDX, 0)
             self.list.addItem(it)
+        if not hits and hint is not None:
+            hi = QListWidgetItem()
+            hi.setData(ROLE_KIND, K_HINT)
+            hi.setData(ROLE_TEXT, hint.text)
+            hi.setData(ROLE_HIT, hint)
+            hi.setData(ROLE_IDX, 0)
+            self.list.addItem(hi)
         first = self._step_row(-1, 1)
         if first >= 0:
             self.list.setCurrentRow(first)
@@ -1524,7 +1564,30 @@ class SearchWindow(QWidget):
         return True
 
     def _on_clicked(self, it: QListWidgetItem) -> None:
+        if it.data(ROLE_KIND) == K_HINT:
+            self.remove_condition(it.data(ROLE_HIT).kind)
+            return
         self._toggle(it.data(ROLE_KIND))
+        self.edit.setFocus()
+
+    def _on_double_clicked(self, _it) -> None:
+        if time.monotonic() - self._hint_used_at < 0.5:
+            return                                  # 0건 안내를 누르면서 생긴 더블클릭은 새 목록을 열지 않는다
+        self._emit("open")
+
+    def remove_condition(self, kind: str) -> None:
+        """0건 안내: 그 조건을 끄고 바로 다시 찾는다. 칩은 끄고, 검색칸에 손으로 친 조각(src: proj: after: before:
+        by: -제외어)은 지운다. kind "all"은 모든 조건."""
+        kinds = set(ZERO_KINDS) if kind == "all" else {kind}
+        self._hint_used_at = time.monotonic()
+        self.chips.clear_kinds(kinds)
+        text = strip_tokens(self.edit.full_text(), kinds)
+        if text != self.edit.full_text():
+            self.edit.setText(text)
+            self.edit.setCursorPosition(len(text))
+        self._timer.stop()
+        self._show_rest = self._show_closed = False
+        self.refresh()
         self.edit.setFocus()
 
     def _current_queue_item(self) -> QueueItem | None:
@@ -1595,6 +1658,8 @@ class SearchWindow(QWidget):
             pane.set_header("", "", "")
             if kind is None:
                 pane.add_note("결과가 없습니다" if self.mode == "search" else "")
+            elif kind == K_HINT:
+                pane.add_note("Enter 또는 클릭: 이 조건을 끄고 다시 찾습니다")
 
     def _fill_recent(self, q: QueueItem) -> None:
         """큐 미리보기 위쪽: 채팅은 최근 몇 턴, 일지 항목은 최근 기록, 노트는 끝부분 몇 줄. 요약 없이도 내용을 본다."""
@@ -1704,6 +1769,10 @@ class SearchWindow(QWidget):
             return
         k = it.data(ROLE_KIND)
         if self._toggle(k):
+            return
+        if k == K_HINT:
+            if kind == "open":
+                self.remove_condition(it.data(ROLE_HIT).kind)
             return
         if k in (K_EMPTY, K_GROUP) or (k != K_HIT and kind == "copy_msg"):
             return

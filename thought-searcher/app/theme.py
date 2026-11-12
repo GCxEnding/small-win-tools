@@ -472,20 +472,20 @@ def search_qss(t: Theme) -> str:
         QFrame#chips {{ background:transparent; border:none; }}
         QFrame#chips QLabel#chipCaption {{ color:{c['sub']}; font-size:8.5pt; padding:0; }}
         QPushButton#qchip {{ background:transparent; color:{c['text']}; border:1px solid {c['line']};
-                             border-radius:11px; padding:2px 10px; font-size:9pt; min-height:18px; }}
+                             border-radius:11px; padding:2px 7px; font-size:9pt; min-height:18px; }}
         QPushButton#qchip:hover {{ background:{c['button']}; }}
         QPushButton#qchip:checked {{ background:{c['accent_soft']}; border-color:{c['accent']}; font-weight:700; }}
         /* 정렬 버튼(정확도 | 최신): 붙은 두 칸, 켜진 쪽은 칩과 같은 옅은 강조색 */
         QPushButton#qseg {{ background:transparent; color:{c['text']}; border:1px solid {c['line']}; border-radius:0;
-                            padding:2px 8px; font-size:9pt; min-height:18px; }}
+                            padding:2px 6px; font-size:9pt; min-height:18px; }}
         QPushButton#qseg:hover {{ background:{c['button']}; }}
         QPushButton#qseg:checked {{ background:{c['accent_soft']}; border-color:{c['accent']}; font-weight:700; }}
         QPushButton#qseg[segpos="first"] {{ border-top-left-radius:11px; border-bottom-left-radius:11px; }}
         QPushButton#qseg[segpos="last"] {{ border-left-width:0; border-top-right-radius:11px;
                                            border-bottom-right-radius:11px; }}
         QPushButton#qseg[segpos="last"]:checked {{ border-left-width:1px; }}
-        QPushButton#chipClear {{ background:transparent; border:none; color:{c['accent']}; font-size:9pt;
-                                 padding:2px 4px; }}
+        QPushButton#chipClear {{ background:transparent; border:none; color:{c['accent']}; font-size:8.5pt;
+                                 padding:2px 2px; }}
         QPushButton#chipClear:hover {{ text-decoration:underline; }}
         QFrame#chipSep {{ background:{c['line']}; border:none; }}
         QListWidget {{ background:{c['bg']}; border:none; outline:none; }}

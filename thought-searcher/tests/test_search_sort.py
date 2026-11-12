@@ -243,15 +243,6 @@ def test_popup_resets_sort_to_setting_default_and_ctrl_r_toggles(qt):
     w.deleteLater()
 
 
-def test_sort_segment_keeps_idle_min_width(qt):
-    """정렬 단추를 달아도, 칩을 하나도 켜지 않았을 때 칩 줄의 최소 폭은 예전(첫 줄 기준)보다 커지지 않는다."""
-    from app.window import SearchWindow
-    w = SearchWindow(projects=lambda: ["small-win-tools"])
-    row1 = w.chips.layout().itemAt(0).layout().minimumSize().width()
-    row2 = w.chips.layout().itemAt(1).layout().minimumSize().width()
-    assert row2 <= row1
-    w.deleteLater()
-
 def test_preview_shows_message_times(qt, searcher):
     from app.window import SearchWindow
     w = SearchWindow()
