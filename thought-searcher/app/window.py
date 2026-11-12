@@ -1041,15 +1041,16 @@ class SearchWindow(QWidget):
         if (w, h) != (self.width(), self.height()):
             self.resize(w, h)                 # 이 모니터보다 크면 줄인다 (저장된 크기는 그대로 둔다)
         self.move(center_position(g, self.width(), self.height()))
-        self.show()
-        self.raise_()
-        self.activateWindow()
-        self.edit.setFocus()
-        self.edit.selectAll()
+        # 목록을 먼저 채운 뒤 띄운다 (띄우고 채우면 큐 계산 동안 빈 창이 보인다)
         self._show_rest = self._show_closed = False
         self.chips.reset()
         self.chips.sync_from_text(self.edit.full_text())
         self.refresh()
+        T.show_without_flash(self)
+        self.raise_()
+        self.activateWindow()
+        self.edit.setFocus()
+        self.edit.selectAll()
 
     def query_text(self) -> str:
         """검색에 넘기는 글자: 검색칸 + 켜진 칩 토큰."""

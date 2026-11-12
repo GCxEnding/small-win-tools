@@ -242,6 +242,21 @@ def apply_app(app, t: Theme) -> None:
     app.setPalette(palette(t))
 
 
+def show_without_flash(widget) -> None:
+    """처음 그리기 전 빈 창(Windows가 칠한 회색 바탕)이 잠깐 보이지 않게, 투명하게 띄워 다 그린 뒤 보인다."""
+    from PySide6.QtCore import QTimer
+    widget.setWindowOpacity(0.0)
+    widget.show()
+    widget.repaint()                      # 첫 그리기를 지금 끝낸다
+
+    def reveal():
+        try:
+            widget.setWindowOpacity(1.0)
+        except RuntimeError:              # 그새 창이 지워짐
+            pass
+    QTimer.singleShot(0, reveal)
+
+
 TIP_DELAY_MS = 300        # 툴팁이 뜨기까지 (Qt 기본 700ms)
 
 

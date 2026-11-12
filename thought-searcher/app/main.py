@@ -549,7 +549,7 @@ class App:
         w = SettingsWindow(self.core, hooks, setup=setup, tab=tab or "general")
         w.finished.connect(lambda _r: setattr(self, "settings_win", None))
         self.settings_win = w
-        w.show()
+        T.show_without_flash(w)            # 처음 그리기 전 빈 회색 창이 보이지 않게
         w.raise_()
         w.activateWindow()
 
