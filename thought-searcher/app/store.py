@@ -27,7 +27,7 @@ DEFAULT_CONFIG = {
     "note_dirs": [],
     "codex_dir": "%USERPROFILE%\\.codex",
     "queue_days": 14,           # 열린 일로 보는 기간 (SPEC-queue.md)
-    "queue_focus": 5,           # 크게 보여 줄 개수
+    "queue_focus": 5,           # 기본 노출 개수 (넘는 일은 '나머지 N개'에 접힘)
     "queue_note_exclude": [],   # 큐에서 뺄 노트 폴더 (노트 폴더 기준 상대 경로)
     "journal_dir": "",          # 업무 일지 보관함 루트. 비면 일지 기능 끔
     "ask_model": "haiku",       # F2 요약 모델
