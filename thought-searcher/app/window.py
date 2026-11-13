@@ -147,7 +147,8 @@ class QueryEdit(QLineEdit):
             self.navigate.emit(1 if k == Qt.Key_Down else -1)
         elif k in (Qt.Key_PageDown, Qt.Key_PageUp):
             self.navigate.emit(8 if k == Qt.Key_PageDown else -8)
-        elif k in (Qt.Key_Left, Qt.Key_Right) and at_end and not (mods & (Qt.ShiftModifier | Qt.ControlModifier)):
+        elif k in (Qt.Key_Left, Qt.Key_Right) and mods == Qt.AltModifier:
+            # 맞은 메시지 넘기기는 Alt+←/→. 그냥 ←/→는 늘 검색어 커서를 움직인다
             self.switchMatch.emit(1 if k == Qt.Key_Right else -1)
         elif k in (Qt.Key_Return, Qt.Key_Enter):
             if mods & Qt.ControlModifier:
@@ -500,7 +501,7 @@ class HitDelegate(QStyledItemDelegate):
             y2 = y1 + fm.height() + 3
             m = hit.matches[min(idx, len(hit.matches) - 1)]
             total = hit.match_total or len(hit.matches)
-            tag = f"← {idx + 1}/{total} →" if total > 1 else ""
+            tag = f"Alt ← {idx + 1}/{total} →" if total > 1 else ""
             tw = fms.horizontalAdvance(tag) + 8 if tag else 0
             p.setFont(self.font)
             _draw_runs(p, x0 + bw + 8, y2, max_x - tw - 4, m.preview, m.highlights, fm, self.t.sub, self.t.mark_bg)
@@ -1690,12 +1691,8 @@ class SearchWindow(QWidget):
         total = hit.match_total or len(hit.matches)
         idx = min(idx, len(hit.matches) - 1) if hit.matches else 0
         when = hit.updated.astimezone().strftime("%Y-%m-%d %H:%M") if hit.updated else ""
-        meta = "  ·  ".join(s for s in (SOURCE_NAME.get(hit.source, hit.source), hit.project,
-                                         f"마지막 {when}" if when else "") if s)
-        shown = hit.matches[idx] if hit.matches else None
-        stamp = msg_stamp(shown.time) if shown is not None and shown.time else ""
-        index = (f"맞은 메시지 {idx + 1} / {total}" + (f" · {stamp}" if stamp else "")
-                 + ("    ← →" if total > 1 else "")) if hit.matches else ""
+        meta = "  ·  ".join(s for s in (SOURCE_NAME.get(hit.source, hit.source), hit.project, when) if s)
+        index = f"맞은 메시지 {idx + 1} / {total}" + ("    Alt+← →" if total > 1 else "") if hit.matches else ""
         pane.set_header(hit.source, hit.title, meta, index)
         if hit.status == "missing":
             pane.add_note("원본 없음")
