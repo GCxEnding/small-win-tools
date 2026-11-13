@@ -127,6 +127,18 @@
 > 이 절은 검색 개선 1단계 이전의 기록입니다(맨 위 절이 최신). 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
+## 같은 날 오전 추가 (CG 피드백, 커밋 83a9779 ~ 318ce2b)
+- 일지 칩(`src:journal`, `src:일지`): 단어와 같이 쓰면 일지 폴더 안의 노트 문서를 찾음(`search.journal_prefix`, `Searcher.journal_dir`, main.py가 검색마다 넣음).
+- 단어 없이 칩만 켜면 검색 대신 열린 일 큐를 거름(`main.filter_queue`, `Core.compute_queue(days=)`로 기간 칩만큼 거슬러 봄). 거른 큐가 비면 검색으로 넘어감.
+- 수집 스크립트 6단계는 굵은 제목 + 여러 줄 설명(`_row(plain=True)`).
+- 문구표(`docs/copy-table.md`) 반영: 줄에는 줄인 설명, ⓘ에는 툴팁 글. 46자 임시 규칙 없앰. 툴팁 글이 없는 줄은 설명이 '…'로 잘릴 때만 ⓘ가 켜짐(`ElideLabel.elidedChanged`). ⓘ는 강조색 16px. 순위 가중치는 `WEIGHT_HELP`에 설명.
+- 툴팁 0.3초(`theme.FastTipStyle`, `install_fast_tips`를 `main()`에서 팔레트보다 먼저).
+- 작은 흰 창 깜빡임: 부모 없는 위젯을 레이아웃에 넣기 전에 `setVisible(True)` 하면 독립 창으로 잠깐 뜸. 아래 막대 키 안내와 ⓘ에서 고침. **위젯은 레이아웃에 넣은 뒤 보이게 할 것.** `test_no_stray_windows_when_opening`이 지킴.
+- 처음 띄울 때 빈 회색 창: 검색창은 목록을 채운 뒤 띄우고, 두 창 모두 `theme.show_without_flash`(투명하게 띄워 첫 그리기 뒤 보임).
+- 설정 창은 만드는 데 약 3초: `theme.BusyNote`("설정 창 여는 중…" + 모래시계 커서).
+- 요약 칸: 끌어서 고르기, Ctrl+C(검색칸 초점 그대로, `QueryEdit.copy_other`), 오른쪽 클릭 복사. 같은 글이면 `setText`를 다시 하지 않아 고른 부분이 남음.
+- 남은 것: 문구표 메모 1("크게 보여 줄 개수" 이름), 요약 지시문을 대화체로 바꿀지(CG가 haiku의 형식 밖 대화체 답을 좋아함, `ask.PROMPT`), Windows 실화면 확인(프로젝트 메뉴, 560px 둘째 줄).
+
 ## 큐 미리보기에 최근 대화 (2026-11-12 아침, CG 요청)
 - 넓은 창의 큐 미리보기 칸 위쪽에 요약 없이도 내용이 보이게 `최근 대화`를 넣었습니다(그 아래에 저장된 요약 또는 F2 안내).
   - 채팅(claude.ai, Code, GPT, Codex): 마지막 5턴(`RECENT_TURNS`, 사용자 질문 하나 + 그 뒤 답들 = 한 턴), 한 줄 30자(`RECENT_CHARS`), `나` / `AI`. 가지 메시지, 빈 메시지는 뺌. md 꾸밈 기호(`` ` ``, `*`, `#`, `>`, 링크)는 빼고 공백은 하나로. 줄인 줄은 툴팁에 전체.
