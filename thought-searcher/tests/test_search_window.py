@@ -468,3 +468,19 @@ def test_busy_note_shows_and_closes(qt):
     b.done()
     b.done()                                               # 두 번 불러도 괜찮다
     assert not b.label.isVisible() and QApplication.overrideCursor() is None
+
+
+def test_arrows_move_cursor_alt_arrows_switch_match(qt):
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QKeyEvent
+    from app.window import QueryEdit
+    e = QueryEdit()
+    got = []
+    e.switchMatch.connect(got.append)
+    e.setText("배포 로그")
+    e.setCursorPosition(len(e.text()))
+    e.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Left, Qt.NoModifier))      # 끝에서도 커서만 움직임
+    assert e.cursorPosition() == len(e.text()) - 1 and got == []
+    e.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Right, Qt.AltModifier))
+    e.keyPressEvent(QKeyEvent(QEvent.KeyPress, Qt.Key_Left, Qt.AltModifier))
+    assert got == [1, -1] and e.cursorPosition() == len(e.text()) - 1
