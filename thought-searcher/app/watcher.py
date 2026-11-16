@@ -12,16 +12,20 @@ STABLE_SECONDS = 5.0
 IGNORE_SUFFIXES = (".crdownload", ".part", ".tmp", ".download")
 
 
+class _GUID(ctypes.Structure):
+    _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD), ("Data3", wintypes.WORD),
+                ("Data4", ctypes.c_ubyte * 8)]
+
+
 def downloads_dir() -> Path:
-    """Windows 알려진 폴더 Downloads (리디렉션 반영)."""
+    """Windows 알려진 폴더 Downloads (리디렉션 반영).
+    구조체 클래스는 모듈에 한 번만 만든다. 부를 때마다 새로 만들면 ctypes가 그 포인터 형을 영구 캐시해
+    2초 확인마다 메모리가 쌓인다(주말 동안 2GB, 2026-11-16 확인)."""
     try:
-        class GUID(ctypes.Structure):
-            _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD), ("Data3", wintypes.WORD),
-                        ("Data4", ctypes.c_ubyte * 8)]
-        fid = GUID(0x374DE290, 0x123F, 0x4565, (ctypes.c_ubyte * 8)(0x91, 0x64, 0x39, 0xC4, 0x92, 0x5E, 0x46, 0x7B))
+        fid = _GUID(0x374DE290, 0x123F, 0x4565, (ctypes.c_ubyte * 8)(0x91, 0x64, 0x39, 0xC4, 0x92, 0x5E, 0x46, 0x7B))
         ptr = ctypes.c_wchar_p()
         shell32 = ctypes.WinDLL("shell32")
-        shell32.SHGetKnownFolderPath.argtypes = [ctypes.POINTER(GUID), wintypes.DWORD, wintypes.HANDLE,
+        shell32.SHGetKnownFolderPath.argtypes = [ctypes.POINTER(_GUID), wintypes.DWORD, wintypes.HANDLE,
                                                  ctypes.POINTER(ctypes.c_wchar_p)]
         if shell32.SHGetKnownFolderPath(ctypes.byref(fid), 0, None, ctypes.byref(ptr)) == 0:
             path = ptr.value
