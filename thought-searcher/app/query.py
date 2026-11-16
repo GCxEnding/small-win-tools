@@ -1,6 +1,6 @@
 """검색어 파서.
 
-문법: 단어(대화 단위 AND), "구문", -제외어, 필터(src:, proj:, after:, before:), 1글자는 제목에서만.
+문법: 단어(대화 단위 AND), "구문", -제외어, 필터(src:, proj:, after:, before:, by:me), 1글자는 제목에서만.
 FTS 질의는 항상 큰따옴표로 감싼 토큰으로 만들어 FTS5 문법 문자가 그대로 들어와도 오류가 나지 않는다.
 """
 from __future__ import annotations
@@ -22,6 +22,7 @@ SOURCE_ALIASES = {
     "journal": "journal", "일지": "journal", "j": "journal",   # 업무 일지: journal_dir 안의 노트 (Searcher.journal_dir)
 }
 
+BY_ME_VALUES = ("me", "나")
 _DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$")
 
 
@@ -47,6 +48,7 @@ class Query:
     projects: list[str] = field(default_factory=list)
     after: date | None = None
     before: date | None = None
+    by_me: bool = False                  # by:me(by:나): 모든 단어가 내가 쓴 메시지에 있어야 한다
 
     @property
     def has_text(self) -> bool:
@@ -68,6 +70,8 @@ class Query:
             out.append(f"after:{self.after.isoformat()}")
         if self.before:
             out.append(f"before:{self.before.isoformat()}")
+        if self.by_me:
+            out.append("by:me")
         out += [f"-{t.text}" for t in self.excludes] + [f"-{t}" for t in self.title_excludes]
         return out
 
@@ -114,6 +118,53 @@ def _split(q: str) -> list[tuple[str, bool, bool]]:
     return out
 
 
+def _raw_tokens(q: str) -> list[tuple[int, int]]:
+    """_split과 같은 규칙으로 자른 검색어 조각들의 (시작, 끝) 위치 (-, 따옴표 포함)."""
+    out = []
+    i, n = 0, len(q or "")
+    while i < n:
+        if q[i].isspace():
+            i += 1
+            continue
+        s = i
+        if q[i] == "-" and i + 1 < n and not q[i + 1].isspace():
+            i += 1
+        if q[i] == '"':
+            j = q.find('"', i + 1)
+            i = n if j < 0 else j + 1
+        else:
+            while i < n and not q[i].isspace():
+                i += 1
+        out.append((s, i))
+    return out
+
+
+def token_kind(token: str) -> str | None:
+    """손으로 친 조각의 조건 종류: source / period / project / mine / exclude. 일반 낱말이면 None."""
+    if len(token) > 1 and token[0] == "-":
+        return "exclude"
+    if token.startswith('"') or ":" not in token:
+        return None
+    key, _, value = token.partition(":")
+    key = key.lower()
+    if key == "src" and value.lower() in SOURCE_ALIASES:
+        return "source"
+    if key == "proj" and value:
+        return "project"
+    if key in ("after", "before") and _parse_date(value):
+        return "period"
+    if key == "by" and value.lower() in BY_ME_VALUES:
+        return "mine"
+    return None
+
+
+def strip_tokens(text: str, kinds: set[str]) -> str:
+    """검색칸 글자에서 해당 종류의 조건 조각(src: proj: after: before: by: -제외어)을 지운다. 낱말은 그대로."""
+    text = text or ""
+    kept = [text[s:e] for s, e in _raw_tokens(text) if token_kind(text[s:e]) not in kinds]
+    return " ".join(kept)
+
+
 def _term(text: str, phrase: bool) -> Term | None:
     toks = tokens(text)
     if not toks:
@@ -141,6 +192,9 @@ def parse(q: str) -> Query:
                 if d:
                     setattr(query, key, d)
                     continue
+            if key == "by" and value.lower() in BY_ME_VALUES:
+                query.by_me = True
+                continue
             # 알 수 없는 필터는 일반 검색어
         core = core_chars(text)
         if not core:

@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
     "ask_command_codex": [],        # 비면 PATH의 codex, 그다음 Codex 데스크톱 앱 번들
     "theme_mode": "system",         # 화면 모드: "light" | "dark" | "system"
     "theme_accent": "ink_blue",     # 강조색: ink_blue | deep_teal | sage_green | rust (색 값은 theme.py)
+    "search_sort": "recent",        # 검색 창 기본 정렬: "recent"(채팅 시각 늦은 순) | "relevance"(정확도)
     "setup_done": False,            # 시작 안내를 마쳤거나 건너뜀 (판정은 '시작 때 config.json이 없었음')
 }
 

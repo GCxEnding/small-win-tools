@@ -33,6 +33,7 @@ from .settings_window import Hooks, SettingsWindow
 from .store import Store
 from .watcher import ZipPoller
 from .window import SearchWindow
+from .zero import search_all
 
 APP_NAME = "생각 검색기"
 MUTEX_NAME = "Local\\GCxEnding.small-win-tools.thought-searcher"
@@ -202,6 +203,7 @@ class App:
         self.window.action.connect(self.on_action)
         self.window.settingsRequested.connect(self._settings_from_search)
         self.window.set_ask_enabled(self.core.ask_provider != "off")
+        self.window.set_default_sort(S.read_search_sort(self.core.config))
         self.ask_bridge = AskBridge()
         self.ask_bridge.finished.connect(self.on_ask_finished)
         self._asking: set[str] = set()
@@ -593,6 +595,8 @@ class App:
             self.searcher.max_results = self.core._int_cfg("max_results", 50)
         if "ask_provider" in changed:
             self.window.set_ask_enabled(self.core.ask_provider != "off")
+        if "search_sort" in changed:
+            self.window.set_default_sort(S.read_search_sort(new))      # 열려 있는 검색은 그대로, 다음에 열 때부터
         if changed & {"theme_mode", "theme_accent"}:
             self.apply_theme()
         if start and not self._setup_pending:
@@ -661,12 +665,19 @@ class App:
                 return
         try:
             self.searcher.journal_dir = str(self.core.journal_dir or "")
-            hits = self.searcher.search(text)
+            out = search_all(self.searcher, text, self.window.sort)   # 0건이면 한영 보정, 그래도 0건이면 조건 안내
+            hits, note, hint = out.hits, out.note, out.hint
         except Exception as e:  # noqa: BLE001
             log.exception("검색 실패")
             self.window.set_results([], f"검색 오류: {e}")
             return
-        self.window.set_results(hits, self._compose_status(len(hits)))
+        last = self.searcher.last_query
+        status = self._compose_status(len(hits))
+        if note:
+            status = f"{note}  ·  {status}"
+        # 날짜 묶음 줄: 최신순이고 단어가 있는 검색 결과에만 (정확도순, 큐, 칩만 켠 목록에는 없음)
+        self.window.set_results(hits, status, grouped=self.window.sort == "recent" and bool(last and last.has_text),
+                                hint=hint)
 
     def project_names(self) -> list[str]:
         """프로젝트 칩 메뉴: 색인의 프로젝트 이름, 최근에 쓴 것부터 (노트는 폴더 경로라 뺀다)."""

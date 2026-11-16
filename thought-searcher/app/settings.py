@@ -36,6 +36,8 @@ PROVIDERS = ("claude", "codex", "off")
 # 화면 모드와 강조색 이름 (색 값은 theme.py 한 곳)
 THEME_MODES = ("light", "dark", "system")
 THEME_MODE_LABEL = {"light": "라이트", "dark": "다크", "system": "시스템"}
+SEARCH_SORTS = ("recent", "relevance")
+SEARCH_SORT_LABEL = {"recent": "최신", "relevance": "정확도"}
 THEME_ACCENTS = ("ink_blue", "deep_teal", "sage_green", "rust")
 THEME_ACCENT_LABEL = {"ink_blue": "잉크 블루", "deep_teal": "딥 틸", "sage_green": "세이지 그린", "rust": "러스트"}
 
@@ -46,6 +48,12 @@ def read_theme(cfg: dict) -> tuple[str, str]:
     accent = str(cfg.get("theme_accent") or "").strip().lower()
     return (mode if mode in THEME_MODES else DEFAULT_CONFIG["theme_mode"],
             accent if accent in THEME_ACCENTS else DEFAULT_CONFIG["theme_accent"])
+
+
+def read_search_sort(cfg: dict) -> str:
+    """검색 창 기본 정렬. 잘못된 값이면 기본값(recent)."""
+    v = str(cfg.get("search_sort") or "").strip().lower()
+    return v if v in SEARCH_SORTS else DEFAULT_CONFIG["search_sort"]
 
 
 def read_sources(cfg: dict) -> dict[str, bool]:
@@ -200,7 +208,7 @@ class Field:
     key: str
     tab: str
     kind: str     # hotkey path paths relpaths int sources queue_sources choice text cli command weights regexes url
-    #               theme_mode theme_accent
+    #               theme_mode theme_accent search_sort
     lo: float | None = None
     hi: float | None = None
 
@@ -209,6 +217,7 @@ FIELDS: tuple[Field, ...] = (
     Field("hotkey", "general", "hotkey"),
     Field("theme_mode", "general", "theme_mode"),
     Field("theme_accent", "general", "theme_accent"),
+    Field("search_sort", "general", "search_sort"),
     Field("archive_dir", "general", "path"),
     Field("note_dirs", "general", "paths"),
     Field("journal_dir", "general", "path"),
@@ -336,6 +345,8 @@ def field_error(key: str, value) -> str:
         return "" if value in PROVIDERS else "claude, codex, off 중 하나여야 합니다"
     if k == "theme_mode":
         return "" if value in THEME_MODES else f"{', '.join(THEME_MODES)} 중 하나여야 합니다"
+    if k == "search_sort":
+        return "" if value in SEARCH_SORTS else f"{', '.join(SEARCH_SORTS)} 중 하나여야 합니다"
     if k == "theme_accent":
         return "" if value in THEME_ACCENTS else f"{', '.join(THEME_ACCENTS)} 중 하나여야 합니다"
     if k == "text":

@@ -141,7 +141,7 @@ def test_mode_is_segmented_and_hotkey_uses_keycaps(qt, core_env):
     app, sw = qt
     w = make(sw, core_env)
     seg = [b for b in w.findChildren(sw.QPushButton) if b.objectName() == "seg"]
-    assert [b.property("segpos") for b in seg] == ["first", "mid", "last"]
+    assert [b.property("segpos") for b in seg] == ["first", "last", "first", "mid", "last"]   # 기본 정렬 2칸 + 모드 3칸
     assert w.hotkey.property("caps") is True and w.hotkey.t is not None
     w.hotkey.start()
     assert w.hotkey.property("caps") is False

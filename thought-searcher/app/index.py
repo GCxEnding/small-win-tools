@@ -15,7 +15,7 @@ from .notes import SOURCE as NOTE_SOURCE, iter_note_files, parse_note
 from .timeutil import parse_iso
 from .tokenize import normalize, token_string
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2: messages.created_ts (메시지 시각, 기간 검색용)
 log = logging.getLogger("thought-searcher")
 
 ProgressFn = Callable[[int, int], None]
@@ -59,8 +59,9 @@ def _schema(contentless: bool) -> list[str]:
         "CREATE INDEX IF NOT EXISTS docs_updated ON docs(updated_ts)",
         """CREATE TABLE IF NOT EXISTS messages(
             id INTEGER PRIMARY KEY, doc_id INTEGER, ordinal INTEGER, role TEXT, line_no INTEGER,
-            body_line INTEGER, is_branch INTEGER, text TEXT)""",
+            body_line INTEGER, is_branch INTEGER, text TEXT, created_ts REAL)""",
         "CREATE INDEX IF NOT EXISTS messages_doc ON messages(doc_id)",
+        "CREATE INDEX IF NOT EXISTS messages_created ON messages(created_ts)",
         f"CREATE VIRTUAL TABLE IF NOT EXISTS conv_fts USING fts5(title_tok, body_tok{opt}, {tok})",
         f"CREATE VIRTUAL TABLE IF NOT EXISTS msg_fts USING fts5(tok{opt}, {tok})",
     ]
@@ -186,20 +187,24 @@ class Index:
     def _insert_doc(conn: sqlite3.Connection, path: Path, doc: ParsedDoc, mtime: float, size: int) -> None:
         m = doc.meta
         upd = parse_iso(m.get("updated"))
+        upd_ts = upd.timestamp() if upd else 0.0
         cur = conn.execute(
             """INSERT INTO docs(conv_id, path, title, title_norm, source, project, project_norm, created,
                updated, updated_ts, status, md_mtime, md_size, msg_count) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (doc.conv_id, str(path), m.get("title", ""), normalize(m.get("title", "")), m.get("source", ""),
              m.get("project", ""), normalize(m.get("project", "")), m.get("created", ""), m.get("updated", ""),
-             upd.timestamp() if upd else 0.0, m.get("source_status", "present") or "present", mtime, size,
+             upd_ts, m.get("source_status", "present") or "present", mtime, size,
              len(doc.messages)))
         doc_id = cur.lastrowid
         first = last = None
         body_parts = []
         for pm in doc.messages:
+            when = parse_iso(pm.created)       # 시각이 없거나 읽을 수 없으면(노트 구역 등) 문서 updated_ts
             c = conn.execute(
-                "INSERT INTO messages(doc_id, ordinal, role, line_no, body_line, is_branch, text) VALUES(?,?,?,?,?,?,?)",
-                (doc_id, pm.ordinal, pm.role, pm.line_no, pm.body_line, int(pm.is_branch), pm.text))
+                "INSERT INTO messages(doc_id, ordinal, role, line_no, body_line, is_branch, text, created_ts)"
+                " VALUES(?,?,?,?,?,?,?,?)",
+                (doc_id, pm.ordinal, pm.role, pm.line_no, pm.body_line, int(pm.is_branch), pm.text,
+                 when.timestamp() if when else upd_ts))
             mid = c.lastrowid
             first = mid if first is None else first
             last = mid

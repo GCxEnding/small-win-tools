@@ -1,6 +1,130 @@
+## 검색 개선 3단계: by:me, 한영 자동 보정, 0건 안내 + 정렬 순서와 `모두 지우기` 위치 (2026-11-13)
+기준 문서는 `docs/search-plan.md` 5, 6, 7절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다.
+
+### 먼저 고친 것 (CG 결정)
+- 정렬 단추 순서를 어디서나 `최신 | 정확도`(기본값이 앞)로. 창 안 단추(`window.SORTS`)를 뒤집었고 설정 세그먼트는 이미 그 순서였습니다.
+- `모두 지우기`를 칩 첫째 줄 끝(`일지` 뒤)으로 옮기고 둘째 줄은 `기간, 프로젝트, 내 질문, 정렬`. 칩 여백(`#qchip` 7px, `#qseg` 6px), 줄 간격 4px, 줄 이름 칸 28px, `모두 지우기` 8.5pt, 프로젝트 칩 이름 8자(`PROJECT_LABEL_MAX`)로 줄여 폭을 맞췄습니다.
+- 칩 줄 최소 폭(실제 Windows 글꼴, 창을 띄운 상태, 출처 칩 8개 + 기간 + 프로젝트 이름 15자 + `모두 지우기` 켬): 예전(30c4b43) 칩 끔 528px / 전부 켬 626px -> 지금 칩 끔 519px / 전부 켬(내 질문 포함) 521px. 창 최소 폭(560px) 안에 들어갑니다.
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/query.py` | `Query.by_me`, `by:me`/`by:나`, `filter_labels`에 `by:me`. `token_kind`, `strip_tokens`(검색칸에서 해당 종류의 조건 조각 지우기: source/period/project/mine/exclude) |
+| `app/search.py` | 후보 계산을 `_term_rows`로 뺌(검색과 개수 세기가 같이 씀). `by:me`: 단어마다 사용자 메시지에 있는 대화만(`_in_user_messages`), 노트 제외(노트 구역이 `role=user`로 저장되기 때문), 맞은 메시지/채팅 시각/미리보기는 사용자 메시지만. `Searcher.count`/`count_query`(Hit를 만들지 않음). `_msg_times`가 (시각, 사용자 메시지 id)를 돌려줌 |
+| `app/hangul.py` (새) | emoji-searcher `hangul.py`의 두벌식 표와 `is_keyboard_latin`, `latin_to_hangul` 복사(출처를 주석에 적음) + `hangul_to_latin`, `latin_word_to_hangul`, `fix_layout`, `found_message` |
+| `app/zero.py` (새) | `present`, `without`, `zero_hint`, `ZeroHint`(`text`: `출처를 제외하면 12건입니다`, `eul_reul`), `search_all`(검색 -> 0건이면 한영 보정 -> 그래도 0건이면 안내) |
+| `app/window.py` | `내 질문` 칩(`ChipBar.mine`, `mine_button`), 칩 `clear_kinds`, 0건 안내 줄(`K_HINT`, 선택 가능, 클릭/Enter -> `remove_condition`), `set_results(..., hint=)`, 정렬 순서, 칩 줄 배치, 미리보기 제목 비움(항목 없을 때 `(제목 없음)` 안 보임) |
+| `app/main.py` | `on_query`가 `search_all` 사용, 보정으로 찾으면 상태에 `nginx로 찾았습니다  ·  N건 · Xms` |
+| `app/theme.py` | 칩/정렬/모두 지우기 여백 |
+| `tests/test_by_me_zero.py` (새) | 17개. `test_search_sort.py`는 옛 최소 폭 시험 한 개를 뺌 |
+| `README.md`, `docs/search-plan.md` | 검색 문법 표 `by:me`, 칩, 한영 보정, 0건 안내, 정렬 순서 |
+
+### 정한 것 (계획에 없던 부분)
+- 맞은 메시지/후보: `by:me`는 단어마다 "사용자 메시지에 그 단어가 있다"를 따로 보고 교집합. 제목에만 있는 단어는 인정하지 않습니다. 단어 없이 `by:me`만 있는 질의는 큐 거르기 길(예전과 같음)이라 `by:me`가 큐에는 영향이 없습니다(큐가 비어 검색으로 넘어가면 노트를 뺀 최근 대화 목록).
+- 한영 보정 대상: `-제외어`, 따옴표 구문, `:`가 든 조각은 건드리지 않습니다. 영문 -> 한글은 소문자 영문 2자 이상이고 결과가 완성된 음절뿐일 때만(`nginx`, `docker`는 낱자가 남아 제외). 한글 -> 영문은 낱자 자모가 하나라도 있는 낱말만(완성된 한글 낱말은 그대로).
+- 상태 글자는 `nginx로 찾았습니다  ·  3건 · 12ms`. 조사는 `로`/`으로`(한글 받침 없음/ㄹ이면 `로`).
+- 0건 안내의 "가장 많이 나오는 조건"이 같으면 순서(출처, 기간, 프로젝트, 내 질문, 제외어) 앞쪽. 조건이 하나뿐이고 그것을 빼도 0건이면 안내 없음. 칩과 손으로 친 조각이 같이 있으면 둘 다 한 조건으로 보고 둘 다 끕니다.
+- 안내 줄 클릭 직후 0.5초 안의 더블클릭은 새 목록의 항목을 열지 않게 무시합니다.
+
+### 함정
+- 칩 줄 폭 수치는 글꼴이 있는 실제 Windows 렌더링 기준입니다. offscreen 시험은 글꼴이 없어 글자가 넓게 잡혀(약 600px) 시험 기준을 `MIN_W + 60`으로 두었습니다.
+- 칩 레이아웃은 창을 띄우기 전과 후의 `minimumSizeHint`가 다릅니다(스타일 적용 전엔 더 큼). 폭을 잴 때는 창을 띄우고 `layout().activate()` 뒤에 재야 합니다.
+- `Searcher.search()`가 `by:me`에서 후보를 줄이는 쿼리는 단어마다 `messages` + `msg_fts` 조인입니다. 흔한 단어에서는 비용이 있으니 마지막 속도 확인 때 같이 보세요.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 통과.
+- 화면 캡처 2장(`$KIROCREW_SCRATCH\png8\`): `search-narrow-chips-light.png`(창 최소 폭 560px, 칩 전부 켬, 모두 지우기 보임), `search-zero-dark.png`(0건 안내 줄). 안내 화면에서 미리보기 칸 제목이 `(제목 없음)`으로 나오는 결함을 고쳐 한 번 다시 찍었습니다.
+
+### 남은 일
+- 모든 단계 뒤 `tests/test_perf.py`를 돌려 `89a7794`와 비교(기간 질의, `by:me`, 최신순 포함).
+- README 설정 창 표와 `docs/copy-table.md` 문구 정리는 CG 확인 후.
+
+---
+
+## 검색 개선 2단계: 정렬, 채팅 시각 표시, 날짜 묶음 줄 (2026-11-13)
+기준 문서는 `docs/search-plan.md` 3, 4, 8절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다(모든 단계 뒤 따로 확인).
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/search.py` | `Searcher.search(text, limit, sort="relevance"\|"recent")`. 최신순은 후보를 채팅 시각 늦은 순(같으면 점수 높은 쪽)으로 정렬한 뒤 limit로 자름(`_rank`는 건드리지 않음, 최신순에서는 부르지 않음). `_matched_times`가 {대화: 맞은 메시지 중 가장 늦은 시각}을 SQL 한 번으로 구해 기간 거르기(`_in_period`)와 정렬이 같이 씀. `MatchedMessage.time` 추가. 최신순이면 `matches`가 늦은 메시지부터 |
+| `app/window.py` | 칩 줄 오른쪽 끝 `정확도 \| 최신` 단추(`ChipBar.sort`, `sort_buttons`, NoFocus), `Ctrl+R`(`QueryEdit.toggleSort`), `popup()`에서 기본값으로 복귀, `SearchWindow.sort`/`set_default_sort`, `set_results(..., grouped=)`와 날짜 묶음 줄(`K_GROUP`, 고를 수 없는 항목 + `_navigate`가 건너뜀), 결과 줄 날짜(`row_when`), 미리보기 머리/메시지 이름표(`msg_stamp`, `role_label`), 아래 막대 키 안내 `정렬 Ctrl R`(좁으면 숨김) |
+| `app/theme.py` | `#qseg`(정렬 단추) 스타일 |
+| `app/settings.py`, `app/store.py` | `search_sort`(기본 `recent`), `SEARCH_SORTS`/`SEARCH_SORT_LABEL`, `read_search_sort`, 칸 종류 `search_sort` |
+| `app/settings_window.py` | `설정 > 일반 > 검색 창 > 기본 정렬` 세그먼트(최신 / 정확도) |
+| `app/main.py` | 검색에 `sort=window.sort`, 묶음 줄은 `최신순 and q.has_text`일 때만, 시작과 설정 저장 때 `set_default_sort` |
+| `tests/test_search_sort.py`(새), `test_search_window.py`, `test_settings_search.py` | 새 테스트 13개. 키 안내 4개, 세그먼트 5개로 기대값 수정 |
+| `README.md` | 검색 문법(기간이 메시지 기준, 정렬), 검색 창 화면, 검색 창 키 `Ctrl+R`, 설정 창 일반 행 |
+
+### 정한 것 (계획에 없던 부분)
+- `search()` 기본 인자는 `sort="relevance"`라 CLI와 예전 테스트는 그대로입니다. 창이 `window.sort`를 넘깁니다.
+- 묶음 줄은 `최신순 + 단어(또는 한 글자) 검색`일 때만 만듭니다. 칩만 켠 목록, 큐, 정확도순에는 없습니다. 기준 날짜는 `SearchWindow.today`(시험에서 바꿈), 묶음 이름은 `window.date_group`.
+- `모두 지우기`는 칩만 끄고 정렬은 그대로 둡니다(`ChipBar.reset(keep_sort=True)`). 창을 열 때(`popup`)만 기본값으로 돌아갑니다. 설정을 바꿔도 열려 있는 검색의 정렬은 그대로이고 다음에 열 때부터 적용됩니다.
+- 설정의 세그먼트 순서는 `최신 | 정확도`, 창 안 단추는 계획대로 `정확도 | 최신`.
+- `· 마지막 MM-DD`는 `Hit.updated`(대화 마지막 시각)와 `Hit.chat_time`의 로컬 날짜가 다를 때만 붙고 흐리게(sub 색 알파 150) 그립니다.
+- 키 안내 `정렬 Ctrl R`을 아래 막대에 넣었고 좁은 창에서는 `대화 복사`처럼 숨깁니다.
+
+### 함정
+- 칩 줄의 최소 폭: 정렬 단추를 달아도 칩을 안 켰을 때는 첫째 줄(590px)이 기준 그대로입니다. 그러나 칩을 켜서 `모두 지우기`가 보이면 둘째 줄이 약 650px 이상이 되어, 창 최소 폭이 그만큼 커집니다(예전 약 590). 좁게 줄여 둔 창에서 칩을 켜면 창이 조금 넓어집니다. 문제가 되면 `모두 지우기`를 첫째 줄로 옮기거나 칩 여백을 줄일 것.
+- 날짜 묶음 줄은 항목 플래그를 비워(`Qt.NoItemFlags`) 고를 수 없게 했습니다. 키 이동은 `_step_row`로 건너뛰고, 위 방향으로 첫 결과에 닿으면 `_on_row_changed`가 바로 위 묶음 줄이 보이게 스크롤합니다.
+- 최신순에서는 영어 앞부분 일치(`log` -> `logpick`)로 약하게 맞은 대화가 위로 올 수 있습니다(계획에서 일단 두기로 함).
+- 화면 확인용 Qt는 `offscreen` 플랫폼에서 글꼴이 없어 글자가 네모로 나옵니다. 화면 캡처는 기본(windows) 플랫폼으로 해야 읽힙니다.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 통과.
+- 화면 캡처 2장(`$KIROCREW_SCRATCH\png7\search-wide-recent-light.png` 980px 라이트, 묶음 4개와 `· 마지막` 한 줄 / `settings-general-dark.png`). 눈에 띄는 결함 없음.
+
+### 남은 일
+- 3단계: `by:me` + `내 질문` 칩(정렬 단추 앞), 한영 자동 보정, 0건 안내.
+- 모든 단계 뒤 `tests/test_perf.py` 확인(최신순은 `_rank`를 안 부르므로 따로 느려지지 않지만, 기간 질의 `_matched_times`는 흔한 단어에서 비용이 있음).
+
+---
+
+## 검색 개선 1단계: 메시지 시각 색인, 메시지 기준 기간 검색, 채팅 시각 (2026-11-12 밤)
+기준 문서는 `docs/search-plan.md`입니다. 이번에는 검색 엔진만 바꿨고 창, 정렬, 칩, 설정은 건드리지 않았습니다. push는 하지 않았습니다.
+
+### 바뀐 파일
+| 파일 | 내용 |
+|---|---|
+| `app/index.py` | `SCHEMA_VERSION` 2. `messages.created_ts REAL`(UTC 초)와 `messages_created` 색인 추가. 메시지 시각을 못 읽거나 없으면 문서 `updated_ts` |
+| `app/search.py` | `Hit.chat_time` 추가. 단어가 있는 검색의 `after:`/`before:`를 맞은 메시지 시각 기준으로 거름(`_in_period`). 메시지 시각 일괄 조회(`_msg_times`). `_make_hit`이 기간 안의 메시지만 `matches`/`match_total`에 담고 `chat_time` 계산 |
+| `tests/test_message_time.py` (새) | 11개 |
+| `tests/test_index_search.py` | 스키마 버전 단언을 `SCHEMA_VERSION`으로 |
+| `docs/search-plan.md` | 이번 커밋에서 처음 추가. 1단계 보충 설명 한 절 덧붙임 |
+
+### 정한 것 (계획에 없던 부분)
+- **맞은 메시지** = 검색어 중 하나라도 들어 있는 메시지(`msg_fts`의 OR). 미리보기가 맞은 메시지를 고르는 방식(`_rowids`를 단어별로 합침)과 같습니다. 대화 전체는 지금처럼 모든 단어가 AND로 맞아야 후보가 됩니다. 그래서 `레디스 캐시`처럼 단어가 서로 다른 메시지에 나뉘어도, 그중 하나가 기간 안이면 남습니다.
+- **제목에만 맞은 대화**(맞은 메시지가 하나도 없음): 예전 대화 단위 조건(`updated_ts >= after`, `created < before`)으로 판단하고 `chat_time`은 `updated_ts`입니다. 미리보기는 기간 안의 첫 메시지(없으면 첫 메시지). 본문에도 맞은 메시지가 있는데 모두 기간 밖이면 이 예외로 살리지 않습니다.
+- 한 글자 검색어만 있는 질의(`title_terms`뿐)와 단어 없는 질의는 예전 그대로입니다. `chat_time`은 `updated_ts`로 채웁니다(마지막 메시지 시각과 같음).
+- `before:`는 로컬 시간대 0시 미만(그날은 제외). `after:`는 0시 이상. 단어가 있을 때만 메시지 시각 `created_ts`로 비교합니다.
+- `chat_time`은 로컬 시간대 aware `datetime`. 기간이 있으면 기간 안의 맞은 메시지 중 가장 늦은 시각.
+- `_rank`는 그대로입니다. 기간 거르기는 `_rank` 앞에서 하므로 상위 N개를 자른 뒤 기간 밖이 섞이지 않습니다.
+- 노트는 구역마다 시각이 없어서 `parse_note`가 문서 시각을 `created`에 넣고 있으므로 결과적으로 문서 `updated_ts`와 같습니다.
+
+### 함정
+- `messages.id`가 대화 안에서 이어지는 번호라는 기존 전제(`msg_first`..`msg_last`)를 그대로 씁니다. 제목에만 맞은 대화의 미리보기 선택도 이 범위를 돕니다.
+- 메시지 시각 일괄 조회는 결과로 나갈 대화(최대 `limit`개)의 메시지 (id, created_ts)를 400개 대화씩 한 번에 읽습니다. 메시지가 아주 많은 대화가 섞이면 이 양이 늘어납니다.
+- 기간 거르기 SQL은 `messages WHERE id IN (msg_fts MATCH ...) AND created_ts 범위`입니다. 흔한 단어 + 넓은 기간이면 `_rowids`와 비슷한 비용이 듭니다.
+- 앱이 시작할 때 `main.py`가 `index.open()`으로 옛 버전 색인을 비우고, 이어서 `start_jobs`의 `sync_index`가 md에서 다시 채웁니다(대화가 많으면 처음에 부분 결과만 보임. 기존 재색인과 같음).
+- `tests/test_queue.py`의 `_fill`은 `created_ts` 없이 `messages`에 넣습니다(NULL 허용). 기간 검색은 NULL 메시지를 기간 밖으로 봅니다.
+- 작업 폴더 파일의 줄 끝이 CRLF인 것과 LF인 것이 섞여 있습니다(`core.autocrlf=true`). 저장소에는 LF로 들어갑니다.
+
+### 확인한 것
+- `python -m pytest -q --deselect tests/test_perf.py` 401개 통과(새 테스트 11개 포함).
+- 스키마 1 -> 2 자동 재생성: 옛 스키마 파일을 직접 만들어 `open()`이 비우고 `sync()`가 md로 채우는 것을 `test_schema_v1_index_is_rebuilt_from_md`로 확인.
+- **속도 테스트(`tests/test_perf.py`)는 CG 지시로 이번 단계에서 건너뜀.** 모든 단계 끝난 뒤 따로 확인할 것. 참고로 변경 전에 한 번 돌렸을 때 `docker 컨테이너 네트워크` 한 질의가 327ms로 한도(300ms)를 넘겨 실패했고(나머지 통과), 변경 후 전체 실행은 21개 모두 통과했습니다. 중간에 따로 잰 `after:2025-06 검색`은 312ms(3회 중 최소)였으니, 기간 질의가 한도 근처인지 마지막에 확인해야 합니다.
+
+### 남은 일
+- 2단계: 정렬(`정확도`/`최신`, `Ctrl+R`, 설정 `search_sort`), 화면의 채팅 시각 표시, 날짜 구분 줄. `Hit.chat_time`을 쓰면 됩니다.
+- 3단계: `by:me`, 한영 자동 보정, 0건 안내.
+- 모든 단계가 끝난 뒤 `tests/test_perf.py`를 돌려 기간 질의 속도를 확인.
+- README와 `docs/copy-table.md` 갱신은 3단계 뒤.
+
+---
+
 # 인수인계: 검색창, 설정창 새 디자인 (2026-11-12)
 
-> 이 절이 최신입니다. 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
+> 이 절은 검색 개선 1단계 이전의 기록입니다(맨 위 절이 최신). 아래 절들은 그 전 작업 기록이고 구조 설명은 여전히 유효합니다.
 > 기준 문서는 `docs/redesign-plan.md`(CG와 정함). 문구 정리는 `docs/copy-table.md`에 표로만 있고 **코드에는 아직 반영하지 않았습니다**(CG 확인 대기). push는 하지 않았습니다.
 
 ## 같은 날 오전 추가 (CG 피드백, 커밋 83a9779 ~ 318ce2b)
