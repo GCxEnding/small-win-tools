@@ -15,7 +15,7 @@ from pathlib import Path
 
 # 색인 문서 중 큐에 오르는 것의 기본값(설정 queue_sources가 없을 때). 그 밖에 "journal"(연결 안 된 일지 항목)
 QUEUE_SOURCES = ("claude-code", "claude-ai", "note")
-ALL_SOURCES = ("claude-ai", "chatgpt", "claude-code", "codex", "note")   # 설정으로 고를 수 있는 것
+ALL_SOURCES = ("claude-ai", "chatgpt", "claude-code", "codex", "gemini", "note")   # 설정으로 고를 수 있는 것
 DAY = 86400.0
 CLOSE_KINDS = ("done", "drop")
 REOPEN = "open"

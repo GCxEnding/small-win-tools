@@ -48,20 +48,20 @@ HINTS_SEARCH = [("열기", ("Enter",), True, False), ("메시지 복사", ("Ctrl
 HINTS_QUEUE = [("열기", ("Enter",), True, False), ("요약", ("F2",), False, False), ("완료", ("F4",), False, False),
                ("버림", ("Shift", "F4"), False, False), ("대화 복사", ("Shift", "Enter"), False, True)]
 BADGE = {"claude-ai": "AI", "claude-code": "Code", "claude-ai-project": "P", "claude-ai-memory": "M", "chatgpt": "GPT", "note": "노트", "codex": "Codex",
-         "journal": "일지"}
+         "gemini": "Gemini", "journal": "일지"}
 SOURCE_NAME = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "claude-ai-project": "claude.ai 프로젝트",
                "claude-ai-memory": "claude.ai 메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex",
-               "journal": "업무 일지"}
+               "gemini": "Gemini", "journal": "업무 일지"}
 PLACEHOLDER = "기억나는 단어 몇 개"
 # 검색 옵션 칩: (글자, src: 값). 회사별로 모아 둔 순서
 SOURCE_CHIPS = [("AI", "ai"), ("프로젝트", "project"), ("메모리", "memory"), ("Code", "code"), ("GPT", "gpt"),
-                ("Codex", "codex"), ("노트", "note"), ("일지", "journal")]
+                ("Codex", "codex"), ("Gemini", "gemini"), ("노트", "note"), ("일지", "journal")]
 _SRC_VALUE = {"claude-ai": "ai", "claude-ai-project": "project", "claude-ai-memory": "memory", "claude-code": "code",
-              "chatgpt": "gpt", "codex": "codex", "note": "note", "journal": "journal"}
+              "chatgpt": "gpt", "codex": "codex", "gemini": "gemini", "note": "note", "journal": "journal"}
 # 기간 칩: (글자, 며칠 전부터 / "year" / None=전체)
 PERIOD_CHIPS = [("전체", None), ("1주", 7), ("1달", 30), ("3달", 90), ("올해", "year")]
 PROJECT_LABEL_MAX = 8    # 칩을 다 켜도 칩 줄이 좁아지게(최소 폭 약 600). 전체 이름은 툴팁
-QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|note|memory|project  proj:  after:2026-10  by:me)")
+QUERY_TIP = ("기억나는 단어 몇 개  (\"구문\"  -제외  src:ai|code|codex|gpt|gemini|note|memory|project  proj:  after:2026-10  by:me)")
 DEBOUNCE_MS = 150
 PREVIEW_DEBOUNCE_MS = 60
 WIN_W, WIN_H = 820, 560
@@ -801,7 +801,8 @@ class ChipBar(QFrame):
             row1.addWidget(b)
             self.src_buttons[value] = b
         row1.addStretch(1)
-        self.clear_button = QPushButton("모두 지우기")
+        self.clear_button = QPushButton("지우기")         # '모두 지우기'였다. Gemini 칩을 넣으며 폭을 맞추려 줄임
+        self.clear_button.setToolTip("칩을 모두 끕니다")
         self.clear_button.setObjectName("chipClear")
         self.clear_button.setFocusPolicy(Qt.NoFocus)
         self.clear_button.setCursor(Qt.PointingHandCursor)

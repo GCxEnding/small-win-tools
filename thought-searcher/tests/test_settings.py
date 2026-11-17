@@ -219,7 +219,7 @@ def test_setup_defaults_from_install_traces(tmp_path):
     home = tmp_path / "home"
     (home / ".claude" / "projects").mkdir(parents=True)
     g = S.guess_sources(home)
-    assert g == {"claude_ai": False, "chatgpt": False, "claude_code": True, "codex": False}
+    assert g == {"claude_ai": False, "chatgpt": False, "gemini": False, "claude_code": True, "codex": False}
     assert S.setup_provider(g) == "claude"
     home2 = tmp_path / "home2"
     (home2 / ".codex").mkdir(parents=True)
@@ -230,7 +230,7 @@ def test_setup_defaults_from_install_traces(tmp_path):
     colleague = {**nothing, "chatgpt": True}
     c = S.setup_config(colleague)
     assert c["ask_provider"] == "codex" and c["queue_sources"] == ["chatgpt", "note"]
-    assert c["sources"] == {"claude_ai": False, "chatgpt": True, "claude_code": False, "codex": False}
+    assert c["sources"] == {"claude_ai": False, "chatgpt": True, "claude_code": False, "codex": False, "gemini": False}
     assert c["setup_done"] is True
     assert S.setup_config({"codex": True})["queue_sources"] == ["codex", "note"]
 

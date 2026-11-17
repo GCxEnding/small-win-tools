@@ -117,7 +117,7 @@ def test_codex_only(code_and_codex):
 
 def test_all_off_status_says_notes_only(core_env):
     core = core_env
-    turn(core, claude_ai=False, chatgpt=False, claude_code=False, codex=False)
+    turn(core, claude_ai=False, chatgpt=False, claude_code=False, codex=False, gemini=False)
     assert "노트 폴더만" in core.status_text()
     assert core.collect_code().new == 0
 

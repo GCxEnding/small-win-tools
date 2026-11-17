@@ -38,7 +38,7 @@ DEFAULT_CONFIG = {
     "capture_dir": "",         # claude.ai 자동 수집 파일 폴더. 비면 <watch_dir>\claude-sync
     "capture_stale_hours": 3,  # 수집이 이만큼 멈추면 트레이 알림
     # 설정 창 확장 (SPEC-settings.md 3-H). 기본값은 예전 동작 그대로
-    "sources": {"claude_ai": True, "claude_code": True, "chatgpt": True, "codex": True},   # 쓰는 서비스
+    "sources": {"claude_ai": True, "claude_code": True, "chatgpt": True, "codex": True, "gemini": True},   # 쓰는 서비스
     "queue_sources": ["claude-ai", "claude-code", "note"],   # 큐에 올릴 출처
     "ask_provider": "claude",       # F2 요약 AI: "claude" | "codex" | "off"
     "ask_model_codex": "gpt-6-luna",

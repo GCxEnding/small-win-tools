@@ -61,6 +61,8 @@ def test_badges_cover_sources_and_group_by_company(T):
         assert fill.name() == "#74aa9c"
         fill, edge, _ = T.badge_colors(t, "codex")
         assert fill is None and edge.name() == "#74aa9c"
+        fill, edge, _ = T.badge_colors(t, "gemini")
+        assert fill.name() == "#4285f4" and edge is None
         assert T.badge_colors(t, "unknown")[0] == t.button
 
 

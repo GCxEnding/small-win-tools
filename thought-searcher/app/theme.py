@@ -40,12 +40,12 @@ ACCENT = {
     "rust": {"light": ("#9A4A2E", "#FFFFFF"), "dark": ("#E0A487", "#2A140B")},
 }
 # 출처 배지: 서비스 고유색과 그 위 글자색
-BRAND = {"claude": ("#D97757", "#FFFFFF"), "gpt": ("#74AA9C", "#10201C")}
+BRAND = {"claude": ("#D97757", "#FFFFFF"), "gpt": ("#74AA9C", "#10201C"), "google": ("#4285F4", "#FFFFFF")}
 # 출처 -> (회사, 칠하기). fill: 웹 채팅, outline: 코드 도구, tint: claude.ai 프로젝트/메모리, neutral: 내 문서
 BADGE_STYLE = {
     "claude-ai": ("claude", "fill"), "claude-ai-project": ("claude", "tint"), "claude-ai-memory": ("claude", "tint"),
     "claude-code": ("claude", "outline"), "chatgpt": ("gpt", "fill"), "codex": ("gpt", "outline"),
-    "note": (None, "neutral"), "journal": (None, "neutral"),
+    "gemini": ("google", "fill"), "note": (None, "neutral"), "journal": (None, "neutral"),
 }
 TINT_ALPHA = 0.24
 # 강조색을 옅게 깐 바탕 (설정 찾기 칸, 탭 맞은 수 배지). 새 색 값이 아니라 강조색과 바탕색의 섞음이다.

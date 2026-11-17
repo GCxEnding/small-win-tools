@@ -160,7 +160,7 @@ def test_chip_row_layout_and_sort_order(qt):
 
 
 def test_chip_bar_min_width_with_all_chips_on(qt):
-    """칩을 다 켜고 '모두 지우기'가 보여도 칩 줄이 창 최소 폭(560px) 근처에 머문다 (예전엔 칩을 켜면 626px)."""
+    """칩을 다 켜고 '지우기'가 보여도 칩 줄이 창 최소 폭(560px) 근처에 머문다 (예전엔 칩을 켜면 626px)."""
     from app import ui_state
     from app.window import SOURCE_CHIPS, SearchWindow
     w = SearchWindow(projects=lambda: ["small-win-tools"])
@@ -181,8 +181,9 @@ def test_chip_bar_min_width_with_all_chips_on(qt):
     c.mine = True
     on = width()
     assert not c.clear_button.isHidden()
-    # 실제 Windows 글꼴에서는 약 521px(창 최소 폭 560 안). 시험은 글꼴이 없는 offscreen이라 글자가 넓게 잡혀 여유를 둔다
-    assert off <= on <= ui_state.MIN_W + 60
+    # 실제 Windows 글꼴에서는 550px(출처 칩 9개, 2026-11-17 Gemini 추가 후, 창 최소 폭 560 안).
+    # 시험은 글꼴이 없는 offscreen이라 영문 칩이 1.5배쯤 넓게 잡혀(Gemini 54 -> 88px) 657px로 나온다. 그만큼 여유를 둔다
+    assert off <= on <= ui_state.MIN_W + 100
     w.hide()
     w.deleteLater()
 

@@ -826,7 +826,8 @@ class Core:
             st = {"by_source": {}, "size": 0}
             self._warn(f"색인 상태 읽기 실패: {e}")
         names = {"claude-ai": "claude.ai 대화", "claude-code": "Claude Code", "claude-ai-project": "프로젝트",
-                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex"}
+                 "claude-ai-memory": "메모리", "chatgpt": "ChatGPT", "note": "노트", "codex": "Codex",
+                 "gemini": "Gemini"}
         src = self.sources
         lines = [f"보관 폴더: {self.archive_dir or '(설정 안 됨)'}{'' if self.archive_ok() else '  ⚠ 없음'}"]
         if src["claude_ai"]:
@@ -835,7 +836,7 @@ class Core:
             label = "Claude Code, Codex" if src["claude_code"] and src["codex"] else \
                 ("Claude Code" if src["claude_code"] else "Codex")
             lines.append(f"마지막 {label} 수집: {fmt(self.state.get('last_code_collect'))}")
-        if src["claude_ai"] or src["chatgpt"]:
+        if src["claude_ai"] or src["chatgpt"] or src["gemini"]:
             lines.append(self.capture_status_line())
         if not any(src.values()):
             lines.append("쓰는 서비스: 없음 (노트 폴더만 검색)")

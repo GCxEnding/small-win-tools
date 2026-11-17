@@ -94,7 +94,7 @@ def test_sources_toggle_hides_fields(qt, core_env):
     w.source_checks["claude_ai"].setChecked(False)
     w.source_checks["codex"].setChecked(False)
     assert w._boxes["reminder_days"].isHidden() and not w.codex_home.isEnabled()
-    assert [g.isHidden() for _s, g in w._guides] == [True, False]
+    assert [g.isHidden() for _s, g in w._guides] == [True, False, False]     # claude.ai, ChatGPT, Gemini
     w._io["ask_provider"][0]("codex")
     assert w.claude_box.isHidden() and not w.codex_box.isHidden()
     w._done = True
@@ -134,7 +134,7 @@ def test_setup_skip_and_finish(qt, tmp_path, monkeypatch):
     _app, sw, _ = qt
     from app.core import Core
     from app.store import Store
-    monkeypatch.setattr(sw.S, "guess_sources", lambda home=None: {"claude_ai": False, "chatgpt": False,
+    monkeypatch.setattr(sw.S, "guess_sources", lambda home=None: {"claude_ai": False, "chatgpt": False, "gemini": False,
                                                                   "claude_code": False, "codex": False})
     roam = tmp_path / "roam"
     core = Core(Store(roam, tmp_path / "local"), create_config=False)
@@ -146,14 +146,17 @@ def test_setup_skip_and_finish(qt, tmp_path, monkeypatch):
     core2 = Core(Store(roam2, tmp_path / "local2"), create_config=False)
     w2, calls2 = make(sw, core2, setup=True)
     w2.setup_sources["chatgpt"].setChecked(True)
+    w2.setup_sources["gemini"].setChecked(True)
     for _ in range(3):
         w2._go(1)
     assert w2.setup_provider["codex"].isChecked() and w2.btn_next.text() == "마치기"
-    assert [g.isHidden() for _s, g in w2.setup_guides] == [True, False]
+    assert [g.isHidden() for _s, g in w2.setup_guides] == [True, False, False]
     w2._go(1)
     saved = json.loads((roam2 / "config.json").read_text(encoding="utf-8"))
-    assert saved["sources"] == {"claude_ai": False, "chatgpt": True, "claude_code": False, "codex": False}
-    assert saved["ask_provider"] == "codex" and saved["queue_sources"] == ["chatgpt", "note"] and saved["setup_done"]
+    assert saved["sources"] == {"claude_ai": False, "chatgpt": True, "claude_code": False, "codex": False,
+                                "gemini": True}
+    assert saved["ask_provider"] == "codex" and saved["queue_sources"] == ["chatgpt", "gemini", "note"]
+    assert saved["setup_done"]
     assert calls2["setup"][0][0] is True
 
 
@@ -258,5 +261,5 @@ def test_missing_cli_does_not_block_save(qt, core_env):
 
 
 def test_services_listed_by_company():
-    assert list(S.SERVICE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex"]
-    assert list(S.QUEUE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex", "노트"]
+    assert list(S.SERVICE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex", "Gemini"]
+    assert list(S.QUEUE_LABEL.values()) == ["claude.ai", "Claude Code", "ChatGPT", "Codex", "Gemini", "노트"]

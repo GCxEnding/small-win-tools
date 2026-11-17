@@ -19,8 +19,8 @@ from .queue import STATE_LABEL
 from .store import atomic_json
 
 SOURCE_LABEL = {"claude-code": "Claude Code 대화", "claude-ai": "claude.ai 대화", "chatgpt": "ChatGPT 대화",
-                "codex": "Codex 대화", "note": "노트", "journal": "업무 일지 항목"}
-CHAT_SOURCES = ("claude-code", "claude-ai", "chatgpt", "codex")   # 재료가 '마지막 메시지들'인 출처
+                "codex": "Codex 대화", "gemini": "Gemini 대화", "note": "노트", "journal": "업무 일지 항목"}
+CHAT_SOURCES = ("claude-code", "claude-ai", "chatgpt", "codex", "gemini")   # 재료가 '마지막 메시지들'인 출처
 PROVIDER_EXE = {"claude": "claude", "codex": "codex"}
 ROLE_LABEL = {"user": "사용자", "assistant": "AI"}
 JOURNAL_DAYS = 3                       # 재료에 넣는 연결된 일지 항목: 최근 3일치

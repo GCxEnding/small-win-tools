@@ -1,3 +1,26 @@
+## Gemini 웹 대화 수집 (2026-11-17)
+CG 결정: gemini.google.com 채팅만 수집합니다. Gemini CLI, Antigravity 수집과 Gemini 요약 AI는 넣지 않았습니다(쓰지 않음, 나중에 필요하면 추가).
+
+### 방식
+- Gemini 웹에는 JSON API가 없어 `userscript/gemini-sync.user.js`가 화면이 쓰는 내부 RPC(`/_/BardChatUi/data/batchexecute`)를 부릅니다. 표(`SNlM0e`, `cfb2h`, `FdrFJe`)는 주기마다 `/app` HTML에서 읽습니다.
+- 목록 `MaZiqc` `[20, 다음 쪽 표]`, 고정 대화는 `[20, null, [1, null, 1]]`로 한 번 더. 본문 `hNvQHb` `[id, 50, 다음 쪽 표, 1, [0], [4], null, 1]`. 두 RPC 모두 `body[1]`이 다음 쪽 표이고 본문은 최신 턴부터 옵니다(2026-11-17 CG 계정의 테스트 대화로 확인, 한 쪽 1개로 넘김까지 확인).
+- 스크립트는 턴 배열을 그대로 `gemini_<hex>.json`에 담고, 칸 위치 해석은 `app/importers/gemini.py`가 합니다. 칸 위치는 그 파일 머리 주석에 있습니다. 바뀌면 그 턴만 건너뜁니다.
+- 바뀜 판단은 목록의 `[5]`(마지막 수정 [초, 나노초]). 나머지(30분 주기, 탭 잠금, 상태 파일 `_status_gemini.json`, 알림)는 ChatGPT 스크립트와 같습니다.
+
+### 바뀐 곳
+- 서비스 `gemini`(설정, 시작 안내, 상태 줄, 멈춤 알림, 큐 출처 선택), 보관 폴더 `gemini/`, 검색 `src:gemini`/`src:gem`, 출처 칩과 배지 `Gemini`(구글 파랑 `#4285F4` 채움), 요약 재료 라벨.
+- 칩 줄 폭: 출처 칩이 9개가 되어 실제 글꼴로 574px(창 최소 폭 560 초과). `모두 지우기`를 `지우기`(툴팁 "칩을 모두 끕니다")로 줄여 550px. 시험 여유는 `MIN_W + 100`(offscreen 657px).
+- 기존 사용자 config의 `queue_sources`에는 gemini가 없어 큐에 오르려면 설정 > 일반에서 켜야 합니다. `sources`에 키가 없으면 켠 것으로 봅니다(예전 규칙).
+
+### 확인한 것
+- 열린 Gemini 탭에서 스크립트 전체를 GM_* 대역으로 돌려 대화 2개(턴 1개, 3개)를 받고 앱 리더로 순서와 글이 맞는지 확인. 실제 Tampermonkey 설치는 CG가 할 일.
+- `pytest -q --ignore=tests/test_perf.py`: `test_search_sort.py::test_preview_shows_message_times` 하나만 실패. 직전 커밋(93dec1b)에서도 실패하는 기존 문제라 손대지 않았습니다.
+
+### 남은 일
+- 실제 Tampermonkey에서 첫 수집 확인. 여러 계정(`/u/1/`) 주소, 고정 대화, '다시 실행' 후보 여러 개, 첨부는 실제 데이터로 아직 못 봤습니다.
+
+---
+
 ## 검색 개선 3단계: by:me, 한영 자동 보정, 0건 안내 + 정렬 순서와 `모두 지우기` 위치 (2026-11-13)
 기준 문서는 `docs/search-plan.md` 5, 6, 7절입니다. push는 하지 않았고 `tests/test_perf.py`는 CG 지시로 돌리지 않았습니다.
 

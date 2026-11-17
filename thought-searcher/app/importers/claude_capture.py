@@ -10,6 +10,9 @@ data는 내보내기 conversations.json의 대화 하나와 거의 같아서 cla
 ChatGPT는 userscript/chatgpt-sync.user.js가 같은 폴더에 chatgpt_<id>.json (site "chatgpt")으로 저장한다.
 data는 대화 본문 API(/backend-api/conversation/<id>) 응답이고, 내보내기 conversations.json의 대화 하나와
 같은 mapping 트리라 chatgpt.convert_conversation을 쓴다. 시각이 ISO 문자열로 오면 숫자로 바꿔 넘긴다.
+
+Gemini는 userscript/gemini-sync.user.js가 gemini_<id>.json (site "gemini")으로 저장한다.
+data는 사이트 내부 RPC의 턴 배열을 그대로 담은 것이라 gemini.convert_capture가 칸 위치로 읽는다.
 """
 from __future__ import annotations
 
@@ -22,14 +25,14 @@ from pathlib import Path
 from ..model import Conversation
 from ..timeutil import parse_iso
 from .base import ImportFailed
-from . import chatgpt
+from . import chatgpt, gemini
 from .claude_export import convert_conversation
 
 FORMAT = "thought-searcher.capture/1"
 STATUS_FORMAT = "thought-searcher.capture-status/1"
-PATTERNS = ("claude-ai_*.json", "chatgpt_*.json")
-STATUS_NAMES = {"claude-ai": "_status.json", "chatgpt": "_status_chatgpt.json"}
-SITE_LABEL = {"claude-ai": "claude.ai", "chatgpt": "ChatGPT"}
+PATTERNS = ("claude-ai_*.json", "chatgpt_*.json", "gemini_*.json")
+STATUS_NAMES = {"claude-ai": "_status.json", "chatgpt": "_status_chatgpt.json", "gemini": "_status_gemini.json"}
+SITE_LABEL = {"claude-ai": "claude.ai", "chatgpt": "ChatGPT", "gemini": "Gemini"}
 STATUS_NAME = STATUS_NAMES["claude-ai"]
 _UUID = re.compile(r"[0-9A-Za-z-]{8,64}")     # 파일 이름에 넣으므로 경로 글자(/ \ .)는 막는다
 
@@ -42,7 +45,11 @@ def capture_files(folder: Path) -> list[Path]:
 
 
 def site_of(name: str) -> str:
-    return "chatgpt" if name.startswith("chatgpt_") else "claude-ai"
+    if name.startswith("chatgpt_"):
+        return "chatgpt"
+    if name.startswith("gemini_"):
+        return "gemini"
+    return "claude-ai"
 
 
 class NotReady(Exception):
@@ -119,12 +126,21 @@ def read_capture(path: Path) -> Conversation | None:
     if not isinstance(d, dict) or d.get("format") != FORMAT or site not in STATUS_NAMES:
         raise ImportFailed(f"수집 파일 형식이 아님: {Path(path).name}")
     data = d.get("data")
-    ok = isinstance(data, dict) and (data.get("uuid") if site == "claude-ai" else isinstance(data.get("mapping"), dict))
+    if not isinstance(data, dict):
+        ok = False
+    elif site == "claude-ai":
+        ok = bool(data.get("uuid"))
+    elif site == "chatgpt":
+        ok = isinstance(data.get("mapping"), dict)
+    else:
+        ok = isinstance(data.get("turns"), list)
     if not ok:
         raise ImportFailed(f"대화 본문이 없음: {Path(path).name}")
     try:
         if site == "chatgpt":
             conv = chatgpt.convert_conversation(_chatgpt_data(data))
+        elif site == "gemini":
+            conv = gemini.convert_capture(data)
         else:
             conv = convert_conversation(_fill_files(data))
     except (KeyError, ValueError, TypeError) as e:

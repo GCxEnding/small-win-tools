@@ -20,18 +20,20 @@ TABS = ("general", "collect", "ask", "advanced")
 TAB_LABEL = {"general": "일반", "collect": "수집", "ask": "요약 AI", "advanced": "고급"}
 
 # ---- 쓰는 서비스와 큐 출처 ------------------------------------------------------
-# 화면에 보이는 순서: 회사별로 묶어 claude.ai, Claude Code, ChatGPT, Codex
-SERVICES = ("claude_ai", "claude_code", "chatgpt", "codex")
-SERVICE_LABEL = {"claude_ai": "claude.ai", "claude_code": "Claude Code", "chatgpt": "ChatGPT", "codex": "Codex"}
-SERVICE_SOURCE = {"claude_ai": "claude-ai", "claude_code": "claude-code", "chatgpt": "chatgpt", "codex": "codex"}
-QUEUE_CHOICES = ("claude-ai", "claude-code", "chatgpt", "codex", "note")
+# 화면에 보이는 순서: 회사별로 묶어 claude.ai, Claude Code, ChatGPT, Codex, Gemini
+SERVICES = ("claude_ai", "claude_code", "chatgpt", "codex", "gemini")
+SERVICE_LABEL = {"claude_ai": "claude.ai", "claude_code": "Claude Code", "chatgpt": "ChatGPT", "codex": "Codex",
+                 "gemini": "Gemini"}
+SERVICE_SOURCE = {"claude_ai": "claude-ai", "claude_code": "claude-code", "chatgpt": "chatgpt", "codex": "codex",
+                  "gemini": "gemini"}
+QUEUE_CHOICES = ("claude-ai", "claude-code", "chatgpt", "codex", "gemini", "note")
 QUEUE_LABEL = {"claude-ai": "claude.ai", "claude-code": "Claude Code", "chatgpt": "ChatGPT", "codex": "Codex",
-               "note": "노트"}
+               "gemini": "Gemini", "note": "노트"}
 LEGACY_QUEUE_SOURCES = ("claude-ai", "claude-code", "note")
 # zip 가져오기 모듈 이름 -> 서비스 (claude.ai 메모리 md 묶음도 claude.ai)
 IMPORTER_SERVICE = {"claude-ai": "claude_ai", "claude-ai-memory-md": "claude_ai", "chatgpt": "chatgpt",
                     "claude-code": "claude_code"}
-CAPTURE_SITE_SERVICE = {"claude-ai": "claude_ai", "chatgpt": "chatgpt"}
+CAPTURE_SITE_SERVICE = {"claude-ai": "claude_ai", "chatgpt": "chatgpt", "gemini": "gemini"}
 PROVIDERS = ("claude", "codex", "off")
 # 화면 모드와 강조색 이름 (색 값은 theme.py 한 곳)
 THEME_MODES = ("light", "dark", "system")
@@ -79,9 +81,9 @@ def read_provider(cfg: dict) -> str:
 
 # ---- 시작 안내 기본값 (3-C-3, 3-D-2, 3-J-1) ----------------------------------------------
 def guess_sources(home: Path | None = None) -> dict[str, bool]:
-    """설치 흔적으로 미리 체크할 서비스. claude.ai, ChatGPT는 로컬에서 알 수 없어 체크하지 않음."""
+    """설치 흔적으로 미리 체크할 서비스. claude.ai, ChatGPT, Gemini는 로컬에서 알 수 없어 체크하지 않음."""
     home = Path(home) if home else Path.home()
-    return {"claude_ai": False, "chatgpt": False,
+    return {"claude_ai": False, "chatgpt": False, "gemini": False,
             "claude_code": (home / ".claude" / "projects").is_dir(),
             "codex": (home / ".codex").is_dir()}
 

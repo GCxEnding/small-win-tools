@@ -37,8 +37,9 @@ from .window import TEXT_FONTS, ElideLabel
 TITLE = "생각 검색기 설정"
 SETUP_TITLE = "생각 검색기 시작하기"
 SCRIPT_DIR = Path(__file__).resolve().parent.parent / "userscript"
-SCRIPTS = {"claude-ai": "claude-sync.user.js", "chatgpt": "chatgpt-sync.user.js"}
-SITES = {"claude-ai": ("claude.ai", "claude_ai", "claude.ai"), "chatgpt": ("ChatGPT", "chatgpt", "chatgpt.com")}
+SCRIPTS = {"claude-ai": "claude-sync.user.js", "chatgpt": "chatgpt-sync.user.js", "gemini": "gemini-sync.user.js"}
+SITES = {"claude-ai": ("claude.ai", "claude_ai", "claude.ai"), "chatgpt": ("ChatGPT", "chatgpt", "chatgpt.com"),
+         "gemini": ("Gemini", "gemini", "gemini.google.com")}
 TAMPERMONKEY_URL = "https://www.tampermonkey.net/"
 CHROME_DOWNLOADS = "chrome://settings/downloads"
 CHROME_PERFORMANCE = "chrome://settings/performance"
@@ -1783,12 +1784,12 @@ class SettingsWindow(QDialog):
         self.setup_sources = {}
         for s in S.SERVICES:
             cb = QCheckBox(S.SERVICE_LABEL[s])
-            cb.setChecked(guess[s])
+            cb.setChecked(guess.get(s, False))
             self.setup_sources[s] = cb
             col.addWidget(cb)
         self._row(sec, "", col, stacked=True,
                   after="Claude Code, Codex는 이 PC에 쓴 흔적이 있으면 미리 체크해 두었습니다. "
-                        "claude.ai, ChatGPT는 브라우저에서 쓰므로 직접 고르세요.")
+                        "claude.ai, ChatGPT, Gemini는 브라우저에서 쓰므로 직접 고르세요.")
         # 2. 보관 폴더
         lay = self._page(title="2. 대화 보관 폴더", desc="모은 대화를 md 파일로 쌓을 곳입니다.")
         sec = self._section(lay, "보관 폴더")
