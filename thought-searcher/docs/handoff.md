@@ -1,3 +1,23 @@
+## 문장을 띄어 친 검색이 0건 되던 문제 (2026-11-20)
+CG 제보: `먼저 온 미래`는 0건인데 `먼저`만 치면 나옴.
+
+### 원인
+- `온`처럼 1글자 단어는 bigram 색인에 없어서 처음 명세대로 "제목에서만 부분 일치, 다른 단어와 AND"로 처리했습니다. 제목에 `온`이 든 대화가 없으니 전체가 0건이었습니다.
+
+### 바꾼 것
+- `app/query.py`: 다른 단어(색인 검색어)가 하나라도 있으면 1글자 단어는 조건에서 빼고 `Query.ignored`에 둡니다. 1글자만 친 경우만 예전처럼 제목 검색. `-한글자` 제외어는 그대로.
+- 테스트: `test_query.py`(새 규칙 2개, 기존 기대값 수정), `test_index_search.py::test_single_char_between_words_ignored`.
+- README 검색 문법 표, SPEC 10번 1글자 규칙.
+
+### 확인한 것
+- 실제 색인에서 `먼저 온 미래` -> 3건(`📚독후감 작성 도우미` 포함). 따옴표 구문이나 `먼저온미래`로 붙여 치면 원래도 찾혔습니다.
+- `pytest -q --ignore=tests/test_perf.py`: `test_search_sort.py::test_preview_shows_message_times` 하나만 실패(이 변경 전에도 실패, 아래 Gemini 항목 참고).
+
+### 남은 일
+- `Query.ignored`는 아직 화면에 안내하지 않습니다(상태 줄에 "'온'은 빼고 찾았습니다" 같은 안내가 필요하면 추가).
+
+---
+
 ## Gemini 웹 대화 수집 (2026-11-17)
 CG 결정: gemini.google.com 채팅만 수집합니다. Gemini CLI, Antigravity 수집과 Gemini 요약 AI는 넣지 않았습니다(쓰지 않음, 나중에 필요하면 추가).
 

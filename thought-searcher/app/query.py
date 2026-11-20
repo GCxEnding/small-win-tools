@@ -45,6 +45,7 @@ class Query:
     excludes: list[Term] = field(default_factory=list)
     title_terms: list[str] = field(default_factory=list)       # 1글자: 제목 부분 일치
     title_excludes: list[str] = field(default_factory=list)
+    ignored: list[str] = field(default_factory=list)            # 다른 단어와 같이 써서 조건에서 뺀 1글자
     sources: list[str] = field(default_factory=list)
     projects: list[str] = field(default_factory=list)
     after: date | None = None
@@ -210,4 +211,8 @@ def parse(q: str) -> Query:
             (query.title_excludes if neg else query.title_terms).append(core)
             continue
         (query.excludes if neg else query.terms).append(term)
+    if query.terms and query.title_terms:
+        # 다른 단어와 같이 쓴 1글자는 조건에서 뺀다. '먼저 온 미래'의 '온'을 제목에서 찾으면 0건이 되기 때문.
+        # 1글자만 쳤을 때만 제목에서 찾는다.
+        query.ignored, query.title_terms = query.title_terms, []
     return query

@@ -64,9 +64,17 @@ def test_unknown_filter_is_text():
 
 
 def test_single_char_title_only():
+    q = parse("배 a")
+    assert q.title_terms == ["배", "a"] and not q.terms
+
+
+def test_single_char_with_words_is_not_a_condition():
+    # '먼저 온 미래': '온'을 제목 조건으로 쓰면 0건이 된다. 다른 단어가 있으면 1글자는 뺀다
+    q = parse("먼저 온 미래")
+    assert [t.tokens for t in q.terms] == [["먼저"], ["미래"]]
+    assert q.title_terms == [] and q.ignored == ["온"]
     q = parse("배 a 로그")
-    assert q.title_terms == ["배", "a"]
-    assert [t.tokens for t in q.terms] == [["로그"]]
+    assert q.title_terms == [] and q.ignored == ["배", "a"]
 
 
 def test_empty_and_specials():
@@ -83,7 +91,7 @@ def test_filters_only():
 def test_combination():
     q = parse('src:code "nginx 설정" -롤백 배포 x')
     assert q.sources == ["claude-code"]
-    assert len(q.terms) == 2 and len(q.excludes) == 1 and q.title_terms == ["x"]
+    assert len(q.terms) == 2 and len(q.excludes) == 1 and q.title_terms == [] and q.ignored == ["x"]
 
 
 @pytest.mark.parametrize("text", ['a* OR b', 'NEAR(a b)', '"', 'AND', 'x"y', "col:val", "^start", "a AND OR NOT b",

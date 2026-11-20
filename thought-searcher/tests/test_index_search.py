@@ -120,6 +120,13 @@ def test_single_char_title_only(synth):
     assert ids(s.search("롤")) == []
 
 
+def test_single_char_between_words_ignored(synth):
+    # '배포 는 순서'처럼 문장을 띄어 친 경우: '는'이 제목 조건이 되어 0건이 되면 안 된다 ('먼저 온 미래' 버그)
+    _, _, s = synth
+    assert "claude-ai:c1000000-0000-4000-8000-000000000001" in ids(s.search("배포 는 순서"))
+    assert ids(s.search("배포 는 순서")) == ids(s.search("배포 순서"))
+
+
 def test_specials_and_fts_syntax(synth):
     _, _, s = synth
     assert len(s.search("!!! ***")) == 8
